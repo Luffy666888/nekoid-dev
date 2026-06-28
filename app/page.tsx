@@ -1,23 +1,34 @@
+import { CharacterReveal } from "@/components/character-reveal"
+
 export default function Page() {
   return (
-    <main className="relative flex min-h-screen items-center justify-center bg-[color:light-dark(#fff,#000)] text-[color:light-dark(#000,#fff)]">
-      <svg
+    <main className="relative min-h-screen overflow-hidden bg-background">
+      {/* 柔和背景光晕 */}
+      <div
         aria-hidden="true"
-        className="size-20"
-        fill="none"
-        viewBox="0 0 20 20"
-        xmlns="http://www.w3.org/2000/svg"
-        stroke="currentColor"
-        strokeWidth="0.5"
-      >
-        <path
-          d="M14.2 14.2H17V6.9375C17 4.76288 15.2371 3 13.0625 3H5.8V5.8M14.2 14.2V7.79063L7.79062 14.2H14.2ZM14.2 14.2V17H6.9375C4.76288 17 3 15.2371 3 13.0625V5.8H5.8M5.8 5.8V12.2313L12.2313 5.8H5.8Z"
-          strokeLinejoin="round"
-        />
-      </svg>
-      <p className="absolute left-1/2 top-[calc(50%+56px)] -translate-x-1/2 whitespace-nowrap text-sm font-medium text-muted-foreground">
-        Your v0 generation will show here.
-      </p>
+        className="pointer-events-none absolute -top-24 left-1/2 size-72 -translate-x-1/2 rounded-full bg-accent/50 blur-3xl"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -bottom-24 -right-16 size-64 rounded-full bg-primary/20 blur-3xl"
+      />
+
+      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-md flex-col px-5 py-10">
+        <header className="mb-7 text-center">
+          <h1 className="text-3xl font-bold tracking-tight text-balance text-foreground">
+            读懂它的小世界
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-pretty text-muted-foreground">
+            AI 通过你上传的照片，生成专属角色形象与人格档案
+          </p>
+        </header>
+
+        <CharacterReveal />
+
+        <footer className="mt-8 text-center text-xs text-muted-foreground">
+          NEKO.ID · 展示原型，仅供预览
+        </footer>
+      </div>
     </main>
   )
 }
