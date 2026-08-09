@@ -9,6 +9,7 @@ import { setCatName } from "../catNameStore";
 import { setCatProfile } from "../catProfileStore";
 import { getPhotoDraft, setPhotoDraft } from "./onboardingDraftStore";
 import { ImagePlus } from "lucide-react";
+import { getNekoUploadLimitError, NEKO_MAX_UPLOAD_LABEL } from "@/lib/neko-upload-limits";
 
 const getStableAvatar = (value: string | null | undefined) =>
   value?.startsWith("data:image/") ? value : null;
@@ -80,7 +81,13 @@ export function Screen2Photo({ onNext, onPrev }: { onNext?: () => void; onPrev?:
 
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
+    e.target.value = "";
     if (!f) return;
+    const limitError = getNekoUploadLimitError(f, "image");
+    if (limitError) {
+      toast(limitError, { icon: "📷" });
+      return;
+    }
     const url = URL.createObjectURL(f);
     setAvatar(url);
     setPendingDataUrlState(null);
@@ -107,7 +114,6 @@ export function Screen2Photo({ onNext, onPrev }: { onNext?: () => void; onPrev?:
     };
     reader.readAsDataURL(f);
     toast.success("照片已更新");
-    e.target.value = "";
   };
 
   const onContinue = async () => {
@@ -179,7 +185,7 @@ export function Screen2Photo({ onNext, onPrev }: { onNext?: () => void; onPrev?:
         />
         <div className="relative z-10 px-7 mt-2">
           <h1 className="text-[22px] font-light leading-tight text-foreground">上传猫咪正脸照片</h1>
-          <p className="mt-1.5 text-[12px] text-[oklch(0.58_0.04_300)]">头像会用于生成人格档案</p>
+          <p className="mt-1.5 text-[12px] text-[oklch(0.58_0.04_300)]">头像会用于生成人格档案 · 图片不超过 {NEKO_MAX_UPLOAD_LABEL}</p>
         </div>
         <div className="relative z-10 mt-6 flex justify-center">
           <button type="button" onClick={pickPhoto} className="relative h-[170px] w-[170px] outline-none">

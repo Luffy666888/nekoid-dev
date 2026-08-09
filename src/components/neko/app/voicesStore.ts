@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 import { getPersistJSON, NEKO_PERSIST_KEYS, setPersistJSON } from "../transientSession";
 
 export type Voice = {
+  cloudId?: string;
   time: string;
   grad: string;
   text: string;
@@ -9,6 +10,7 @@ export type Voice = {
   tags?: string[];
   createdAt?: number;
   media?: string;
+  mediaObjectKey?: string;
   mediaType?: "photo" | "video";
   aspect?: "9:16" | "4:5" | "3:4" | "1:1";
   videoDuration?: string;
@@ -23,6 +25,7 @@ const CAT_GRADIENTS = [
 ];
 
 function voiceKey(v: Voice) {
+  if (v.cloudId) return `cloud:${v.cloudId}`;
   return [v.createdAt ?? "", v.text ?? "", v.media?.slice(0, 96) ?? ""].join("|");
 }
 
@@ -61,6 +64,10 @@ export const voicesStore = {
   },
   clear: () => {
     voices = [];
+    emit();
+  },
+  replaceAll: (list: Voice[]) => {
+    voices = normalizeVoices(list);
     emit();
   },
   replaceAt: (i: number, v: Voice) => {

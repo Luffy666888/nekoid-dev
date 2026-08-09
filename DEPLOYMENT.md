@@ -27,12 +27,48 @@ BYTECAT_API_KEY=...
 BYTECAT_BASE_URL=https://www.bytecatcode.org/v1
 BYTECAT_MODEL=gpt-5.6-luna
 BYTECAT_VISION_MODEL=gpt-5.6-terra
+VITE_SUPABASE_URL=https://jbjgrkivscrombvnlcrl.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=...
+SUPABASE_URL=https://jbjgrkivscrombvnlcrl.supabase.co
+SUPABASE_PUBLISHABLE_KEY=...
+SUPABASE_SECRET_KEY=...
+SUPABASE_JWKS_URL=https://jbjgrkivscrombvnlcrl.supabase.co/auth/v1/.well-known/jwks.json
 ```
 
 Upload or refresh secrets for the Worker:
 
 ```sh
 pnpm dlx wrangler@latest secret bulk .env.local --name nekoid
+```
+
+`VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` are public browser config and must be available during `pnpm build`; the Supabase secret key must only be uploaded as a Worker secret or kept in local `.env.local`.
+
+Supabase persistence uses project `jbjgrkivscrombvnlcrl` and the private Storage bucket `neko-media`. Apply database changes through committed files under `supabase/migrations/` before deploying code that depends on them.
+
+## Supabase Auth
+
+NEKO.ID currently supports email OTP login only.
+
+In Supabase Dashboard → Authentication → Email Templates → Magic Link or OTP, make sure the email content includes the OTP token instead of only a magic link:
+
+```html
+<h2>Your NEKO.ID verification code</h2>
+<p>Use this 6-digit code to sign in:</p>
+<p style="font-size: 28px; letter-spacing: 8px; font-weight: 700;">{{ .Token }}</p>
+<p>If you did not request this, you can ignore this email.</p>
+```
+
+Supabase chooses the email behavior from the template: `{{ .ConfirmationURL }}` sends a magic link, while `{{ .Token }}` sends an OTP code. The app verifies the code at `/auth/login`.
+
+Also set Auth redirect URLs to include:
+
+```text
+https://neko-id.uk/auth/login
+https://neko-id.uk/app/me
+http://localhost:5173/auth/login
+http://localhost:5173/app/me
+http://localhost:8080/auth/login
+http://localhost:8080/app/me
 ```
 
 ## Deploy

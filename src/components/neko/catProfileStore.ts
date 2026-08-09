@@ -6,15 +6,19 @@ import { getPersistJSON, getSessionJSON, NEKO_PERSIST_KEYS, NEKO_SESSION_KEYS, r
 const EVT = "neko:profile-change";
 
 export type CatProfile = {
+  cloudId?: string;
   name: string;
   gender: "小公猫" | "小母猫";
   ageStage: "幼猫" | "青年猫" | "成熟猫" | "资深猫";
   avatar?: string;
+  avatarObjectKey?: string;
   quiz?: Record<number, "a" | "b" | null>;
   updatedAt: number;
 };
 
 export type CatPersona = {
+  cloudId?: string;
+  catCloudId?: string;
   name: string;
   type: string;
   mbti: string;
@@ -84,6 +88,32 @@ export function persistCatResult() {
   if (persona) setPersistJSON(NEKO_PERSIST_KEYS.persona, persona);
   persistCatName(profile.name);
   if (profile.avatar) persistCatAvatar(profile.avatar);
+  window.dispatchEvent(new CustomEvent(EVT));
+}
+
+export function hydratePersistedCatResult(profile: CatProfile, persona?: CatPersona | null) {
+  const normalizedProfile = {
+    ...profile,
+    name: profile.name.trim() || getCatName(),
+    updatedAt: profile.updatedAt || Date.now(),
+  };
+
+  setSessionJSON(NEKO_SESSION_KEYS.profile, normalizedProfile);
+  setPersistJSON(NEKO_PERSIST_KEYS.profile, normalizedProfile);
+  setCatName(normalizedProfile.name);
+  persistCatName(normalizedProfile.name);
+
+  if (normalizedProfile.avatar) {
+    setCatAvatar(normalizedProfile.avatar);
+    persistCatAvatar(normalizedProfile.avatar);
+  }
+
+  if (persona) {
+    const normalizedPersona = { ...persona, savedAt: persona.savedAt || Date.now() };
+    setSessionJSON(NEKO_SESSION_KEYS.persona, normalizedPersona);
+    setPersistJSON(NEKO_PERSIST_KEYS.persona, normalizedPersona);
+  }
+
   window.dispatchEvent(new CustomEvent(EVT));
 }
 

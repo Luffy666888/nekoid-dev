@@ -11,7 +11,9 @@ import { detectCatFace } from "@/lib/catface.functions";
 import { clearPublishPhoto, getPublishPhoto, setPublishPhoto, usePublishPhoto } from "./publishPhotoStore";
 import { generateCatVoice } from "@/lib/neko-ai.functions";
 import { clearCatPersona, getCatPersona, getCatProfile, updateCatProfile, useCatPersona } from "../catProfileStore";
-import { getPublishScene, getPublishVoice, setPublishScene, setPublishVoice } from "./publishDraftStore";
+import { clearPublishDraft, getPublishScene, getPublishVoice, setPublishScene, setPublishVoice } from "./publishDraftStore";
+import { deleteCloudVoice, loadNekoFromCloud, saveLocalNekoToCloud, signOutNekoCloud, useNekoCloudAuth } from "@/lib/neko-cloud";
+import { getNekoUploadLimitError, NEKO_MAX_UPLOAD_LABEL } from "@/lib/neko-upload-limits";
 export { CAT_GRADIENTS };
 
 // ---------- shared bits ----------
@@ -237,7 +239,9 @@ export function ScreenHome() {
   };
   const handleDelete = () => {
     if (confirmDelIdx === null) return;
+    const voice = voices[confirmDelIdx];
     voicesStore.removeAt(confirmDelIdx);
+    void deleteCloudVoice(voice).catch(() => undefined);
     setConfirmDelIdx(null);
     toast.success("心声已删除");
   };
@@ -712,6 +716,7 @@ export function ScreenVoiceDetail({ id = 0 }: { id?: number }) {
   };
   const handleDelete = () => {
     setConfirmDel(false);
+    void deleteCloudVoice(v).catch(() => undefined);
     voicesStore.removeAt(id);
     toast.success("心声已删除");
     navigate({ to: "/app" });
@@ -874,6 +879,11 @@ export function ScreenPublish1() {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
+    const limitError = getNekoUploadLimitError(file, "image");
+    if (limitError) {
+      toast(limitError, { icon: "📷" });
+      return;
+    }
     setUploadError(false);
     setUploading(true);
     try {
@@ -925,7 +935,7 @@ export function ScreenPublish1() {
         {/* title */}
         <div className="px-7 pt-6">
           <h1 className="text-[24px] font-light leading-tight text-foreground">记录一个瞬间</h1>
-          <p className="mt-1.5 text-[12.5px] leading-relaxed text-[oklch(0.58_0.04_300)]">上传一张照片，AI 帮你读懂它的小心思</p>
+          <p className="mt-1.5 text-[12.5px] leading-relaxed text-[oklch(0.58_0.04_300)]">上传一张照片，AI 帮你读懂它的小心思 · 不超过 {NEKO_MAX_UPLOAD_LABEL}</p>
         </div>
 
         {/* main upload card */}
@@ -1161,6 +1171,7 @@ export function ScreenPublish3() {
       voicesStore.prepend(voiceToPublish);
       clearPublishDraft();
       clearPublishPhoto();
+      void saveLocalNekoToCloud().catch(() => undefined);
       toast.success("心声已发布到首页 ✨");
       void navigate({ to: "/app", replace: true }).catch(() => {
         window.location.href = "/app";
@@ -1280,6 +1291,7 @@ export function ScreenSuccess() {
     insertedRef.current = true;
     if (!publishedVoice) return;
     voicesStore.prepend({ ...publishedVoice, media: publishedVoice.media ?? publishedPhoto ?? uploadedPhoto ?? undefined });
+    void saveLocalNekoToCloud().catch(() => undefined);
     clearPublishDraft();
     clearPublishPhoto();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1387,6 +1399,115 @@ export function ScreenSuccess() {
   );
 }
 
+function CloudSyncPanel() {
+  const auth = useNekoCloudAuth();
+  const [busy, setBusy] = useState<"save" | "load" | "signout" | null>(null);
+
+  const run = async (kind: typeof busy, task: () => Promise<void>) => {
+    if (busy) return;
+    setBusy(kind);
+    try {
+      await task();
+    } catch (error) {
+      console.error("NEKO cloud action failed", error);
+      const message = error instanceof Error && error.message.includes("NEKO_UPLOAD_TOO_LARGE")
+        ? `云端同步失败：图片或视频不能超过 ${NEKO_MAX_UPLOAD_LABEL}`
+        : "云端同步失败，请稍后再试";
+      toast.error(message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  if (auth.status === "unconfigured") {
+    return (
+      <div className="mx-5 mt-4 rounded-[22px] bg-white/75 p-4 text-[11.5px] leading-relaxed text-[oklch(0.55_0.06_300)] backdrop-blur"
+        style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}>
+        云端记忆已预留，配置 <span className="font-medium text-foreground">VITE_SUPABASE_URL</span> 和 <span className="font-medium text-foreground">VITE_SUPABASE_PUBLISHABLE_KEY</span> 后即可登录同步。
+      </div>
+    );
+  }
+
+  if (auth.status === "loading") {
+    return (
+      <div className="mx-5 mt-4 rounded-[22px] bg-white/75 p-4 text-[12px] text-[oklch(0.55_0.06_300)] backdrop-blur"
+        style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}>
+        正在检查云端记忆…
+      </div>
+    );
+  }
+
+  if (auth.status === "signed-out") {
+    return (
+      <div className="mx-5 mt-4 rounded-[22px] bg-white/80 p-4 backdrop-blur"
+        style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}>
+        <div className="flex items-center gap-2">
+          <span className="text-soul text-[13px]">✦</span>
+          <div className="text-[10px] tracking-[0.35em] text-[oklch(0.55_0.06_300)]">云 端 记 忆</div>
+        </div>
+        <p className="mt-2 text-[11.5px] leading-relaxed text-foreground/75">
+          登录后，猫咪档案、人格和心声会保存到 Supabase。现在只支持邮箱验证码登录。
+        </p>
+        <Link to="/auth/login" className="mt-3 flex w-full items-center justify-center rounded-full px-4 py-2.5 text-[12px] font-medium text-white"
+          style={{ background: "var(--gradient-cta)" }}>
+          邮箱验证码登录
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-5 mt-4 rounded-[22px] bg-white/80 p-4 backdrop-blur"
+      style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-soul text-[13px]">✦</span>
+            <div className="text-[10px] tracking-[0.35em] text-[oklch(0.55_0.06_300)]">云 端 记 忆</div>
+          </div>
+          <div className="mt-1 truncate text-[12px] text-foreground/80">{auth.user.email}</div>
+        </div>
+        <button
+          disabled={busy === "signout"}
+          onClick={() => void run("signout", async () => {
+            await signOutNekoCloud();
+            toast.success("已退出登录");
+          })}
+          className="shrink-0 rounded-full bg-white/90 px-3 py-1.5 text-[11px] text-[oklch(0.55_0.06_300)] disabled:opacity-60"
+        >
+          退出
+        </button>
+      </div>
+      <Link to="/app/account" className="mt-3 flex w-full items-center justify-center rounded-full bg-white/90 px-4 py-2.5 text-[12px] text-foreground">
+        账号中心
+      </Link>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button
+          disabled={busy === "save"}
+          onClick={() => void run("save", async () => {
+            const result = await saveLocalNekoToCloud();
+            toast.success(`已保存到云端 · ${result.voicesCount} 条心声`);
+          })}
+          className="rounded-full px-3 py-2.5 text-[12px] font-medium text-white disabled:opacity-60"
+          style={{ background: "var(--gradient-cta)" }}
+        >
+          {busy === "save" ? "保存中" : "保存到云端"}
+        </button>
+        <button
+          disabled={busy === "load"}
+          onClick={() => void run("load", async () => {
+            const result = await loadNekoFromCloud();
+            toast.success(result.restored ? `已恢复云端记忆 · ${result.voicesCount} 条心声` : "云端暂时还没有猫咪档案");
+          })}
+          className="rounded-full bg-white/90 px-3 py-2.5 text-[12px] text-foreground disabled:opacity-60"
+        >
+          {busy === "load" ? "恢复中" : "从云端恢复"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ---------- Screen 7: 我的 ----------
 export function ScreenMe() {
   const catName = useCatName();
@@ -1419,7 +1540,10 @@ export function ScreenMe() {
           </div>
         </div>
 
+        <CloudSyncPanel />
+
         <div className="mx-5 mt-5 flex flex-col gap-2.5">
+          <MeRow to="/app/account" icon="☁" title="账号与云端数据" sub="邮箱登录、昵称和同步管理" />
           <MeRow to="/app/me/edit" icon="✎" title="修改人格档案" sub="编辑猫咪基本信息" />
           <MeRow to="/app/me/voices" icon="♡" title="管理猫咪心声" sub="查看和管理所有心声" />
         </div>
@@ -1428,7 +1552,7 @@ export function ScreenMe() {
     </ScreenShell>
   );
 }
-function MeRow({ icon, title, sub, to }: { icon: string; title: string; sub: string; to: "/app/me/edit" | "/app/me/voices" }) {
+function MeRow({ icon, title, sub, to }: { icon: string; title: string; sub: string; to: "/app/account" | "/app/me/edit" | "/app/me/voices" }) {
   return (
     <Link to={to} className="flex items-center gap-3 rounded-[20px] bg-white/80 px-4 py-3.5 text-left backdrop-blur active:bg-white/95 active:scale-[0.99] transition-all duration-150" style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}>
       <div className="flex h-10 w-10 items-center justify-center rounded-2xl text-[16px] text-[oklch(0.5_0.1_320)]"
@@ -1463,6 +1587,11 @@ export function ScreenEditProfile() {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
+    const limitError = getNekoUploadLimitError(file, "image");
+    if (limitError) {
+      toast(limitError, { icon: "📷" });
+      return;
+    }
     try {
       const url = await readAsDataUrl(file);
       setAvatar(url);
@@ -1473,6 +1602,7 @@ export function ScreenEditProfile() {
   };
   const saveProfile = () => {
     updateCatProfile({ name: name.trim(), gender, ageStage, avatar: avatar ?? undefined });
+    void saveLocalNekoToCloud({ includeVoices: false }).catch(() => undefined);
     toast.success("已保存修改");
     navigate({ to: "/app/me" });
   };
@@ -1498,7 +1628,7 @@ export function ScreenEditProfile() {
             )}
             <button onClick={() => fileRef.current?.click()} className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-white text-[11px] text-[oklch(0.5_0.1_320)]" style={{ boxShadow: "var(--shadow-soft)" }}>✎</button>
           </div>
-          <button onClick={() => fileRef.current?.click()} className="mt-3 text-[11.5px] tracking-[0.2em] text-[oklch(0.5_0.1_320)] active:text-[oklch(0.4_0.12_320)] active:scale-[0.98] transition-all duration-150">更换照片</button>
+          <button onClick={() => fileRef.current?.click()} className="mt-3 text-[11.5px] tracking-[0.2em] text-[oklch(0.5_0.1_320)] active:text-[oklch(0.4_0.12_320)] active:scale-[0.98] transition-all duration-150">更换照片 · ≤ {NEKO_MAX_UPLOAD_LABEL}</button>
         </div>
 
         <div className="mx-5 mt-5 flex flex-col gap-2.5">
@@ -1576,7 +1706,9 @@ export function ScreenManageVoices() {
   };
   const handleDelete = () => {
     const n = selected.size;
+    const toDelete = allVoices.filter((_, idx) => selected.has(idx));
     voicesStore.removeMany(selected);
+    void Promise.all(toDelete.map((voice) => deleteCloudVoice(voice).catch(() => undefined)));
     setConfirmDel(false);
     setEditMode(false);
     setSelected(new Set());

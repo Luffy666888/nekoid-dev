@@ -9,6 +9,7 @@ import { useCatName } from "../catNameStore";
 import { persistCatResult, useCatPersona, useCatProfile } from "../catProfileStore";
 import { getPhotoDraft } from "./onboardingDraftStore";
 import { voicesStore } from "../app/voicesStore";
+import { saveLocalNekoToCloud } from "@/lib/neko-cloud";
 
 const TRAITS = [
   { icon: "🐾", label: "粘人度", v: 68 },
@@ -88,6 +89,7 @@ export function Screen6Result({ onRestart, onBack }: { onNext?: () => void; onPr
   const handleSave = () => {
     persistCatResult();
     voicesStore.clear();
+    void saveLocalNekoToCloud({ includeVoices: false }).catch(() => undefined);
     navigate({ to: "/app" });
   };
   return (

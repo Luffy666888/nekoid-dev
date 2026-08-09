@@ -9,27 +9,29 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppRouteImport } from './routes/app'
 import { Route as AppIndexRouteImport } from './routes/app.index'
+import { Route as AppAccountRouteImport } from './routes/app.account'
 import { Route as AppProfileRouteImport } from './routes/app.profile'
-import { Route as AppPublishIndexRouteImport } from './routes/app.publish.index'
+import { Route as AuthLoginRouteImport } from './routes/auth.login'
 import { Route as AppMeIndexRouteImport } from './routes/app.me.index'
-import { Route as AppVoiceIdRouteImport } from './routes/app.voice.$id'
-import { Route as AppPublishSuccessRouteImport } from './routes/app.publish.success'
-import { Route as AppPublishPreviewRouteImport } from './routes/app.publish.preview'
-import { Route as AppPublishBackgroundRouteImport } from './routes/app.publish.background'
-import { Route as AppMeVoicesRouteImport } from './routes/app.me.voices'
 import { Route as AppMeEditRouteImport } from './routes/app.me.edit'
+import { Route as AppMeVoicesRouteImport } from './routes/app.me.voices'
+import { Route as AppPublishIndexRouteImport } from './routes/app.publish.index'
+import { Route as AppPublishBackgroundRouteImport } from './routes/app.publish.background'
+import { Route as AppPublishPreviewRouteImport } from './routes/app.publish.preview'
+import { Route as AppPublishSuccessRouteImport } from './routes/app.publish.success'
+import { Route as AppVoiceIdRouteImport } from './routes/app.voice.$id'
 
-const AppRoute = AppRouteImport.update({
-  id: '/app',
-  path: '/app',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppRoute = AppRouteImport.update({
+  id: '/app',
+  path: '/app',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppIndexRoute = AppIndexRouteImport.update({
@@ -37,44 +39,24 @@ const AppIndexRoute = AppIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAccountRoute = AppAccountRouteImport.update({
+  id: '/account',
+  path: '/account',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppProfileRoute = AppProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
   getParentRoute: () => AppRoute,
 } as any)
-const AppPublishIndexRoute = AppPublishIndexRouteImport.update({
-  id: '/publish/',
-  path: '/publish/',
-  getParentRoute: () => AppRoute,
+const AuthLoginRoute = AuthLoginRouteImport.update({
+  id: '/auth/login',
+  path: '/auth/login',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AppMeIndexRoute = AppMeIndexRouteImport.update({
   id: '/me/',
   path: '/me/',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppVoiceIdRoute = AppVoiceIdRouteImport.update({
-  id: '/voice/$id',
-  path: '/voice/$id',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppPublishSuccessRoute = AppPublishSuccessRouteImport.update({
-  id: '/publish/success',
-  path: '/publish/success',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppPublishPreviewRoute = AppPublishPreviewRouteImport.update({
-  id: '/publish/preview',
-  path: '/publish/preview',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppPublishBackgroundRoute = AppPublishBackgroundRouteImport.update({
-  id: '/publish/background',
-  path: '/publish/background',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppMeVoicesRoute = AppMeVoicesRouteImport.update({
-  id: '/me/voices',
-  path: '/me/voices',
   getParentRoute: () => AppRoute,
 } as any)
 const AppMeEditRoute = AppMeEditRouteImport.update({
@@ -82,11 +64,43 @@ const AppMeEditRoute = AppMeEditRouteImport.update({
   path: '/me/edit',
   getParentRoute: () => AppRoute,
 } as any)
+const AppMeVoicesRoute = AppMeVoicesRouteImport.update({
+  id: '/me/voices',
+  path: '/me/voices',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPublishIndexRoute = AppPublishIndexRouteImport.update({
+  id: '/publish/',
+  path: '/publish/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPublishBackgroundRoute = AppPublishBackgroundRouteImport.update({
+  id: '/publish/background',
+  path: '/publish/background',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPublishPreviewRoute = AppPublishPreviewRouteImport.update({
+  id: '/publish/preview',
+  path: '/publish/preview',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPublishSuccessRoute = AppPublishSuccessRouteImport.update({
+  id: '/publish/success',
+  path: '/publish/success',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppVoiceIdRoute = AppVoiceIdRouteImport.update({
+  id: '/voice/$id',
+  path: '/voice/$id',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
+  '/app/account': typeof AppAccountRoute
   '/app/profile': typeof AppProfileRoute
+  '/auth/login': typeof AuthLoginRoute
   '/app/': typeof AppIndexRoute
   '/app/me/edit': typeof AppMeEditRoute
   '/app/me/voices': typeof AppMeVoicesRoute
@@ -99,7 +113,9 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/app/account': typeof AppAccountRoute
   '/app/profile': typeof AppProfileRoute
+  '/auth/login': typeof AuthLoginRoute
   '/app': typeof AppIndexRoute
   '/app/me/edit': typeof AppMeEditRoute
   '/app/me/voices': typeof AppMeVoicesRoute
@@ -114,7 +130,9 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
+  '/app/account': typeof AppAccountRoute
   '/app/profile': typeof AppProfileRoute
+  '/auth/login': typeof AuthLoginRoute
   '/app/': typeof AppIndexRoute
   '/app/me/edit': typeof AppMeEditRoute
   '/app/me/voices': typeof AppMeVoicesRoute
@@ -130,7 +148,9 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/app'
+    | '/app/account'
     | '/app/profile'
+    | '/auth/login'
     | '/app/'
     | '/app/me/edit'
     | '/app/me/voices'
@@ -143,7 +163,9 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/app/account'
     | '/app/profile'
+    | '/auth/login'
     | '/app'
     | '/app/me/edit'
     | '/app/me/voices'
@@ -157,7 +179,9 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/app'
+    | '/app/account'
     | '/app/profile'
+    | '/auth/login'
     | '/app/'
     | '/app/me/edit'
     | '/app/me/voices'
@@ -172,22 +196,23 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
+  AuthLoginRoute: typeof AuthLoginRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/app': {
-      id: '/app'
-      path: '/app'
-      fullPath: '/app'
-      preLoaderRoute: typeof AppRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app/': {
@@ -197,6 +222,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/account': {
+      id: '/app/account'
+      path: '/account'
+      fullPath: '/app/account'
+      preLoaderRoute: typeof AppAccountRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/profile': {
       id: '/app/profile'
       path: '/profile'
@@ -204,53 +236,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProfileRouteImport
       parentRoute: typeof AppRoute
     }
-    '/app/publish/': {
-      id: '/app/publish/'
-      path: '/publish'
-      fullPath: '/app/publish/'
-      preLoaderRoute: typeof AppPublishIndexRouteImport
-      parentRoute: typeof AppRoute
+    '/auth/login': {
+      id: '/auth/login'
+      path: '/auth/login'
+      fullPath: '/auth/login'
+      preLoaderRoute: typeof AuthLoginRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/app/me/': {
       id: '/app/me/'
       path: '/me'
       fullPath: '/app/me/'
       preLoaderRoute: typeof AppMeIndexRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/voice/$id': {
-      id: '/app/voice/$id'
-      path: '/voice/$id'
-      fullPath: '/app/voice/$id'
-      preLoaderRoute: typeof AppVoiceIdRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/publish/success': {
-      id: '/app/publish/success'
-      path: '/publish/success'
-      fullPath: '/app/publish/success'
-      preLoaderRoute: typeof AppPublishSuccessRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/publish/preview': {
-      id: '/app/publish/preview'
-      path: '/publish/preview'
-      fullPath: '/app/publish/preview'
-      preLoaderRoute: typeof AppPublishPreviewRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/publish/background': {
-      id: '/app/publish/background'
-      path: '/publish/background'
-      fullPath: '/app/publish/background'
-      preLoaderRoute: typeof AppPublishBackgroundRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/me/voices': {
-      id: '/app/me/voices'
-      path: '/me/voices'
-      fullPath: '/app/me/voices'
-      preLoaderRoute: typeof AppMeVoicesRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/me/edit': {
@@ -260,10 +257,53 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMeEditRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/me/voices': {
+      id: '/app/me/voices'
+      path: '/me/voices'
+      fullPath: '/app/me/voices'
+      preLoaderRoute: typeof AppMeVoicesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/publish/': {
+      id: '/app/publish/'
+      path: '/publish'
+      fullPath: '/app/publish/'
+      preLoaderRoute: typeof AppPublishIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/publish/background': {
+      id: '/app/publish/background'
+      path: '/publish/background'
+      fullPath: '/app/publish/background'
+      preLoaderRoute: typeof AppPublishBackgroundRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/publish/preview': {
+      id: '/app/publish/preview'
+      path: '/publish/preview'
+      fullPath: '/app/publish/preview'
+      preLoaderRoute: typeof AppPublishPreviewRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/publish/success': {
+      id: '/app/publish/success'
+      path: '/publish/success'
+      fullPath: '/app/publish/success'
+      preLoaderRoute: typeof AppPublishSuccessRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/voice/$id': {
+      id: '/app/voice/$id'
+      path: '/voice/$id'
+      fullPath: '/app/voice/$id'
+      preLoaderRoute: typeof AppVoiceIdRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
+  AppAccountRoute: typeof AppAccountRoute
   AppProfileRoute: typeof AppProfileRoute
   AppIndexRoute: typeof AppIndexRoute
   AppMeEditRoute: typeof AppMeEditRoute
@@ -277,6 +317,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAccountRoute: AppAccountRoute,
   AppProfileRoute: AppProfileRoute,
   AppIndexRoute: AppIndexRoute,
   AppMeEditRoute: AppMeEditRoute,
@@ -294,6 +335,7 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
+  AuthLoginRoute: AuthLoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -5,8 +5,20 @@ import { detectCatFace } from "@/lib/catface.functions";
 import { Sparkles } from "../screens/_shared";
 import { BackButton } from "./BackButton";
 import { getVideoDraft, setVideoDraft } from "./onboardingDraftStore";
+import {
+  getNekoUploadLimitError,
+  NEKO_MAX_ONBOARDING_VIDEO_BYTES,
+  NEKO_MAX_ONBOARDING_VIDEO_LABEL,
+} from "@/lib/neko-upload-limits";
 
 type Clip = { id: string; thumb?: string; gradient: string; duration: string; label: string };
+
+function getOnboardingVideoLimitError(file: File) {
+  return getNekoUploadLimitError(file, "video", {
+    maxBytes: NEKO_MAX_ONBOARDING_VIDEO_BYTES,
+    maxLabel: NEKO_MAX_ONBOARDING_VIDEO_LABEL,
+  });
+}
 
 export function Screen3Video({ onNext, onPrev }: { onNext?: () => void; onPrev?: () => void } = {}) {
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -28,11 +40,18 @@ export function Screen3Video({ onNext, onPrev }: { onNext?: () => void; onPrev?:
 
   const onFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
     if (!files.length) return;
     const remain = Math.max(0, 3 - clips.length);
-    const picked = files.slice(0, remain);
+    const candidates = files.slice(0, remain);
+    const oversized = candidates.filter((file) => getOnboardingVideoLimitError(file));
+    const picked = candidates.filter((file) => !getOnboardingVideoLimitError(file));
     if (files.length > remain) toast("最多只能上传 3 个视频哦~");
     if (files.length > 1) toast("为了更快返回页面，NEKO 会一次处理 1 个视频，可继续添加喵～");
+    if (oversized.length) {
+      toast(oversized.length === 1 ? getOnboardingVideoLimitError(oversized[0])! : `${oversized.length} 个视频超过 ${NEKO_MAX_ONBOARDING_VIDEO_LABEL}，已跳过`, { icon: "🎞️" });
+    }
+    if (!picked.length) return;
     const baseId = Date.now();
     const next: Clip[] = picked.map((f, i) => ({
       id: `${baseId}_${i}`,
@@ -53,7 +72,6 @@ export function Screen3Video({ onNext, onPrev }: { onNext?: () => void; onPrev?:
         setClips((current) => current.map((clip) => (clip.id === id ? { ...clip, thumb: meta.thumb, duration: meta.duration } : clip)));
       }, 0);
     });
-    e.target.value = "";
   };
 
   const removeClip = (id: string) => setClips((c) => c.filter((x) => x.id !== id));
@@ -104,7 +122,7 @@ export function Screen3Video({ onNext, onPrev }: { onNext?: () => void; onPrev?:
       </div>
       <div className="relative z-10 px-7">
         <h1 className="text-[22px] font-light leading-tight text-foreground">上传猫咪视频</h1>
-        <p className="mt-1.5 text-[12px] text-[oklch(0.58_0.04_300)]">上传 1～3 个视频展示猫咪日常，建议每次添加 1 个</p>
+        <p className="mt-1.5 text-[12px] text-[oklch(0.58_0.04_300)]">上传 1～3 个视频展示猫咪日常，单个不超过 {NEKO_MAX_ONBOARDING_VIDEO_LABEL}</p>
       </div>
       <div className="relative z-10 mx-5 mt-6">
         <button
@@ -119,7 +137,7 @@ export function Screen3Video({ onNext, onPrev }: { onNext?: () => void; onPrev?:
             ▶
           </div>
           <div className="relative mt-3 text-[14px] font-medium text-foreground">轻触上传视频</div>
-          <div className="relative mt-1 text-[11px] text-[oklch(0.58_0.05_300)]">每次 1 个 · 可添加 3 次</div>
+          <div className="relative mt-1 text-[11px] text-[oklch(0.58_0.05_300)]">每次 1 个 · 可添加 3 次 · ≤ {NEKO_MAX_ONBOARDING_VIDEO_LABEL}</div>
         </button>
       </div>
       {clips.length > 0 && (
