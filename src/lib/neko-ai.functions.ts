@@ -14,7 +14,7 @@ type VoiceInput = {
   scene?: string;
 };
 
-type AIProvider = "openai" | "qwen" | "deepseek";
+type AIProvider = "openai" | "qwen" | "deepseek" | "bytecat";
 
 let envFileCache: Record<string, string> | null | undefined;
 
@@ -22,7 +22,10 @@ async function readLocalEnvFile() {
   if (envFileCache !== undefined) return envFileCache;
   envFileCache = null;
   try {
-    const [{ readFileSync }, { resolve }] = await Promise.all([import("node:fs"), import("node:path")]);
+    const [{ readFileSync }, { resolve }] = await Promise.all([
+      import("node:fs"),
+      import("node:path"),
+    ]);
     const text = readFileSync(resolve(process.cwd(), ".env.local"), "utf8");
     envFileCache = Object.fromEntries(
       text
@@ -32,7 +35,10 @@ async function readLocalEnvFile() {
         .map((line) => {
           const idx = line.indexOf("=");
           const key = line.slice(0, idx).trim();
-          const value = line.slice(idx + 1).trim().replace(/^['"]|['"]$/g, "");
+          const value = line
+            .slice(idx + 1)
+            .trim()
+            .replace(/^['"]|['"]$/g, "");
           return [key, value];
         }),
     );
@@ -48,7 +54,14 @@ async function getServerEnv(name: string) {
 
 function normalizeProvider(value?: string | null): AIProvider | null {
   const explicit = value?.toLowerCase().trim();
-  if (explicit === "qwen" || explicit === "dashscope" || explicit === "bailian" || explicit === "aliyun") return "qwen";
+  if (
+    explicit === "qwen" ||
+    explicit === "dashscope" ||
+    explicit === "bailian" ||
+    explicit === "aliyun"
+  )
+    return "qwen";
+  if (explicit === "bytecat" || explicit === "bytecatcode") return "bytecat";
   if (explicit === "deepseek" || explicit === "openai") return explicit;
   return null;
 }
@@ -58,13 +71,17 @@ async function getAIProvider(): Promise<AIProvider> {
   if (explicit) return explicit;
   if (await getServerEnv("OPENAI_API_KEY")) return "openai";
   if (await getServerEnv("DASHSCOPE_API_KEY")) return "qwen";
-  return (await getServerEnv("DEEPSEEK_API_KEY")) ? "deepseek" : "openai";
+  if (await getServerEnv("DEEPSEEK_API_KEY")) return "deepseek";
+  return (await getServerEnv("BYTECAT_API_KEY")) ? "bytecat" : "openai";
 }
 
 async function getAIProviderOrder(): Promise<AIProvider[]> {
   const primary = await getAIProvider();
   const fallback = normalizeProvider(await getServerEnv("AI_FALLBACK_PROVIDER"));
-  return [primary, fallback].filter((provider, index, list): provider is AIProvider => Boolean(provider) && list.indexOf(provider) === index);
+  return [primary, fallback].filter(
+    (provider, index, list): provider is AIProvider =>
+      Boolean(provider) && list.indexOf(provider) === index,
+  );
 }
 
 async function shouldRequireRealAI() {
@@ -160,65 +177,91 @@ function normalizePersonaForProfile(persona: CatPersona, profile: CatProfile): C
 }
 
 function buildStablePersona(profile: CatProfile): CatPersona {
-  const ageTone: Record<CatProfile["ageStage"], { type: string; mbti: string; mood: string; tags: string[]; traits: CatPersona["traits"] }> = {
+  const ageTone: Record<
+    CatProfile["ageStage"],
+    { type: string; mbti: string; mood: string; tags: string[]; traits: CatPersona["traits"] }
+  > = {
     幼猫: {
       type: "好奇小探险家",
       mbti: "ENFP-A",
       mood: "今天也想探索新角落",
       tags: ["好奇心旺", "撒娇高手", "活力满满", "需要陪玩", "软萌外表", "小小冒险"],
-      traits: [{ label: "粘人度", value: 82 }, { label: "探索欲", value: 90 }, { label: "安全感", value: 68 }],
+      traits: [
+        { label: "粘人度", value: 82 },
+        { label: "探索欲", value: 90 },
+        { label: "安全感", value: 68 },
+      ],
     },
     青年猫: {
       type: "优雅观察者",
       mbti: "INFP-A",
       mood: "安静又温暖，适合窝在你身边",
       tags: ["优雅独立", "温柔治愈", "好奇探索", "安静陪伴", "慢热亲近", "小小主见"],
-      traits: [{ label: "粘人度", value: 72 }, { label: "独立性", value: 84 }, { label: "好奇心", value: 88 }],
+      traits: [
+        { label: "粘人度", value: 72 },
+        { label: "独立性", value: 84 },
+        { label: "好奇心", value: 88 },
+      ],
     },
     成熟猫: {
       type: "从容陪伴者",
       mbti: "ISFJ-A",
       mood: "今天想安稳地陪你一会",
       tags: ["稳定温柔", "懂得陪伴", "慢热可靠", "观察细腻", "亲密有度", "安心感"],
-      traits: [{ label: "粘人度", value: 76 }, { label: "稳定感", value: 90 }, { label: "观察力", value: 82 }],
+      traits: [
+        { label: "粘人度", value: 76 },
+        { label: "稳定感", value: 90 },
+        { label: "观察力", value: 82 },
+      ],
     },
     资深猫: {
       type: "安静小智者",
       mbti: "INFJ-A",
       mood: "慢慢看着你，就是它的温柔",
       tags: ["沉稳安静", "经验丰富", "温柔守候", "安全感强", "慢节奏", "小智者"],
-      traits: [{ label: "粘人度", value: 70 }, { label: "稳定感", value: 92 }, { label: "洞察力", value: 86 }],
+      traits: [
+        { label: "粘人度", value: 70 },
+        { label: "稳定感", value: 92 },
+        { label: "洞察力", value: 86 },
+      ],
     },
   };
   const tone = ageTone[profile.ageStage] ?? ageTone.青年猫;
-  return normalizePersonaForProfile({
-    name: profile.name,
-    type: tone.type,
-    mbti: tone.mbti,
-    matchScore: 88,
-    monologue: `今天也想悄悄靠近你，陪你待一会。`,
-    analysis: `${profile.name}是${profile.ageStage}里的${profile.gender}，性格里带着独立和温柔。它会先观察环境，再用停留、靠近和注视表达亲近。`,
-    ownerRole: `在${profile.name}眼里，你是能给它安全感的人。它信任你，也会用自己的节奏靠近你、陪伴你。`,
-    tags: tone.tags,
-    traits: tone.traits,
-    observations: [
-      { label: "行为倾向", value: "先观察，再靠近" },
-      { label: "情绪表达", value: "通过停留和注视传递亲近" },
-      { label: "亲密关系", value: "需要安全感，也保留自己的小主见" },
-      { label: "年龄阶段", value: `${profile.ageStage}特征更明显` },
-    ],
-    dailyMood: tone.mood,
-    savedAt: Date.now(),
-  }, profile);
+  return normalizePersonaForProfile(
+    {
+      name: profile.name,
+      type: tone.type,
+      mbti: tone.mbti,
+      matchScore: 88,
+      monologue: `今天也想悄悄靠近你，陪你待一会。`,
+      analysis: `${profile.name}是${profile.ageStage}里的${profile.gender}，性格里带着独立和温柔。它会先观察环境，再用停留、靠近和注视表达亲近。`,
+      ownerRole: `在${profile.name}眼里，你是能给它安全感的人。它信任你，也会用自己的节奏靠近你、陪伴你。`,
+      tags: tone.tags,
+      traits: tone.traits,
+      observations: [
+        { label: "行为倾向", value: "先观察，再靠近" },
+        { label: "情绪表达", value: "通过停留和注视传递亲近" },
+        { label: "亲密关系", value: "需要安全感，也保留自己的小主见" },
+        { label: "年龄阶段", value: `${profile.ageStage}特征更明显` },
+      ],
+      dailyMood: tone.mood,
+      savedAt: Date.now(),
+    },
+    profile,
+  );
 }
 
-function normalizeVoiceForProfile(input: {
-  text?: unknown;
-  analysis?: unknown;
-  mood?: unknown;
-  location?: unknown;
-  tags?: unknown;
-}, profile: CatProfile, imageDataUrl?: string | null): Voice {
+function normalizeVoiceForProfile(
+  input: {
+    text?: unknown;
+    analysis?: unknown;
+    mood?: unknown;
+    location?: unknown;
+    tags?: unknown;
+  },
+  profile: CatProfile,
+  imageDataUrl?: string | null,
+): Voice {
   const tags = Array.isArray(input.tags)
     ? input.tags.map((tag) => normalizeCatFacts(tag, profile)).filter(Boolean)
     : [];
@@ -230,14 +273,25 @@ function normalizeVoiceForProfile(input: {
     grad: "linear-gradient(135deg, oklch(0.9 0.06 280), oklch(0.92 0.05 320))",
     tags: (tags.length ? tags : [`💭 ${mood}`, "✨ 小心思"]).slice(0, 3),
     aspect: "3:4",
-    text: normalizeCatFacts(input.text, profile, `靠近一点嘛，今天也想被你看见。`) || `靠近一点嘛，今天也想被你看见。`,
+    text:
+      normalizeCatFacts(input.text, profile, `靠近一点嘛，今天也想被你看见。`) ||
+      `靠近一点嘛，今天也想被你看见。`,
     media: imageDataUrl ?? undefined,
     mediaType: "photo",
-    analysis: normalizeCatFacts(input.analysis, profile, `${profile.name}的表情和停留姿态给人一种想被关注、又保持自己节奏的感觉。`) || `${profile.name}的表情和停留姿态给人一种想被关注、又保持自己节奏的感觉。`,
+    analysis:
+      normalizeCatFacts(
+        input.analysis,
+        profile,
+        `${profile.name}的表情和停留姿态给人一种想被关注、又保持自己节奏的感觉。`,
+      ) || `${profile.name}的表情和停留姿态给人一种想被关注、又保持自己节奏的感觉。`,
   } as Voice;
 }
 
-function buildStableVoice(profile: CatProfile, imageDataUrl?: string | null, scene?: string): Voice {
+function buildStableVoice(
+  profile: CatProfile,
+  imageDataUrl?: string | null,
+  scene?: string,
+): Voice {
   const sceneText = scene?.trim();
   const ageMood: Record<CatProfile["ageStage"], string> = {
     幼猫: "想玩一会",
@@ -264,73 +318,109 @@ function buildStableVoice(profile: CatProfile, imageDataUrl?: string | null, sce
   const analysis = sceneText
     ? `结合你补充的场景，${profile.name}的停留和注视更像是在回应当下互动，而不是单纯发呆。`
     : `${profile.name}是${profile.ageStage}里的${profile.gender}，画面里的停留和注视适合解读为想被关注。`;
-  return normalizeVoiceForProfile({
-    text,
-    analysis,
-    mood,
-    location: "家里",
-    tags: [`💭 ${mood}`, "🐾 想靠近", "✨ 小心思"],
-  }, profile, imageDataUrl);
+  return normalizeVoiceForProfile(
+    {
+      text,
+      analysis,
+      mood,
+      location: "家里",
+      tags: [`💭 ${mood}`, "🐾 想靠近", "✨ 小心思"],
+    },
+    profile,
+    imageDataUrl,
+  );
 }
 
 function providerLabel(provider: AIProvider) {
   if (provider === "qwen") return "Qwen-VL";
   if (provider === "deepseek") return "DeepSeek";
+  if (provider === "bytecat") return "ByteCat";
   return "OpenAI";
 }
 
-async function getProviderModel(provider: AIProvider) {
+async function getProviderModel(provider: AIProvider, mode: "text" | "vision" = "text") {
   if (provider === "deepseek") return (await getServerEnv("DEEPSEEK_MODEL")) || "deepseek-v4-flash";
   if (provider === "qwen") return (await getServerEnv("QWEN_VL_MODEL")) || "qwen-vl-plus";
-  return (await getServerEnv("OPENAI_MODEL")) || "gpt-4o-mini";
+  if (provider === "bytecat") {
+    return mode === "vision"
+      ? (await getServerEnv("BYTECAT_VISION_MODEL")) ||
+          (await getServerEnv("BYTECAT_MODEL")) ||
+          "gpt-5.6-terra"
+      : (await getServerEnv("BYTECAT_MODEL")) || "gpt-5.6-luna";
+  }
+  return mode === "vision"
+    ? (await getServerEnv("OPENAI_VISION_MODEL")) ||
+        (await getServerEnv("OPENAI_MODEL")) ||
+        "gpt-4o-mini"
+    : (await getServerEnv("OPENAI_MODEL")) || "gpt-4o-mini";
 }
 
-async function callOpenAI(provider: AIProvider, messages: unknown[], options: { maxTokens?: number; temperature?: number; timeoutMs?: number } = {}) {
+async function callChatCompletion(
+  provider: AIProvider,
+  messages: unknown[],
+  options: {
+    maxTokens?: number;
+    temperature?: number;
+    timeoutMs?: number;
+    modelMode?: "text" | "vision";
+  } = {},
+) {
   const isDeepSeek = provider === "deepseek";
   const isQwen = provider === "qwen";
+  const isBytecat = provider === "bytecat";
   const apiKey = isQwen
     ? await getServerEnv("DASHSCOPE_API_KEY")
     : isDeepSeek
       ? await getServerEnv("DEEPSEEK_API_KEY")
-      : await getServerEnv("OPENAI_API_KEY");
-  if (!apiKey) throw new Error(isQwen ? "Missing DASHSCOPE_API_KEY" : isDeepSeek ? "Missing DEEPSEEK_API_KEY" : "Missing OPENAI_API_KEY");
+      : isBytecat
+        ? await getServerEnv("BYTECAT_API_KEY")
+        : await getServerEnv("OPENAI_API_KEY");
+  if (!apiKey) {
+    throw new Error(
+      isQwen
+        ? "Missing DASHSCOPE_API_KEY"
+        : isDeepSeek
+          ? "Missing DEEPSEEK_API_KEY"
+          : isBytecat
+            ? "Missing BYTECAT_API_KEY"
+            : "Missing OPENAI_API_KEY",
+    );
+  }
 
   const baseUrl = isQwen
-    ? (await getServerEnv("DASHSCOPE_BASE_URL")) || "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    ? (await getServerEnv("DASHSCOPE_BASE_URL")) ||
+      "https://dashscope.aliyuncs.com/compatible-mode/v1"
     : isDeepSeek
       ? (await getServerEnv("DEEPSEEK_BASE_URL")) || "https://api.deepseek.com"
-      : (await getServerEnv("OPENAI_BASE_URL")) || "https://api.openai.com/v1";
-  const model = await getProviderModel(provider);
+      : isBytecat
+        ? (await getServerEnv("BYTECAT_BASE_URL")) || "https://www.bytecatcode.org/v1"
+        : (await getServerEnv("OPENAI_BASE_URL")) || "https://api.openai.com/v1";
+  const model = await getProviderModel(provider, options.modelMode);
+  const timeoutMs =
+    options.timeoutMs ?? (isBytecat && options.modelMode === "vision" ? 45_000 : 18_000);
   const controller = new AbortController();
   const startedAt = Date.now();
-  const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 18_000);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   let res: Response;
   try {
-    res = await fetch(
-    isQwen
-      ? `${baseUrl.replace(/\/$/, "")}/chat/completions`
-      : isDeepSeek
-        ? `${baseUrl.replace(/\/$/, "")}/chat/completions`
-        : `${baseUrl.replace(/\/$/, "")}/chat/completions`,
-    {
-    method: "POST",
-    signal: controller.signal,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      temperature: options.temperature ?? 0.82,
-      ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
-      response_format: { type: "json_object" },
-      messages,
-    }),
-    },
-  );
+    res = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        temperature: options.temperature ?? 0.82,
+        ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
+        response_format: { type: "json_object" },
+        messages,
+      }),
+    });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
-      throw new Error(`${providerLabel(provider)} timeout after ${options.timeoutMs ?? 18_000}ms`);
+      throw new Error(`${providerLabel(provider)} timeout after ${timeoutMs}ms`);
     }
     throw error;
   } finally {
@@ -345,7 +435,9 @@ async function callOpenAI(provider: AIProvider, messages: unknown[], options: { 
   }
 
   const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  console.info(`NEKO ${providerLabel(provider)} success model=${model} duration=${Date.now() - startedAt}ms`);
+  console.info(
+    `NEKO ${providerLabel(provider)} success model=${model} duration=${Date.now() - startedAt}ms`,
+  );
   return json.choices?.[0]?.message?.content ?? "{}";
 }
 
@@ -353,23 +445,33 @@ function buildVisionContent(provider: AIProvider, prompt: string, imageDataUrl?:
   if (provider === "deepseek") return prompt;
   return [
     { type: "text", text: prompt },
-    ...(imageDataUrl ? [{ type: "image_url", image_url: { url: imageDataUrl, detail: "low" } }] : []),
+    ...(imageDataUrl
+      ? [{ type: "image_url", image_url: { url: imageDataUrl, detail: "low" } }]
+      : []),
   ];
 }
 
 async function callFirstAvailableJson<T>(
   buildMessages: (provider: AIProvider) => unknown[],
-  options: { maxTokens?: number; temperature?: number; timeoutMs?: number },
+  options: {
+    maxTokens?: number;
+    temperature?: number;
+    timeoutMs?: number;
+    modelMode?: "text" | "vision";
+  },
 ): Promise<{ parsed: T; provider: AIProvider }> {
   const providers = await getAIProviderOrder();
   let lastError: unknown;
   for (const provider of providers) {
     try {
-      const raw = await callOpenAI(provider, buildMessages(provider), options);
+      const raw = await callChatCompletion(provider, buildMessages(provider), options);
       return { parsed: extractJson<T>(raw), provider };
     } catch (error) {
       lastError = error;
-      console.error(`NEKO ${providerLabel(provider)} failed, ${providers.length > 1 ? "trying next provider" : "no fallback provider"}`, error);
+      console.error(
+        `NEKO ${providerLabel(provider)} failed, ${providers.length > 1 ? "trying next provider" : "no fallback provider"}`,
+        error,
+      );
     }
   }
   throw lastError instanceof Error ? lastError : new Error("AI provider failed");
@@ -379,7 +481,8 @@ export const generateCatPersona = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => {
     const data = input as PersonaInput;
     if (!data?.profile?.name) throw new Error("missing profile");
-    if (data.imageDataUrl && !data.imageDataUrl.startsWith("data:image/")) throw new Error("invalid image");
+    if (data.imageDataUrl && !data.imageDataUrl.startsWith("data:image/"))
+      throw new Error("invalid image");
     return data;
   })
   .handler(async ({ data }): Promise<CatPersona> => {
@@ -405,33 +508,49 @@ export const generateCatPersona = createServerFn({ method: "POST" })
 3. 不要把${data.profile.gender}写成另一种性别，不要把${data.profile.ageStage}写成其他年龄阶段。
 4. 基于行为学线索 + 拟人化创作，不做医疗诊断。语言适合小红书分享。`;
     try {
-      const result = await callFirstAvailableJson<CatPersona>((provider) => [
-        { role: "system", content: "你是 NEKO.ID 的猫咪人格设计师，擅长把猫咪照片和主人描述转化为温柔、有记忆感、可分享的人格档案。只返回 JSON。" },
-        { role: "user", content: buildVisionContent(provider, prompt, data.imageDataUrl) },
-      ], { maxTokens: 720, temperature: 0.58 });
+      const result = await callFirstAvailableJson<CatPersona>(
+        (provider) => [
+          {
+            role: "system",
+            content:
+              "你是 NEKO.ID 的猫咪人格设计师，擅长把猫咪照片和主人描述转化为温柔、有记忆感、可分享的人格档案。只返回 JSON。",
+          },
+          { role: "user", content: buildVisionContent(provider, prompt, data.imageDataUrl) },
+        ],
+        { maxTokens: 720, temperature: 0.58, modelMode: data.imageDataUrl ? "vision" : "text" },
+      );
       const parsed = result.parsed;
-      const normalized = normalizePersonaForProfile({
-        name: parsed.name || data.profile.name,
-        type: parsed.type || "优雅观察者",
-        mbti: parsed.mbti || "INFP-A",
-        matchScore: Math.max(60, Math.min(99, Number(parsed.matchScore) || 88)),
-        monologue: parsed.monologue || "今天也想悄悄靠近你，陪你待一会。",
-        analysis: parsed.analysis || `${data.profile.name}会先观察环境，再用停留、靠近和注视表达亲近。`,
-        ownerRole: parsed.ownerRole || `你是${data.profile.name}确认世界安全的小坐标。`,
-        tags: (Array.isArray(parsed.tags) ? parsed.tags : []).slice(0, 6),
-        traits: (Array.isArray(parsed.traits) ? parsed.traits : []).slice(0, 3),
-        observations: (Array.isArray(parsed.observations) ? parsed.observations : []).slice(0, 4),
-        dailyMood: parsed.dailyMood || "今天好像有点想你",
-        savedAt: Date.now(),
-      }, data.profile);
-      if (!normalized.tags.length || normalized.traits.length < 3 || !normalized.observations.length) {
+      const normalized = normalizePersonaForProfile(
+        {
+          name: parsed.name || data.profile.name,
+          type: parsed.type || "优雅观察者",
+          mbti: parsed.mbti || "INFP-A",
+          matchScore: Math.max(60, Math.min(99, Number(parsed.matchScore) || 88)),
+          monologue: parsed.monologue || "今天也想悄悄靠近你，陪你待一会。",
+          analysis:
+            parsed.analysis || `${data.profile.name}会先观察环境，再用停留、靠近和注视表达亲近。`,
+          ownerRole: parsed.ownerRole || `你是${data.profile.name}确认世界安全的小坐标。`,
+          tags: (Array.isArray(parsed.tags) ? parsed.tags : []).slice(0, 6),
+          traits: (Array.isArray(parsed.traits) ? parsed.traits : []).slice(0, 3),
+          observations: (Array.isArray(parsed.observations) ? parsed.observations : []).slice(0, 4),
+          dailyMood: parsed.dailyMood || "今天好像有点想你",
+          savedAt: Date.now(),
+        },
+        data.profile,
+      );
+      if (
+        !normalized.tags.length ||
+        normalized.traits.length < 3 ||
+        !normalized.observations.length
+      ) {
         if (await shouldRequireRealAI()) throw new Error("AI persona JSON missing required fields");
         return buildStablePersona(data.profile);
       }
       return normalized;
     } catch (error) {
       console.error("NEKO persona AI failed", error);
-      if (await shouldRequireRealAI()) throw new Error(`AI 人格生成失败：${error instanceof Error ? error.message : "未知错误"}`);
+      if (await shouldRequireRealAI())
+        throw new Error(`AI 人格生成失败：${error instanceof Error ? error.message : "未知错误"}`);
       return buildStablePersona(data.profile);
     }
   });
@@ -440,7 +559,8 @@ export const generateCatVoice = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => {
     const data = input as VoiceInput;
     if (!data?.profile?.name) throw new Error("missing profile");
-    if (data.imageDataUrl && !data.imageDataUrl.startsWith("data:image/")) throw new Error("invalid image");
+    if (data.imageDataUrl && !data.imageDataUrl.startsWith("data:image/"))
+      throw new Error("invalid image");
     return data;
   })
   .handler(async ({ data }): Promise<Voice> => {
@@ -456,10 +576,28 @@ export const generateCatVoice = createServerFn({ method: "POST" })
 }
 要求：温柔、拟人化、适合小红书卡片；只做情绪陪伴和行为想象，不做医疗诊断；只返回 JSON。`;
     try {
-      const result = await callFirstAvailableJson<{ text?: unknown; analysis?: unknown; mood?: unknown; location?: unknown; tags?: unknown }>((provider) => [
-        { role: "system", content: "你是猫咪心声翻译官和宠物照片观察员。必须基于图片可见信息生成猫咪第一人称心声，并给出简短 AI 解析。只返回 JSON。" },
-        { role: "user", content: buildVisionContent(provider, prompt, data.imageDataUrl) },
-      ], { maxTokens: 320, temperature: 0.5, timeoutMs: 14_000 });
+      const result = await callFirstAvailableJson<{
+        text?: unknown;
+        analysis?: unknown;
+        mood?: unknown;
+        location?: unknown;
+        tags?: unknown;
+      }>(
+        (provider) => [
+          {
+            role: "system",
+            content:
+              "你是猫咪心声翻译官和宠物照片观察员。必须基于图片可见信息生成猫咪第一人称心声，并给出简短 AI 解析。只返回 JSON。",
+          },
+          { role: "user", content: buildVisionContent(provider, prompt, data.imageDataUrl) },
+        ],
+        {
+          maxTokens: 320,
+          temperature: 0.5,
+          timeoutMs: data.imageDataUrl ? 45_000 : 14_000,
+          modelMode: data.imageDataUrl ? "vision" : "text",
+        },
+      );
       const parsed = result.parsed;
       const voice = normalizeVoiceForProfile(parsed, data.profile, data.imageDataUrl);
       if (!voice.text.trim() || !voice.analysis?.trim()) {
@@ -469,7 +607,8 @@ export const generateCatVoice = createServerFn({ method: "POST" })
       return voice;
     } catch (error) {
       console.error("NEKO voice AI failed", error);
-      if (await shouldRequireRealAI()) throw new Error(`AI 心声生成失败：${error instanceof Error ? error.message : "未知错误"}`);
+      if (await shouldRequireRealAI())
+        throw new Error(`AI 心声生成失败：${error instanceof Error ? error.message : "未知错误"}`);
       return buildStableVoice(data.profile, data.imageDataUrl, data.scene);
     }
   });
