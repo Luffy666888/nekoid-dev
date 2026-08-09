@@ -1650,7 +1650,7 @@ export function ScreenEditProfile() {
 
         <div className="mx-5 mt-6 grid grid-cols-2 gap-2.5">
           <button onClick={saveProfile} className="rounded-full bg-white/85 px-4 py-3.5 text-[12.5px] text-foreground backdrop-blur active:bg-white/95 active:scale-[0.98] transition-all duration-150" style={{ boxShadow: "var(--shadow-soft)" }}>保存修改</button>
-          <button onClick={() => { updateCatProfile({ name: name.trim(), gender, ageStage, avatar: avatar ?? undefined }); clearCatPersona(); toast.success("已保存，正在重新测试…"); navigate({ to: "/" }); }} className="rounded-full px-4 py-3.5 text-[12.5px] font-medium text-white active:scale-[0.97] active:brightness-[0.92] transition-all duration-150"
+          <button onClick={() => { updateCatProfile({ name: name.trim(), gender, ageStage, avatar: avatar ?? undefined }); clearCatPersona(); toast.success("已保存，正在重新测试…"); navigate({ to: "/", search: { restart: true } }); }} className="rounded-full px-4 py-3.5 text-[12.5px] font-medium text-white active:scale-[0.97] active:brightness-[0.92] transition-all duration-150"
             style={{ background: "linear-gradient(135deg, oklch(0.70 0.14 305), oklch(0.76 0.11 0))", boxShadow: "0 14px 28px -14px oklch(0.70 0.14 305 / 0.6)" }}>
             保存并重新测试
           </button>

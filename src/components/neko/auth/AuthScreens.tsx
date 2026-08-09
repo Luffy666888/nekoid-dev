@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, type PropsWithChildren } from "react";
 import { toast } from "sonner";
 
 import { CatAvatar, ScreenShell, StatusBar } from "@/components/neko/app/AppShowcase";
+import { getCatPersona } from "@/components/neko/catProfileStore";
 import {
   loadNekoAccountSummary,
   loadNekoFromCloud,
@@ -89,9 +90,21 @@ export function AuthLoginScreen() {
     if (busy) return;
     setBusy("verify");
     try {
+      const hadLocalPersona = Boolean(getCatPersona());
       await verifyNekoLoginCode(normalizedEmail, code);
-      toast.success("登录成功，欢迎回到 NEKO.ID");
-      await navigate({ to: "/app/me", replace: true });
+      let restored = false;
+
+      if (!hadLocalPersona) {
+        try {
+          const result = await loadNekoFromCloud();
+          restored = result.restored;
+        } catch (error) {
+          console.warn("NEKO login auto restore failed", error);
+        }
+      }
+
+      toast.success(restored ? "登录成功，已恢复云端猫咪档案" : "登录成功，欢迎回到 NEKO.ID");
+      await navigate({ to: restored || hadLocalPersona ? "/app" : "/", replace: true });
     } catch (error) {
       toast.error(authErrorMessage(error));
     } finally {
