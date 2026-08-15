@@ -1,9 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
 
-type Result = { isCat: boolean; reason?: string };
+export type CatFaceResult = { isCat: boolean; reason?: string };
+export type CatFaceInput = { imageDataUrl: string; mode?: "face" | "presence" };
 type AIProvider = "openai" | "qwen" | "deepseek" | "bytecat";
 
+let workerEnv: Record<string, string | undefined> | null = null;
 let envFileCache: Record<string, string> | null | undefined;
+
+export function setCatFaceWorkerEnv(env: unknown) {
+  workerEnv = (env as Record<string, string | undefined> | undefined) ?? null;
+}
 
 async function readLocalEnvFile() {
   if (envFileCache !== undefined) return envFileCache;
@@ -36,7 +42,10 @@ async function readLocalEnvFile() {
 }
 
 async function getServerEnv(name: string) {
-  return process.env[name] || (await readLocalEnvFile())?.[name];
+  const workerValue = workerEnv?.[name];
+  if (workerValue) return workerValue;
+  const processValue = typeof process !== "undefined" ? process.env[name] : undefined;
+  return processValue || (await readLocalEnvFile())?.[name];
 }
 
 function normalizeProvider(value?: string | null): AIProvider | null {
@@ -99,117 +108,122 @@ async function getProviderModel(provider: AIProvider) {
   );
 }
 
-export const detectCatFace = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => {
-    const data = input as { imageDataUrl?: string; mode?: "face" | "presence" };
-    if (
-      !data ||
-      typeof data.imageDataUrl !== "string" ||
-      !data.imageDataUrl.startsWith("data:image/")
-    ) {
-      throw new Error("invalid image");
-    }
-    if (data.imageDataUrl.length > 8_000_000) {
-      throw new Error("image too large");
-    }
-    return { imageDataUrl: data.imageDataUrl, mode: data.mode ?? "face" };
-  })
-  .handler(async ({ data }): Promise<Result> => {
-    const isPresence = data.mode === "presence";
-    const providers = await getAIProviderOrder();
-    let lastError: unknown;
+function validateCatFaceInput(input: unknown): CatFaceInput {
+  const data = input as { imageDataUrl?: string; mode?: "face" | "presence" };
+  if (
+    !data ||
+    typeof data.imageDataUrl !== "string" ||
+    !data.imageDataUrl.startsWith("data:image/")
+  ) {
+    throw new Error("invalid image");
+  }
+  if (data.imageDataUrl.length > 8_000_000) {
+    throw new Error("image too large");
+  }
+  return { imageDataUrl: data.imageDataUrl, mode: data.mode ?? "face" };
+}
 
-    for (const provider of providers) {
-      if (provider === "deepseek") continue;
-      const isQwen = provider === "qwen";
-      const isBytecat = provider === "bytecat";
-      const apiKey = isQwen
-        ? await getServerEnv("DASHSCOPE_API_KEY")
+export async function detectCatFaceServer(input: CatFaceInput): Promise<CatFaceResult> {
+  const data = validateCatFaceInput(input);
+  const isPresence = data.mode === "presence";
+  const providers = await getAIProviderOrder();
+  let lastError: unknown;
+
+  for (const provider of providers) {
+    if (provider === "deepseek") continue;
+    const isQwen = provider === "qwen";
+    const isBytecat = provider === "bytecat";
+    const apiKey = isQwen
+      ? await getServerEnv("DASHSCOPE_API_KEY")
+      : isBytecat
+        ? await getServerEnv("BYTECAT_API_KEY")
+        : await getServerEnv("OPENAI_API_KEY");
+    if (!apiKey) {
+      lastError = new Error(
+        isQwen
+          ? "Missing DASHSCOPE_API_KEY"
+          : isBytecat
+            ? "Missing BYTECAT_API_KEY"
+            : "Missing OPENAI_API_KEY",
+      );
+      continue;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), isQwen ? 9000 : isBytecat ? 20_000 : 5500);
+
+    try {
+      const baseUrl = isQwen
+        ? (await getServerEnv("DASHSCOPE_BASE_URL")) ||
+          "https://dashscope.aliyuncs.com/compatible-mode/v1"
         : isBytecat
-          ? await getServerEnv("BYTECAT_API_KEY")
-          : await getServerEnv("OPENAI_API_KEY");
-      if (!apiKey) {
+          ? (await getServerEnv("BYTECAT_BASE_URL")) || "https://www.bytecatcode.org/v1"
+          : (await getServerEnv("OPENAI_BASE_URL")) || "https://api.openai.com/v1";
+      const res = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: await getProviderModel(provider),
+          temperature: 0,
+          max_tokens: 12,
+          messages: [
+            {
+              role: "system",
+              content: isPresence
+                ? '判断画面中是否出现猫。仅返回 JSON：{"isCat":true|false}。'
+                : '判断图片中是否包含清晰猫咪正脸。仅返回 JSON：{"isCat":true|false}。',
+            },
+            {
+              role: "user",
+              content: [
+                { type: "text", text: isPresence ? "画面里有猫吗？" : "图中有清晰猫咪正脸吗？" },
+                { type: "image_url", image_url: { url: data.imageDataUrl, detail: "low" } },
+              ],
+            },
+          ],
+          response_format: { type: "json_object" },
+        }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
         lastError = new Error(
-          isQwen
-            ? "Missing DASHSCOPE_API_KEY"
-            : isBytecat
-              ? "Missing BYTECAT_API_KEY"
-              : "Missing OPENAI_API_KEY",
+          `${providerLabel(provider)} error ${res.status}: ${text.slice(0, 200)}`,
+        );
+        console.error(
+          `NEKO ${providerLabel(provider)} vision error ${res.status}: ${text.slice(0, 500)}`,
         );
         continue;
       }
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), isQwen ? 9000 : isBytecat ? 20_000 : 5500);
 
+      const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+      const content = json.choices?.[0]?.message?.content ?? "{}";
       try {
-        const baseUrl = isQwen
-          ? (await getServerEnv("DASHSCOPE_BASE_URL")) ||
-            "https://dashscope.aliyuncs.com/compatible-mode/v1"
-          : isBytecat
-            ? (await getServerEnv("BYTECAT_BASE_URL")) || "https://www.bytecatcode.org/v1"
-            : (await getServerEnv("OPENAI_BASE_URL")) || "https://api.openai.com/v1";
-        const res = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
-          method: "POST",
-          signal: controller.signal,
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model: await getProviderModel(provider),
-            temperature: 0,
-            max_tokens: 12,
-            messages: [
-              {
-                role: "system",
-                content: isPresence
-                  ? '判断画面中是否出现猫。仅返回 JSON：{"isCat":true|false}。'
-                  : '判断图片中是否包含清晰猫咪正脸。仅返回 JSON：{"isCat":true|false}。',
-              },
-              {
-                role: "user",
-                content: [
-                  { type: "text", text: isPresence ? "画面里有猫吗？" : "图中有清晰猫咪正脸吗？" },
-                  { type: "image_url", image_url: { url: data.imageDataUrl, detail: "low" } },
-                ],
-              },
-            ],
-            response_format: { type: "json_object" },
-          }),
-        });
-
-        if (!res.ok) {
-          const text = await res.text().catch(() => "");
-          lastError = new Error(
-            `${providerLabel(provider)} error ${res.status}: ${text.slice(0, 200)}`,
-          );
-          console.error(
-            `NEKO ${providerLabel(provider)} vision error ${res.status}: ${text.slice(0, 500)}`,
-          );
-          continue;
-        }
-
-        const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-        const content = json.choices?.[0]?.message?.content ?? "{}";
-        try {
-          const parsed = JSON.parse(content) as { isCat?: boolean };
-          return { isCat: parsed.isCat === true };
-        } catch {
-          return { isCat: /true/i.test(content) };
-        }
-      } catch (error) {
-        lastError = error;
-        if (!(error instanceof Error && error.name === "AbortError"))
-          console.error(`NEKO ${providerLabel(provider)} vision failed`, error);
-      } finally {
-        clearTimeout(timer);
+        const parsed = JSON.parse(content) as { isCat?: boolean };
+        return { isCat: parsed.isCat === true };
+      } catch {
+        return { isCat: /true/i.test(content) };
       }
+    } catch (error) {
+      lastError = error;
+      if (!(error instanceof Error && error.name === "AbortError"))
+        console.error(`NEKO ${providerLabel(provider)} vision failed`, error);
+    } finally {
+      clearTimeout(timer);
     }
+  }
 
-    if (await shouldRequireRealAI()) {
-      throw new Error(
-        `猫咪图片识别失败：${lastError instanceof Error ? lastError.message : "AI 未返回结果"}`,
-      );
-    }
-    return { isCat: true, reason: "vision_unavailable" };
-  });
+  if (await shouldRequireRealAI()) {
+    throw new Error(
+      `猫咪图片识别失败：${lastError instanceof Error ? lastError.message : "AI 未返回结果"}`,
+    );
+  }
+  return { isCat: true, reason: "vision_unavailable" };
+}
+
+export const detectCatFace = createServerFn({ method: "POST" })
+  .inputValidator(validateCatFaceInput)
+  .handler(async ({ data }): Promise<CatFaceResult> => detectCatFaceServer(data));

@@ -2,12 +2,12 @@ import { createServerFn } from "@tanstack/react-start";
 import type { CatPersona, CatProfile } from "@/components/neko/catProfileStore";
 import type { Voice } from "@/components/neko/app/voicesStore";
 
-type PersonaInput = {
+export type PersonaInput = {
   profile: CatProfile;
   imageDataUrl?: string | null;
 };
 
-type VoiceInput = {
+export type VoiceInput = {
   profile: CatProfile;
   persona: CatPersona | null;
   imageDataUrl?: string | null;
@@ -16,7 +16,12 @@ type VoiceInput = {
 
 type AIProvider = "openai" | "qwen" | "deepseek" | "bytecat";
 
+let workerEnv: Record<string, string | undefined> | null = null;
 let envFileCache: Record<string, string> | null | undefined;
+
+export function setNekoAIWorkerEnv(env: unknown) {
+  workerEnv = (env as Record<string, string | undefined> | undefined) ?? null;
+}
 
 async function readLocalEnvFile() {
   if (envFileCache !== undefined) return envFileCache;
@@ -49,7 +54,10 @@ async function readLocalEnvFile() {
 }
 
 async function getServerEnv(name: string) {
-  return process.env[name] || (await readLocalEnvFile())?.[name];
+  const workerValue = workerEnv?.[name];
+  if (workerValue) return workerValue;
+  const processValue = typeof process !== "undefined" ? process.env[name] : undefined;
+  return processValue || (await readLocalEnvFile())?.[name];
 }
 
 function normalizeProvider(value?: string | null): AIProvider | null {
@@ -477,18 +485,31 @@ async function callFirstAvailableJson<T>(
   throw lastError instanceof Error ? lastError : new Error("AI provider failed");
 }
 
-export const generateCatPersona = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => {
-    const data = input as PersonaInput;
-    if (!data?.profile?.name) throw new Error("missing profile");
-    if (data.imageDataUrl && !data.imageDataUrl.startsWith("data:image/"))
-      throw new Error("invalid image");
-    return data;
-  })
-  .handler(async ({ data }): Promise<CatPersona> => {
-    const profileFacts = `猫咪名称：${data.profile.name}；性别：${data.profile.gender}；年龄阶段：${data.profile.ageStage}`;
-    const wrongGender = data.profile.gender === "小公猫" ? "小母猫、她、她的" : "小公猫、他、他的";
-    const prompt = `请为这只猫生成 NEKO.ID 的猫咪人格档案。猫咪资料：${JSON.stringify(data.profile)}。硬性资料事实：${profileFacts}。${data.imageDataUrl ? "用户已上传猫咪正脸照片；当前模型如无法直接读取图片，请主要依据猫咪基础资料进行拟人化创作。" : ""}输出严格 JSON，不要 Markdown。字段：
+function validatePersonaInput(input: unknown): PersonaInput {
+  const data = input as PersonaInput;
+  if (!data?.profile?.name) throw new Error("missing profile");
+  if (data.imageDataUrl && !data.imageDataUrl.startsWith("data:image/"))
+    throw new Error("invalid image");
+  if (data.imageDataUrl && data.imageDataUrl.length > 8_000_000)
+    throw new Error("image too large");
+  return data;
+}
+
+function validateVoiceInput(input: unknown): VoiceInput {
+  const data = input as VoiceInput;
+  if (!data?.profile?.name) throw new Error("missing profile");
+  if (data.imageDataUrl && !data.imageDataUrl.startsWith("data:image/"))
+    throw new Error("invalid image");
+  if (data.imageDataUrl && data.imageDataUrl.length > 8_000_000)
+    throw new Error("image too large");
+  return data;
+}
+
+export async function generateCatPersonaServer(input: PersonaInput): Promise<CatPersona> {
+  const data = validatePersonaInput(input);
+  const profileFacts = `猫咪名称：${data.profile.name}；性别：${data.profile.gender}；年龄阶段：${data.profile.ageStage}`;
+  const wrongGender = data.profile.gender === "小公猫" ? "小母猫、她、她的" : "小公猫、他、他的";
+  const prompt = `请为这只猫生成 NEKO.ID 的猫咪人格档案。猫咪资料：${JSON.stringify(data.profile)}。硬性资料事实：${profileFacts}。${data.imageDataUrl ? "用户已上传猫咪正脸照片；当前模型如无法直接读取图片，请主要依据猫咪基础资料进行拟人化创作。" : ""}输出严格 JSON，不要 Markdown。字段：
 {
   "name": "猫名",
   "type": "四到六字人格类型",
@@ -507,64 +528,61 @@ export const generateCatPersona = createServerFn({ method: "POST" })
 2. 全文不要出现与资料冲突的表达，例如：${wrongGender}；描述猫咪时优先使用“它”。
 3. 不要把${data.profile.gender}写成另一种性别，不要把${data.profile.ageStage}写成其他年龄阶段。
 4. 基于行为学线索 + 拟人化创作，不做医疗诊断。语言适合小红书分享。`;
-    try {
-      const result = await callFirstAvailableJson<CatPersona>(
-        (provider) => [
-          {
-            role: "system",
-            content:
-              "你是 NEKO.ID 的猫咪人格设计师，擅长把猫咪照片和主人描述转化为温柔、有记忆感、可分享的人格档案。只返回 JSON。",
-          },
-          { role: "user", content: buildVisionContent(provider, prompt, data.imageDataUrl) },
-        ],
-        { maxTokens: 720, temperature: 0.58, modelMode: data.imageDataUrl ? "vision" : "text" },
-      );
-      const parsed = result.parsed;
-      const normalized = normalizePersonaForProfile(
+  try {
+    const result = await callFirstAvailableJson<CatPersona>(
+      (provider) => [
         {
-          name: parsed.name || data.profile.name,
-          type: parsed.type || "优雅观察者",
-          mbti: parsed.mbti || "INFP-A",
-          matchScore: Math.max(60, Math.min(99, Number(parsed.matchScore) || 88)),
-          monologue: parsed.monologue || "今天也想悄悄靠近你，陪你待一会。",
-          analysis:
-            parsed.analysis || `${data.profile.name}会先观察环境，再用停留、靠近和注视表达亲近。`,
-          ownerRole: parsed.ownerRole || `你是${data.profile.name}确认世界安全的小坐标。`,
-          tags: (Array.isArray(parsed.tags) ? parsed.tags : []).slice(0, 6),
-          traits: (Array.isArray(parsed.traits) ? parsed.traits : []).slice(0, 3),
-          observations: (Array.isArray(parsed.observations) ? parsed.observations : []).slice(0, 4),
-          dailyMood: parsed.dailyMood || "今天好像有点想你",
-          savedAt: Date.now(),
+          role: "system",
+          content:
+            "你是 NEKO.ID 的猫咪人格设计师，擅长把猫咪照片和主人描述转化为温柔、有记忆感、可分享的人格档案。只返回 JSON。",
         },
-        data.profile,
-      );
-      if (
-        !normalized.tags.length ||
-        normalized.traits.length < 3 ||
-        !normalized.observations.length
-      ) {
-        if (await shouldRequireRealAI()) throw new Error("AI persona JSON missing required fields");
-        return buildStablePersona(data.profile);
-      }
-      return normalized;
-    } catch (error) {
-      console.error("NEKO persona AI failed", error);
-      if (await shouldRequireRealAI())
-        throw new Error(`AI 人格生成失败：${error instanceof Error ? error.message : "未知错误"}`);
+        { role: "user", content: buildVisionContent(provider, prompt, data.imageDataUrl) },
+      ],
+      { maxTokens: 720, temperature: 0.58, modelMode: data.imageDataUrl ? "vision" : "text" },
+    );
+    const parsed = result.parsed;
+    const normalized = normalizePersonaForProfile(
+      {
+        name: parsed.name || data.profile.name,
+        type: parsed.type || "优雅观察者",
+        mbti: parsed.mbti || "INFP-A",
+        matchScore: Math.max(60, Math.min(99, Number(parsed.matchScore) || 88)),
+        monologue: parsed.monologue || "今天也想悄悄靠近你，陪你待一会。",
+        analysis:
+          parsed.analysis || `${data.profile.name}会先观察环境，再用停留、靠近和注视表达亲近。`,
+        ownerRole: parsed.ownerRole || `你是${data.profile.name}确认世界安全的小坐标。`,
+        tags: (Array.isArray(parsed.tags) ? parsed.tags : []).slice(0, 6),
+        traits: (Array.isArray(parsed.traits) ? parsed.traits : []).slice(0, 3),
+        observations: (Array.isArray(parsed.observations) ? parsed.observations : []).slice(0, 4),
+        dailyMood: parsed.dailyMood || "今天好像有点想你",
+        savedAt: Date.now(),
+      },
+      data.profile,
+    );
+    if (
+      !normalized.tags.length ||
+      normalized.traits.length < 3 ||
+      !normalized.observations.length
+    ) {
+      if (await shouldRequireRealAI()) throw new Error("AI persona JSON missing required fields");
       return buildStablePersona(data.profile);
     }
-  });
+    return normalized;
+  } catch (error) {
+    console.error("NEKO persona AI failed", error);
+    if (await shouldRequireRealAI())
+      throw new Error(`AI 人格生成失败：${error instanceof Error ? error.message : "未知错误"}`);
+    return buildStablePersona(data.profile);
+  }
+}
 
-export const generateCatVoice = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => {
-    const data = input as VoiceInput;
-    if (!data?.profile?.name) throw new Error("missing profile");
-    if (data.imageDataUrl && !data.imageDataUrl.startsWith("data:image/"))
-      throw new Error("invalid image");
-    return data;
-  })
-  .handler(async ({ data }): Promise<Voice> => {
-    const prompt = `请基于用户上传的猫咪照片，为 NEKO.ID 生成一条真实、有画面依据的“猫咪心声”。猫咪资料：${JSON.stringify(data.profile)}。人格档案：${JSON.stringify(data.persona)}。用户补充场景：${data.scene || "无"}。
+export const generateCatPersona = createServerFn({ method: "POST" })
+  .inputValidator(validatePersonaInput)
+  .handler(async ({ data }): Promise<CatPersona> => generateCatPersonaServer(data));
+
+export async function generateCatVoiceServer(input: VoiceInput): Promise<Voice> {
+  const data = validateVoiceInput(input);
+  const prompt = `请基于用户上传的猫咪照片，为 NEKO.ID 生成一条真实、有画面依据的“猫咪心声”。猫咪资料：${JSON.stringify(data.profile)}。人格档案：${JSON.stringify(data.persona)}。用户补充场景：${data.scene || "无"}。
 你必须先观察图片里的猫咪姿态、表情、视线、周围物品/环境，再生成内容。不要写泛泛的“等待心声”“AI会结合照片”等占位文案。不要机械复述用户补充场景，不要出现“给它新买了…”这种主人视角陈述；气泡文案必须像猫咪自己短短说出的小心思。
 输出严格 JSON：
 {
@@ -575,40 +593,44 @@ export const generateCatVoice = createServerFn({ method: "POST" })
   "tags": ["2-3个带 emoji 的标签"]
 }
 要求：温柔、拟人化、适合小红书卡片；只做情绪陪伴和行为想象，不做医疗诊断；只返回 JSON。`;
-    try {
-      const result = await callFirstAvailableJson<{
-        text?: unknown;
-        analysis?: unknown;
-        mood?: unknown;
-        location?: unknown;
-        tags?: unknown;
-      }>(
-        (provider) => [
-          {
-            role: "system",
-            content:
-              "你是猫咪心声翻译官和宠物照片观察员。必须基于图片可见信息生成猫咪第一人称心声，并给出简短 AI 解析。只返回 JSON。",
-          },
-          { role: "user", content: buildVisionContent(provider, prompt, data.imageDataUrl) },
-        ],
+  try {
+    const result = await callFirstAvailableJson<{
+      text?: unknown;
+      analysis?: unknown;
+      mood?: unknown;
+      location?: unknown;
+      tags?: unknown;
+    }>(
+      (provider) => [
         {
-          maxTokens: 320,
-          temperature: 0.5,
-          timeoutMs: data.imageDataUrl ? 45_000 : 14_000,
-          modelMode: data.imageDataUrl ? "vision" : "text",
+          role: "system",
+          content:
+            "你是猫咪心声翻译官和宠物照片观察员。必须基于图片可见信息生成猫咪第一人称心声，并给出简短 AI 解析。只返回 JSON。",
         },
-      );
-      const parsed = result.parsed;
-      const voice = normalizeVoiceForProfile(parsed, data.profile, data.imageDataUrl);
-      if (!voice.text.trim() || !voice.analysis?.trim()) {
-        if (await shouldRequireRealAI()) throw new Error("AI voice JSON missing required fields");
-        return buildStableVoice(data.profile, data.imageDataUrl, data.scene);
-      }
-      return voice;
-    } catch (error) {
-      console.error("NEKO voice AI failed", error);
-      if (await shouldRequireRealAI())
-        throw new Error(`AI 心声生成失败：${error instanceof Error ? error.message : "未知错误"}`);
+        { role: "user", content: buildVisionContent(provider, prompt, data.imageDataUrl) },
+      ],
+      {
+        maxTokens: 320,
+        temperature: 0.5,
+        timeoutMs: data.imageDataUrl ? 45_000 : 14_000,
+        modelMode: data.imageDataUrl ? "vision" : "text",
+      },
+    );
+    const parsed = result.parsed;
+    const voice = normalizeVoiceForProfile(parsed, data.profile, data.imageDataUrl);
+    if (!voice.text.trim() || !voice.analysis?.trim()) {
+      if (await shouldRequireRealAI()) throw new Error("AI voice JSON missing required fields");
       return buildStableVoice(data.profile, data.imageDataUrl, data.scene);
     }
-  });
+    return voice;
+  } catch (error) {
+    console.error("NEKO voice AI failed", error);
+    if (await shouldRequireRealAI())
+      throw new Error(`AI 心声生成失败：${error instanceof Error ? error.message : "未知错误"}`);
+    return buildStableVoice(data.profile, data.imageDataUrl, data.scene);
+  }
+}
+
+export const generateCatVoice = createServerFn({ method: "POST" })
+  .inputValidator(validateVoiceInput)
+  .handler(async ({ data }): Promise<Voice> => generateCatVoiceServer(data));
