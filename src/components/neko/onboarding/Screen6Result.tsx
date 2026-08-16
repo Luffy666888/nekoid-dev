@@ -1,5 +1,10 @@
+import hero from "@/assets/neko-hero.jpg";
+import sceneA from "@/assets/neko-noble.jpg";
+import sceneB from "@/assets/neko-magic.jpg";
+import sceneC from "@/assets/neko-pink.jpg";
+import bond from "@/assets/neko-bond.jpg";
 import { useNavigate } from "@tanstack/react-router";
-import { ChevronLeft, Share2 } from "lucide-react";
+import { Share2 } from "lucide-react";
 import { Sparkles } from "../screens/_shared";
 import { useRef, useState } from "react";
 import { toPng } from "html-to-image";
@@ -7,60 +12,61 @@ import { toast } from "sonner";
 import { getCatAvatar, getCurrentSessionCatAvatar, useCatAvatar } from "../catAvatarStore";
 import { useCatName } from "../catNameStore";
 import { persistCatResult, useCatPersona, useCatProfile } from "../catProfileStore";
-import { getPhotoDraft } from "./onboardingDraftStore";
 import { voicesStore } from "../app/voicesStore";
 import { saveLocalNekoToCloud } from "@/lib/neko-cloud";
+import { getPhotoDraft } from "./onboardingDraftStore";
 
-const TRAITS = [
-  { icon: "🐾", label: "粘人度", v: 68 },
-  { icon: "🏠", label: "独立性", v: 90 },
-  { icon: "🔍", label: "好奇心", v: 82 },
-];
-const CHIPS = ["高冷外表", "内心温柔", "观察大师", "独立自主", "慢热型选手", "安全第一"];
-const OBSERVATIONS = [
-  { label: "主动观察陌生事物", v: "12 次" },
-  { label: "主动靠近主人", v: "8 次" },
-  { label: "独处行为", v: "23 次" },
-  { label: "守门行为", v: "5 次" },
+const KEYWORDS = ["温柔观察者", "慢热", "安静陪伴"];
+
+const INSIGHTS = [
+  { emoji: "👀", title: "先观察，再靠近", desc: "不会马上亲近，但会偷偷观察你。" },
+  { emoji: "🏠", title: "很需要自己的安全区", desc: "熟悉的位置和气味会让它安心。" },
+  { emoji: "❤️", title: "喜欢你，但不一定黏着你", desc: "待在附近，就是它表达亲近的方式。" },
 ];
 
-export function Screen6Result({ onRestart, onBack }: { onNext?: () => void; onPrev?: () => void; onRestart?: () => void; onBack?: () => void } = {}) {
+export function Screen6Result({
+  onRestart,
+  onBack,
+}: {
+  onNext?: () => void;
+  onPrev?: () => void;
+  onRestart?: () => void;
+  onBack?: () => void;
+} = {}) {
   const navigate = useNavigate();
   const cardRef = useRef<HTMLDivElement | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const profile = useCatProfile();
-  const liveAvatar = useCatAvatar();
-  const avatarSrc = getCurrentSessionCatAvatar() ?? profile.avatar ?? getPhotoDraft().avatar ?? liveAvatar ?? getCatAvatar();
+  const uploaded = useCatAvatar();
+  const avatarSrc =
+    getCurrentSessionCatAvatar() ??
+    profile.avatar ??
+    getPhotoDraft().avatar ??
+    uploaded ??
+    getCatAvatar() ??
+    hero;
   const catName = useCatName();
   const persona = useCatPersona();
-  const personaType = persona?.type ?? "高冷观察者";
-  const personaMbti = persona?.mbti ?? "INTJ-A";
-  const personaTags = persona?.tags?.length ? persona.tags : CHIPS;
-  const personaTraits = persona?.traits?.length
-    ? persona.traits.slice(0, 3).map((t, i) => ({ icon: ["🐾", "🏠", "🔍"][i] ?? "✦", label: t.label, v: t.value }))
-    : TRAITS;
-  const personaObservations = persona?.observations?.length
-    ? persona.observations.slice(0, 4).map((o) => {
-        const raw = o as { label?: string; value?: string; v?: string };
-        return {
-          label: raw.label || "观察依据",
-          v: raw.value || raw.v || "",
-        };
-      })
-    : OBSERVATIONS;
+  const personaType = persona?.type ?? "奶油小绅士";
+  const personaMbti = persona?.mbti ?? "ISFJ-A";
+  const personaKeywords = persona?.tags?.length ? persona.tags.slice(0, 3) : KEYWORDS;
+  const personaInsights = persona?.observations?.length
+    ? persona.observations.slice(0, 3).map((item, index) => ({
+        emoji: ["👀", "🏠", "❤️"][index] ?? "✦",
+        title: item.label,
+        desc: item.value,
+      }))
+    : INSIGHTS;
 
-  const openShare = () => setShareOpen(true);
+  const SCENES = [
+    { src: sceneA, title: "靠窗发呆", line: "我喜欢你在，但不用一直陪我。" },
+    { src: sceneB, title: "偷偷陪伴", line: "你忙你的，我在旁边就好。" },
+    { src: sceneC, title: "睡前守候", line: "等你睡了，我再走。" },
+  ];
+
   const closeShare = () => setShareOpen(false);
 
-  const shareToWeChat = () => {
-    closeShare();
-    toast("正在调起微信，请选择要分享的好友…");
-  };
-  const shareToMoments = () => {
-    closeShare();
-    toast("正在打开朋友圈发布页…");
-  };
   const saveImage = async () => {
     if (busy || !cardRef.current) return;
     setBusy(true);
@@ -87,101 +93,131 @@ export function Screen6Result({ onRestart, onBack }: { onNext?: () => void; onPr
   };
 
   const handleSave = () => {
+    try {
+      localStorage.setItem(
+        "neko:result",
+        JSON.stringify({
+          name: catName,
+          type: personaType,
+          mbti: personaMbti,
+          savedAt: Date.now(),
+        }),
+      );
+    } catch {
+      // Continue saving the profile even when local storage is unavailable.
+    }
     persistCatResult();
     voicesStore.clear();
     void saveLocalNekoToCloud({ includeVoices: false }).catch(() => undefined);
     navigate({ to: "/app" });
   };
-  return (
-    <div ref={cardRef} className="absolute inset-0 flex flex-col pt-[50px] overflow-y-auto scrollbar-none"
-      style={{ background: "linear-gradient(180deg, oklch(0.98 0.018 80) 0%, oklch(0.96 0.03 320) 55%, oklch(0.96 0.035 270) 100%)" }}>
-      <Sparkles count={22} />
 
-      {/* top bar */}
-      <div className="relative z-10 flex items-center justify-between px-6">
-        <div className="flex items-center gap-2">
-          {onBack && (
+  return (
+    <div
+      ref={cardRef}
+      className="absolute inset-0 flex flex-col overflow-y-auto scrollbar-none"
+      style={{
+        background:
+          "linear-gradient(180deg, oklch(0.975 0.022 320) 0%, oklch(0.965 0.03 300) 50%, oklch(0.96 0.035 285) 100%)",
+      }}
+    >
+      <Sparkles count={14} />
+
+      {/* ================= SCREEN 1 : 这是我的猫 ================= */}
+      <div className="relative z-10 shrink-0">
+        <div className="absolute left-0 right-0 top-0 z-30 flex items-center justify-between px-5 pt-[50px]">
+          {onBack ? (
             <button
               type="button"
               aria-label="返回"
               onClick={onBack}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-white/80 text-[oklch(0.5_0.1_320)] backdrop-blur transition-all duration-150 active:scale-[0.95] active:bg-white/95"
-              style={{ boxShadow: "var(--shadow-soft)" }}
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-white/80 backdrop-blur-md transition-transform active:scale-95"
             >
-              <ChevronLeft size={16} strokeWidth={2.25} />
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M15 6l-6 6 6 6"
+                  stroke="oklch(0.45 0.12 305)"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </button>
+          ) : (
+            <span />
           )}
-          <span className="text-[10px] tracking-[0.5em] text-[oklch(0.55_0.08_320)]">N E K O · I D</span>
-        </div>
-        <button
-          type="button"
-          aria-label="分享"
-          onClick={openShare}
-          className="flex h-10 w-10 items-center justify-center rounded-full text-white transition-transform duration-75 active:scale-95"
-          style={{
-            background: "linear-gradient(135deg, #B69AEF 0%, #E6B8CF 100%)",
-            boxShadow: "0 10px 22px -8px oklch(0.78 0.11 305 / 0.55)",
-          }}
-        >
-          <Share2 className="h-[18px] w-[18px]" strokeWidth={2.2} />
-        </button>
-      </div>
-
-      {/* === SECTION 1 · HERO (horizontal, 150px) === */}
-      <div className="relative z-10 mx-5 mt-4 shrink-0 overflow-hidden rounded-[26px] p-4"
-        style={{
-          background: "linear-gradient(135deg, oklch(1 0 0 / 0.92) 0%, oklch(0.97 0.035 320 / 0.82) 55%, oklch(0.96 0.04 270 / 0.75) 100%)",
-          border: "1px solid oklch(1 0 0 / 0.7)",
-          backdropFilter: "blur(22px)",
-          boxShadow: "0 24px 48px -28px oklch(0.78 0.11 305 / 0.35)",
-        }}>
-        {/* match badge top-right */}
-        <div className="absolute right-3 top-3 z-10 rounded-full bg-white/80 px-2.5 py-[3px] text-[9.5px] tracking-wider text-[oklch(0.45_0.1_305)] shadow-[0_4px_10px_-6px_oklch(0.78_0.11_305/0.4)]"
-          style={{ border: "1px solid oklch(0.9 0.04 320 / 0.6)" }}>
-          <span className="text-[oklch(0.55_0.06_300)]">人格匹配度</span> <span className="font-semibold">{persona?.matchScore ?? 92}%</span>
+          <span className="text-[10px] tracking-[0.5em] font-medium text-[oklch(0.55_0.06_320)]">
+            NEKO.ID
+          </span>
+          <button
+            type="button"
+            aria-label="分享"
+            onClick={() => setShareOpen(true)}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/80 backdrop-blur-md text-[oklch(0.45_0.12_305)] transition-transform active:scale-95"
+          >
+            <Share2 className="h-[16px] w-[16px]" strokeWidth={2} />
+          </button>
         </div>
 
-        {/* aura */}
-        <div className="pointer-events-none absolute -left-8 top-1/2 h-[180px] w-[180px] -translate-y-1/2 rounded-full opacity-55 blur-3xl"
-          style={{ background: "radial-gradient(circle, oklch(0.9 0.1 320 / 0.85), transparent 70%)" }} />
+        {/* HERO */}
+        <div className="relative h-[520px] w-full overflow-hidden">
+          <img
+            src={avatarSrc}
+            alt={catName}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+          <div
+            className="absolute inset-x-0 bottom-0 h-[300px]"
+            style={{
+              background:
+                "linear-gradient(180deg, transparent 0%, oklch(0.97 0.025 320 / 0.6) 50%, oklch(0.965 0.03 300) 100%)",
+            }}
+          />
 
-        <div className="relative flex items-center gap-4">
-          {/* avatar */}
-          <div className="relative h-[112px] w-[112px] shrink-0">
-            <div className="absolute inset-0 rounded-full border border-[oklch(0.86_0.06_320/0.45)] animate-orbit" />
-            <div className="absolute inset-2 rounded-full border border-[oklch(0.86_0.06_260/0.4)] [animation:orbit_24s_linear_infinite_reverse]" />
-            <div className="absolute inset-[6px] overflow-hidden rounded-full bg-white p-1 shadow-[0_14px_30px_-14px_oklch(0.78_0.11_305/0.55)]">
-              {avatarSrc ? (
-                <img src={avatarSrc} alt={catName} className="h-full w-full rounded-full object-cover" loading="lazy" width={1024} height={1024} />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center rounded-full bg-[oklch(0.985_0.018_320)] text-[10px] tracking-[0.18em] text-[oklch(0.58_0.06_300)]">
-                  本次头像
-                </div>
-              )}
+          <div className="absolute left-6 right-6 bottom-5 z-10">
+            <div
+              className="text-[15px] font-medium leading-none tracking-[0.02em] text-[oklch(0.5_0.045_300)]"
+              style={{ textShadow: "0 2px 14px oklch(1 0 0 / 0.9)" }}
+            >
+              {catName}
             </div>
-          </div>
-
-          {/* info */}
-          <div className="min-w-0 flex-1">
-            <div className="text-[15px] font-light leading-none tracking-wide text-[oklch(0.5_0.05_300)]">{catName}</div>
-            <div className="mt-1.5 text-[22px] font-medium leading-tight"
-              style={{
-                background: "linear-gradient(90deg, #A88BEA 0%, #C896E0 50%, #EFAFC8 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}>
-              {personaType}
+            <div className="mt-1.5 flex flex-col gap-1.5">
+              <span
+                className="text-[26px] font-semibold leading-tight"
+                style={{
+                  background: "linear-gradient(90deg, #A88BEA 0%, #C896E0 45%, #EFAFC8 100%)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                }}
+              >
+                {personaType}
+              </span>
+              <span
+                className="flex items-baseline gap-2"
+                style={{ textShadow: "0 2px 10px oklch(1 0 0 / 0.9)" }}
+              >
+                <span className="text-[11px] font-normal tracking-[0.24em] text-[oklch(0.62_0.04_300)]">
+                  MBTI
+                </span>
+                <span className="text-[15px] font-medium text-[oklch(0.45_0.11_300)]">
+                  {personaMbti}
+                </span>
+              </span>
             </div>
-            <div className="mt-1.5 flex items-center gap-1.5">
-              <span className="text-[9px] tracking-[0.3em] text-[oklch(0.55_0.06_300)]">MBTI</span>
-              <span className="text-[11.5px] font-medium tracking-wider text-[oklch(0.45_0.1_305)]">{personaMbti}</span>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1">
-              {personaTags.slice(0, 4).map((t) => (
-                <span key={t}
-                  className="rounded-full border border-[oklch(0.9_0.04_320/0.6)] bg-white/80 px-2 py-[2px] text-[9.5px] tracking-wider text-[oklch(0.5_0.08_320)]">
-                  {t}
+            <p
+              className="mt-3 text-[14px] font-normal leading-[1.7] text-[oklch(0.42_0.045_300)]"
+              style={{ textShadow: "0 1px 6px oklch(1 0 0 / 0.95)" }}
+            >
+              “{persona?.monologue ?? "不黏人，但永远会待在离你不远的地方。"}”
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {personaKeywords.map((k) => (
+                <span
+                  key={k}
+                  className="rounded-full bg-white/85 backdrop-blur px-3 py-[6px] text-[12px] font-normal text-[oklch(0.5_0.08_305)]"
+                  style={{ boxShadow: "0 8px 20px -14px oklch(0.6 0.12 305 / 0.6)" }}
+                >
+                  {k}
                 </span>
               ))}
             </div>
@@ -189,154 +225,263 @@ export function Screen6Result({ onRestart, onBack }: { onNext?: () => void; onPr
         </div>
       </div>
 
-      {/* === SECTION 2 · INNER MONOLOGUE === */}
-      <Section title="AI 内心独白" hint="INNER · VOICE" tone>
-        <div className="relative">
-          <span className="absolute -left-1 -top-2 text-[34px] font-serif leading-none text-[oklch(0.78_0.11_305/0.35)]">“</span>
-          <p className="px-4 pt-1 text-center text-[14px] font-light italic leading-[1.7] text-foreground">
-            {persona?.monologue ?? "如果你早点回来，我也不是不可以陪你玩一会。"}
-          </p>
-          <span className="absolute -right-1 -bottom-3 text-[34px] font-serif leading-none text-[oklch(0.78_0.11_305/0.35)]">”</span>
-        </div>
-        <div className="mt-3 text-right text-[10px] tracking-[0.25em] text-[oklch(0.55_0.05_300)]">—— {catName} · by NEKO</div>
-      </Section>
+      {/* ================= SCREEN 2 ================= */}
 
-      {/* === SECTION 3 · PERSONALITY ANALYSIS === */}
-      <Section title="AI 人格解析" hint="PERSONALITY · ANALYSIS">
-        <p className="text-[12.5px] leading-[1.8] text-foreground/85">
-          {persona?.analysis ?? "它习惯先观察，再靠近。对陌生人保持礼貌距离，却会在熟悉的人面前偷偷放松。它不擅长直接表达喜欢，更愿意通过停留、陪伴和注视，表达自己的情感。"}
-        </p>
-      </Section>
-
-      {/* === SECTION 4 · HOW YOUR CAT SEES YOU === */}
-      <Section title="它眼中的你" hint="YOUR · ROLE">
-        <p className="text-[12.5px] leading-[1.8] text-foreground/85">
-          {persona?.ownerRole ?? "你是它最信任的人。虽然经常回来得有点晚，但它总会在门口等你。那份从未说出口的牵挂，藏在每一次回望里。"}
-        </p>
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {["温柔", "安全感", "可信", "陪伴者"].map((t) => (
-            <span key={t}
-              className="rounded-full px-2.5 py-[3px] text-[10px] tracking-wider text-white shadow-[0_4px_12px_-6px_oklch(0.78_0.11_305/0.45)]"
-              style={{ background: "var(--gradient-selected)" }}>
-              {t}
-            </span>
+      {/* 小世界 */}
+      <section className="relative z-10 mt-7 shrink-0">
+        <h2 className="flex items-baseline gap-2 px-6 text-[16px] font-semibold text-[oklch(0.32_0.05_300)]">
+          {catName}的小世界
+          <span className="text-[10px] font-normal tracking-[0.22em] text-[oklch(0.72_0.035_300)]">
+            LITTLE · WORLD
+          </span>
+        </h2>
+        <div className="mt-3.5 flex snap-x snap-mandatory gap-3.5 overflow-x-auto scrollbar-none pl-6 pr-[12%] pb-2">
+          {SCENES.map((s, i) => (
+            <SceneCard key={s.title} scene={s} index={i} total={SCENES.length} />
           ))}
         </div>
-      </Section>
-
-      {/* === SECTION 5 · 个性画像 (3 rings) === */}
-      <Section title="个性画像" hint="PERSONALITY · PORTRAIT">
-        <div className="grid grid-cols-3 gap-2 pt-1">
-          {personaTraits.map((t) => <Ring key={t.label} {...t} />)}
-        </div>
-      </Section>
-
-      {/* === SECTION 6 · PERSONALITY TAGS (6 only) === */}
-      <Section
-        title="人格标签"
-        hint="TAGS · 06"
-        action={<button className="text-[10px] tracking-wider text-[oklch(0.5_0.1_305)]">查看全部 ›</button>}
-      >
-        <div className="flex flex-wrap gap-1.5">
-          {personaTags.slice(0, 6).map((c, i) => (
-            <span key={c} className={
-              "rounded-full px-3 py-1.5 text-[11px] tracking-wide " +
-              (i % 2 === 0
-                ? "border border-[oklch(0.9_0.04_320/0.6)] bg-white/85 text-[oklch(0.45_0.08_320)]"
-                : "text-white shadow-[0_6px_14px_-8px_oklch(0.78_0.11_305/0.4)]")
-            } style={i % 2 === 1 ? { background: "var(--gradient-selected)" } : undefined}>
-              {c}
-            </span>
+        <div className="mt-3 flex justify-center gap-1.5">
+          {SCENES.map((s, i) => (
+            <span
+              key={s.title}
+              className="h-[5px] rounded-full"
+              style={{
+                width: i === 0 ? 16 : 5,
+                background:
+                  i === 0 ? "linear-gradient(90deg,#B69AEF,#E6B8CF)" : "oklch(0.86 0.04 310)",
+              }}
+            />
           ))}
         </div>
-      </Section>
+      </section>
 
-      {/* === SECTION 7 · AI OBSERVATION BASIS === */}
-      <Section title="AI 观察依据" hint="WHY · AI · THINKS · SO">
-        <div className="text-[10.5px] tracking-wider text-[oklch(0.55_0.06_300)]">最近 30 天观察</div>
-        <div className="mt-2.5 space-y-2">
-          {personaObservations.map((o) => (
-            <div key={`${o.label}-${o.v}`} className="rounded-[14px] bg-white/55 px-3 py-2.5"
-              style={{ border: "1px solid oklch(0.92 0.035 320 / 0.7)" }}>
-              <div className="text-[10px] tracking-[0.22em] text-[oklch(0.56_0.06_300)]">{o.label}</div>
-              <div className="mt-1 text-[12px] font-medium leading-[1.65] text-[oklch(0.42_0.08_305)]">{o.v}</div>
+      {/* 洞察 */}
+      <section className="relative z-10 mx-5 mt-7 shrink-0">
+        <h2 className="flex items-baseline gap-2 text-[16px] font-semibold text-[oklch(0.32_0.05_300)]">
+          原来它是这样的猫
+          <span className="text-[10px] font-normal tracking-[0.22em] text-[oklch(0.72_0.035_300)]">
+            CAT · INSIGHT
+          </span>
+        </h2>
+        <div className="mt-3.5 flex flex-col gap-2.5">
+          {personaInsights.map((it) => (
+            <div
+              key={it.title}
+              className="flex items-start gap-3 rounded-[20px] p-4"
+              style={{
+                background:
+                  "linear-gradient(180deg, oklch(1 0 0 / 0.85), oklch(0.99 0.015 320 / 0.65))",
+                border: "1px solid oklch(1 0 0 / 0.8)",
+                backdropFilter: "blur(20px)",
+                boxShadow: "0 14px 30px -24px oklch(0.6 0.12 305 / 0.5)",
+              }}
+            >
+              <span className="shrink-0 text-[18px] leading-none pt-[3px]">{it.emoji}</span>
+              <div className="min-w-0">
+                <div className="text-[14px] font-medium text-[oklch(0.33_0.045_300)]">
+                  {it.title}
+                </div>
+                <div className="mt-1 text-[13px] leading-[1.6] text-[oklch(0.57_0.04_300)]">
+                  {it.desc}
+                </div>
+              </div>
             </div>
           ))}
         </div>
-        <div className="mt-3 rounded-[14px] bg-white/55 px-3 py-2.5"
-          style={{ border: "1px solid oklch(1 0 0 / 0.7)" }}>
-          <span className="text-[10px] tracking-[0.3em] text-[oklch(0.55_0.08_320)]">AI 发现</span>
-          <p className="mt-1 text-[12px] leading-[1.7] text-foreground/85">
-            它更倾向于观察后行动，因此形成明显的<span className="font-medium text-[oklch(0.45_0.1_305)]">观察型</span>人格特征。
-          </p>
-        </div>
-      </Section>
+      </section>
 
-      {/* === BOTTOM ACTIONS === */}
-      <div className="sticky bottom-0 z-20 mt-4 shrink-0 grid grid-cols-2 gap-3 px-5 pt-5 pb-[max(10px,env(safe-area-inset-bottom))]">
-        <button
-          type="button"
-          onClick={() => onRestart?.()}
-          className="touch-manipulation rounded-full bg-white px-4 py-3.5 text-[13px] font-medium text-[oklch(0.5_0.1_305)] transition-transform duration-75 active:scale-[0.98]"
-          style={{
-            border: "1.5px solid #C7B3F2",
-            boxShadow: "0 8px 20px -14px oklch(0.78 0.11 305 / 0.4)",
-          }}>
-          重新识别
-        </button>
-        <button
-          type="button"
-          onClick={handleSave}
-          className="flex touch-manipulation items-center justify-center rounded-full px-4 py-3.5 text-[13px] font-medium text-white transition-transform duration-75 active:scale-[0.98]"
-          style={{
-            background: "linear-gradient(90deg, #B69AEF 0%, #E6B8CF 100%)",
-            boxShadow: "0 14px 28px -14px oklch(0.78 0.11 305 / 0.55)",
-          }}>
-          保存结果
-        </button>
+      {/* 情绪高潮：你在它心里 */}
+      <section
+        className="relative z-10 mx-5 mt-7 shrink-0 overflow-hidden rounded-[26px]"
+        style={{
+          background:
+            "linear-gradient(160deg, oklch(0.97 0.035 330 / 0.95), oklch(0.955 0.045 295 / 0.95))",
+          border: "1px solid oklch(1 0 0 / 0.8)",
+          boxShadow: "0 20px 44px -26px oklch(0.6 0.14 305 / 0.6)",
+        }}
+      >
+        <div className="flex min-h-[168px] items-stretch">
+          {/* 左侧：文字 */}
+          <div className="flex-1 min-w-0 px-5 py-5">
+            <div className="flex items-start gap-2">
+              <span className="shrink-0 text-[15px] leading-[1.5] pt-[3px]">❤️</span>
+              <h2 className="min-w-0 flex-1 break-words text-[16px] font-semibold leading-[1.5] text-[oklch(0.32_0.05_300)]">
+                在{catName}眼里，你是什么？
+              </h2>
+            </div>
+            <div
+              className="mt-3 inline-flex rounded-full px-3.5 py-1.5 text-[13px] font-medium text-white"
+              style={{ background: "linear-gradient(90deg, #B69AEF, #E6B8CF)" }}
+            >
+              {persona?.ownerRole ?? "我的安全区"}
+            </div>
+            <p className="mt-3 text-[13px] leading-[1.75] text-[oklch(0.45_0.04_300)]">
+              “{persona?.analysis ?? "我不一定每次都跑向你，但如果你在家，我会睡得更安心。"}”
+            </p>
+          </div>
+
+          {/* 右侧：图片 */}
+          <div className="relative w-[40%] min-w-[130px] overflow-hidden">
+            <img
+              src={bond}
+              alt=""
+              loading="lazy"
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+            <div
+              className="absolute inset-y-0 left-0 w-[28px]"
+              style={{
+                background: "linear-gradient(90deg, oklch(0.97 0.035 330 / 0.95), transparent)",
+              }}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* 底部操作 */}
+      <div
+        className="sticky bottom-0 z-20 mt-7 shrink-0 px-5 pt-3 pb-[max(20px,env(safe-area-inset-bottom))]"
+        style={{
+          background:
+            "linear-gradient(180deg, transparent, oklch(0.96 0.035 290 / 0.92) 35%, oklch(0.96 0.035 285 / 0.98) 100%)",
+        }}
+      >
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => onRestart?.()}
+            className="touch-manipulation rounded-full bg-white px-4 py-3.5 text-[14px] font-medium text-[oklch(0.5_0.1_305)] transition-transform duration-75 active:scale-[0.98]"
+            style={{
+              border: "1.5px solid #C7B3F2",
+              boxShadow: "0 8px 20px -14px oklch(0.78 0.11 305 / 0.4)",
+            }}
+          >
+            重新识别
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            className="flex touch-manipulation items-center justify-center rounded-full px-4 py-3.5 text-[14px] font-medium text-white transition-transform duration-75 active:scale-[0.98]"
+            style={{
+              background: "linear-gradient(90deg, #B69AEF 0%, #E6B8CF 100%)",
+              boxShadow: "0 14px 28px -14px oklch(0.78 0.11 305 / 0.55)",
+            }}
+          >
+            保存结果
+          </button>
+        </div>
       </div>
 
-      {shareOpen && (
-        <ShareSheet
-          onClose={closeShare}
-          onWeChat={shareToWeChat}
-          onMoments={shareToMoments}
-          onSaveImage={saveImage}
-          busy={busy}
-        />
-      )}
+      {shareOpen && <ShareSheet onClose={closeShare} onSaveImage={saveImage} busy={busy} />}
     </div>
+  );
+}
+
+function SceneCard({
+  scene,
+  index,
+  total,
+}: {
+  scene: { src: string; title: string; line: string };
+  index: number;
+  total: number;
+}) {
+  return (
+    <article
+      className="relative w-[88vw] max-w-[340px] shrink-0 snap-start overflow-hidden rounded-[24px]"
+      style={{
+        border: "1px solid oklch(1 0 0 / 0.85)",
+        boxShadow: "0 18px 36px -26px oklch(0.6 0.12 305 / 0.55)",
+      }}
+    >
+      <div className="relative aspect-[4/5] w-full overflow-hidden">
+        <img
+          src={scene.src}
+          alt={scene.title}
+          loading="lazy"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        <div
+          className="absolute inset-x-0 bottom-0 h-[52%]"
+          style={{
+            background:
+              "linear-gradient(180deg, transparent, oklch(0.2 0.05 300 / 0.55) 55%, oklch(0.18 0.05 300 / 0.72))",
+          }}
+        />
+        <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 px-4 pb-4">
+          <div className="min-w-0">
+            <div
+              className="text-[14px] font-medium tracking-[0.06em] text-white/95"
+              style={{ textShadow: "0 1px 8px oklch(0.2 0.05 300 / 0.6)" }}
+            >
+              {scene.title}
+            </div>
+            <p
+              className="mt-1 text-[12.5px] leading-[1.6] text-white/80"
+              style={{ textShadow: "0 1px 8px oklch(0.2 0.05 300 / 0.6)" }}
+            >
+              {scene.line}
+            </p>
+          </div>
+          <div className="shrink-0 pb-[2px] text-[10px] tracking-[0.16em] text-white/70">
+            {String(index + 1).padStart(2, "0")}/{String(total).padStart(2, "0")}
+          </div>
+        </div>
+      </div>
+    </article>
   );
 }
 
 function ShareSheet({
   onClose,
-  onWeChat,
-  onMoments,
   onSaveImage,
   busy,
 }: {
   onClose: () => void;
-  onWeChat: () => void;
-  onMoments: () => void;
   onSaveImage: () => void;
   busy: boolean;
 }) {
   const items = [
-    { key: "wechat", label: "微信好友", emoji: "💬", bg: "linear-gradient(135deg, #6BD46B, #2BB85C)", onClick: onWeChat },
-    { key: "moments", label: "朋友圈", emoji: "🌈", bg: "linear-gradient(135deg, #FFB36B, #FF6BB5)", onClick: onMoments },
-    { key: "save", label: "保存图片", emoji: "⬇️", bg: "linear-gradient(135deg, #B69AEF, #E6B8CF)", onClick: onSaveImage },
+    {
+      key: "wechat",
+      label: "微信好友",
+      emoji: "💬",
+      bg: "linear-gradient(135deg, #6BD46B, #2BB85C)",
+      onClick: () => {
+        onClose();
+        toast("正在调起微信…");
+      },
+    },
+    {
+      key: "moments",
+      label: "朋友圈",
+      emoji: "🌈",
+      bg: "linear-gradient(135deg, #FFB36B, #FF6BB5)",
+      onClick: () => {
+        onClose();
+        toast("正在打开朋友圈发布页…");
+      },
+    },
+    {
+      key: "save",
+      label: "保存图片",
+      emoji: "⬇️",
+      bg: "linear-gradient(135deg, #B69AEF, #E6B8CF)",
+      onClick: onSaveImage,
+    },
   ];
   return (
     <div className="absolute inset-0 z-50 flex flex-col justify-end" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/35 backdrop-blur-[2px] animate-in fade-in duration-150" />
+      <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px] animate-in fade-in duration-150" />
       <div
         className="relative mx-auto w-full max-w-[480px] rounded-t-[28px] bg-white/95 px-5 pb-7 pt-5 shadow-[0_-20px_50px_-20px_oklch(0.4_0.1_305/0.35)] backdrop-blur-xl"
         style={{ animation: "slideUp 220ms cubic-bezier(0.22, 1, 0.36, 1)" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mx-auto h-1 w-10 rounded-full bg-[oklch(0.9_0.03_320)]" />
-        <div className="mt-4 text-center text-[13px] font-medium text-foreground">分享我的猫人格</div>
+        <div className="mt-4 text-center text-[15px] font-medium text-foreground">
+          分享我的猫人格
+        </div>
         <div className="mt-5 grid grid-cols-3 gap-2">
           {items.map((it) => (
             <button
@@ -352,96 +497,19 @@ function ShareSheet({
               >
                 {it.emoji}
               </span>
-              <span className="text-[11.5px] text-foreground/80">{it.label}</span>
+              <span className="text-[13px] text-foreground/80">{it.label}</span>
             </button>
           ))}
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="mt-5 w-full rounded-full bg-[oklch(0.96_0.02_320)] py-3 text-[13px] font-medium text-[oklch(0.45_0.08_305)] active:scale-[0.99] transition-transform duration-75"
+          className="mt-5 w-full rounded-full bg-[oklch(0.96_0.02_320)] py-3.5 text-[15px] font-medium text-[oklch(0.45_0.08_305)] active:scale-[0.99] transition-transform duration-75"
         >
           取消
         </button>
       </div>
       <style>{`@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }`}</style>
-    </div>
-  );
-}
-
-function Section({
-  title,
-  hint,
-  children,
-  tone,
-  action,
-}: {
-  title: string;
-  hint: string;
-  children: React.ReactNode;
-  tone?: boolean;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="relative z-10 mx-5 mt-3 shrink-0 rounded-[22px] p-4"
-      style={tone
-        ? {
-            background: "linear-gradient(160deg, oklch(0.98 0.03 320) 0%, oklch(0.97 0.04 270) 100%)",
-            border: "1px solid oklch(1 0 0 / 0.6)",
-            boxShadow: "0 14px 30px -22px oklch(0.78 0.11 305 / 0.35)",
-          }
-        : {
-            background: "linear-gradient(180deg, oklch(1 0 0 / 0.88), oklch(0.98 0.015 320 / 0.7))",
-            border: "1px solid oklch(1 0 0 / 0.7)",
-            backdropFilter: "blur(20px)",
-            boxShadow: "0 14px 30px -22px oklch(0.78 0.11 305 / 0.3)",
-          }}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-          <span className="text-[13px] font-medium text-foreground">{title}</span>
-          <span className="max-w-full break-words text-[8px] tracking-[0.24em] leading-[1.4] text-[oklch(0.6_0.08_320)]">{hint}</span>
-        </div>
-        {action ? <div className="shrink-0">{action}</div> : null}
-      </div>
-      <div className="mt-3">{children}</div>
-    </div>
-  );
-}
-
-function Ring({ icon, label, v }: { icon: string; label: string; v: number }) {
-  const SIZE = 72;
-  const STROKE = 8;
-  const r = (SIZE - STROKE) / 2;
-  const C = 2 * Math.PI * r;
-  const id = `ring-${label}`;
-  return (
-    <div className="flex flex-col items-center">
-      <div className="relative" style={{ width: SIZE, height: SIZE }}>
-        <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="absolute inset-0 -rotate-90">
-          <defs>
-            <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#B69AEF" />
-              <stop offset="100%" stopColor="#E6B8CF" />
-            </linearGradient>
-          </defs>
-          <circle cx={SIZE / 2} cy={SIZE / 2} r={r} fill="none" stroke="#EEE6F8" strokeWidth={STROKE} />
-          <circle
-            cx={SIZE / 2}
-            cy={SIZE / 2}
-            r={r}
-            fill="none"
-            stroke={`url(#${id})`}
-            strokeWidth={STROKE}
-            strokeLinecap="round"
-            strokeDasharray={`${(C * v) / 100} ${C}`}
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-[15px] font-semibold tracking-tight text-[oklch(0.4_0.1_305)]">{v}%</span>
-          <span className="text-[11px] leading-none">{icon}</span>
-        </div>
-      </div>
-      <div className="mt-2 text-[11px] tracking-wide text-foreground/80">{label}</div>
     </div>
   );
 }
