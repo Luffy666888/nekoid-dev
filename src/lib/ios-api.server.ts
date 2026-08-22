@@ -1,4 +1,5 @@
 import { detectCatFaceServer, setCatFaceWorkerEnv } from "./catface.functions";
+import { handleIOSCloudRequest, IOSCloudError } from "./ios-cloud.server";
 import {
   generateCatPersonaServer,
   generateCatVoiceServer,
@@ -75,7 +76,7 @@ async function requireSupabaseUser(request: Request, env: unknown) {
     throw new APIError(401, "invalid_auth", "Invalid Supabase session");
   }
 
-  return user;
+  return { token, user: { id: user.id, email: user.email ?? null } };
 }
 
 async function readJson(request: Request) {
@@ -121,8 +122,13 @@ export async function handleIOSAPIRequest(request: Request, env: unknown) {
       throw new APIError(405, "method_not_allowed", "Use POST");
     }
 
-    await requireSupabaseUser(request, env);
+    const { token, user } = await requireSupabaseUser(request, env);
     const body = await readJson(request);
+
+    const cloudResult = await handleIOSCloudRequest(url.pathname, body, env, token, user);
+    if (cloudResult !== null) {
+      return jsonResponse({ ok: true, data: cloudResult });
+    }
 
     if (url.pathname === "/api/ios/detect-cat-face") {
       const result = await detectCatFaceServer(body as { imageDataUrl: string; mode?: "face" | "presence" });
@@ -143,7 +149,7 @@ export async function handleIOSAPIRequest(request: Request, env: unknown) {
 
     return errorResponse(404, "not_found", "Unknown iOS API endpoint");
   } catch (error) {
-    if (error instanceof APIError) {
+    if (error instanceof APIError || error instanceof IOSCloudError) {
       return errorResponse(error.status, error.code, error.message);
     }
 
