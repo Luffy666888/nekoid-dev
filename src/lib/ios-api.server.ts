@@ -122,13 +122,7 @@ export async function handleIOSAPIRequest(request: Request, env: unknown) {
       throw new APIError(405, "method_not_allowed", "Use POST");
     }
 
-    const { token, user } = await requireSupabaseUser(request, env);
     const body = await readJson(request);
-
-    const cloudResult = await handleIOSCloudRequest(url.pathname, body, env, token, user);
-    if (cloudResult !== null) {
-      return jsonResponse({ ok: true, data: cloudResult });
-    }
 
     if (url.pathname === "/api/ios/detect-cat-face") {
       const result = await detectCatFaceServer(body as { imageDataUrl: string; mode?: "face" | "presence" });
@@ -140,6 +134,13 @@ export async function handleIOSAPIRequest(request: Request, env: unknown) {
         body as Parameters<typeof generateCatPersonaServer>[0],
       );
       return jsonResponse({ ok: true, data: result });
+    }
+
+    const { token, user } = await requireSupabaseUser(request, env);
+
+    const cloudResult = await handleIOSCloudRequest(url.pathname, body, env, token, user);
+    if (cloudResult !== null) {
+      return jsonResponse({ ok: true, data: cloudResult });
     }
 
     if (url.pathname === "/api/ios/voice") {
