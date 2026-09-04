@@ -1,0 +1,23 @@
+[Unit]
+Description=NEKO.ID China Node server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nekoid
+Group=nekoid
+WorkingDirectory=/opt/nekoid/current
+EnvironmentFile=/etc/nekoid/nekoid.env
+ExecStart=/usr/bin/node .output/server/index.mjs
+Restart=always
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

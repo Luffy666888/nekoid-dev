@@ -1,4 +1,5 @@
 import { detectCatFaceServer, setCatFaceWorkerEnv } from "./catface.functions";
+import { handleIOSAuthRequest, IOSAuthError } from "./ios-auth.server";
 import { handleIOSCloudRequest, IOSCloudError } from "./ios-cloud.server";
 import {
   generateCatPersonaServer,
@@ -136,6 +137,11 @@ export async function handleIOSAPIRequest(request: Request, env: unknown) {
       return jsonResponse({ ok: true, data: result });
     }
 
+    const authResult = await handleIOSAuthRequest(url.pathname, body, env);
+    if (authResult !== null) {
+      return jsonResponse({ ok: true, data: authResult });
+    }
+
     const { token, user } = await requireSupabaseUser(request, env);
 
     const cloudResult = await handleIOSCloudRequest(url.pathname, body, env, token, user);
@@ -150,7 +156,7 @@ export async function handleIOSAPIRequest(request: Request, env: unknown) {
 
     return errorResponse(404, "not_found", "Unknown iOS API endpoint");
   } catch (error) {
-    if (error instanceof APIError || error instanceof IOSCloudError) {
+    if (error instanceof APIError || error instanceof IOSAuthError || error instanceof IOSCloudError) {
       return errorResponse(error.status, error.code, error.message);
     }
 
