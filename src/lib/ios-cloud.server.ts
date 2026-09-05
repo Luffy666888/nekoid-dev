@@ -85,7 +85,7 @@ function requireSupabaseConfig(env: unknown) {
     getEnvValue(env, "SUPABASE_PUBLISHABLE_KEY") || getEnvValue(env, "VITE_SUPABASE_PUBLISHABLE_KEY");
 
   if (!url || !publishableKey) {
-    throw new IOSCloudError(500, "supabase_not_configured", "Supabase is not configured");
+    throw new IOSCloudError(500, "supabase_not_configured", "云端服务暂时不可用，请稍后再试。");
   }
 
   return { url, publishableKey };
@@ -161,7 +161,7 @@ function extFromMime(mime: string) {
 function decodeDataURL(dataUrl: string) {
   const match = dataUrl.match(/^data:([^;,]+)?(;base64)?,(.*)$/);
   if (!match) {
-    throw new IOSCloudError(400, "invalid_media_data", "Invalid media data");
+    throw new IOSCloudError(400, "invalid_media_data", "媒体读取失败，请换一个文件再试。");
   }
 
   const mime = match[1] || "application/octet-stream";
@@ -408,6 +408,19 @@ async function upsertPersona(client: SupabaseClient, user: IOSUser, catId: strin
 
 async function saveCatProfile(client: SupabaseClient, user: IOSUser, body: JsonRecord) {
   const currentCatId = cleanString(body.currentCatId);
+
+  if (!currentCatId) {
+    const existingActiveCat = await fetchActiveCatRow(client, user);
+    if (existingActiveCat) {
+      const [profile, persona] = await Promise.all([
+        mapCatRow(client, existingActiveCat),
+        fetchPersona(client, existingActiveCat.id),
+      ]);
+
+      return { profile, persona };
+    }
+  }
+
   const catId = currentCatId || randomId();
   const name = cleanString(body.name, "丸子").slice(0, 40);
   const gender = cleanString(body.gender, "小母猫");
@@ -424,7 +437,7 @@ async function saveCatProfile(client: SupabaseClient, user: IOSUser, body: JsonR
 
   if (existing?.error) throw new IOSCloudError(500, "cat_load_failed", existing.error.message);
   if (currentCatId && !existing?.data) {
-    throw new IOSCloudError(404, "cat_not_found", "Cat profile not found");
+    throw new IOSCloudError(404, "cat_not_found", "没有找到这份猫咪档案，请刷新后再试。");
   }
 
   const existingCat = existing?.data as { avatar_object_key?: string | null; quiz?: Record<string, string> | null } | null;
@@ -464,7 +477,7 @@ async function saveCatProfile(client: SupabaseClient, user: IOSUser, body: JsonR
 
 async function updateAvatar(client: SupabaseClient, user: IOSUser, body: JsonRecord) {
   const catId = cleanString(body.catId);
-  if (!catId) throw new IOSCloudError(400, "missing_cat_id", "Missing cat id");
+  if (!catId) throw new IOSCloudError(400, "missing_cat_id", "猫咪档案状态异常，请刷新后再试。");
 
   const { data: existing, error: loadError } = await client
     .from("cats")
@@ -517,8 +530,8 @@ async function saveVoice(client: SupabaseClient, user: IOSUser, body: JsonRecord
   const catId = cleanString(body.catId);
   const voice = (body.voice && typeof body.voice === "object" ? body.voice : {}) as JsonRecord;
   const voiceId = cleanString(voice.cloudId) || randomId();
-  if (!catId) throw new IOSCloudError(400, "missing_cat_id", "Missing cat id");
-  if (!cleanString(voice.text)) throw new IOSCloudError(400, "missing_voice_text", "Missing voice text");
+  if (!catId) throw new IOSCloudError(400, "missing_cat_id", "猫咪档案状态异常，请刷新后再试。");
+  if (!cleanString(voice.text)) throw new IOSCloudError(400, "missing_voice_text", "心声内容为空，请重新识别后再试。");
 
   const mediaObjectKey = await uploadDataUrl(client, user.id, `voices/${voiceId}/media`, body.imageDataUrl, cleanString(voice.mediaObjectKey));
   const createdAt = msToIso(voice.createdAt);
@@ -553,7 +566,7 @@ async function saveVoice(client: SupabaseClient, user: IOSUser, body: JsonRecord
 async function deleteVoices(client: SupabaseClient, user: IOSUser, body: JsonRecord) {
   const catId = cleanString(body.catId);
   const ids = Array.isArray(body.ids) ? body.ids.map(String).filter(Boolean) : [];
-  if (!catId) throw new IOSCloudError(400, "missing_cat_id", "Missing cat id");
+  if (!catId) throw new IOSCloudError(400, "missing_cat_id", "猫咪档案状态异常，请刷新后再试。");
   if (!ids.length) return { deleted: 0 };
 
   const { data: rows, error: loadError } = await client

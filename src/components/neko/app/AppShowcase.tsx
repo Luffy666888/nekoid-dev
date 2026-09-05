@@ -1446,7 +1446,7 @@ function CloudSyncPanel() {
           <div className="text-[10px] tracking-[0.35em] text-[oklch(0.55_0.06_300)]">云 端 记 忆</div>
         </div>
         <p className="mt-2 text-[11.5px] leading-relaxed text-foreground/75">
-          登录后，猫咪档案、人格和心声会保存到 Supabase。现在只支持邮箱验证码登录。
+          登录后，猫咪档案、人格和心声会安全保存到云端。现在支持验证码登录。
         </p>
         <Link to="/auth/login" className="mt-3 flex w-full items-center justify-center rounded-full px-4 py-2.5 text-[12px] font-medium text-white"
           style={{ background: "var(--gradient-cta)" }}>

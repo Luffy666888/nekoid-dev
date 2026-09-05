@@ -36,6 +36,52 @@ function errorResponse(status: number, code: string, message: string) {
   return jsonResponse({ ok: false, error: { code, message } }, { status });
 }
 
+function containsInternalDetails(message: string) {
+  return /bytecat|qwen|deepseek|openai|dashscope|supabase|api[_ -]?key|bearer|timeout after|fetch failed|econn|etimedout|stack|trace/i.test(
+    message,
+  );
+}
+
+function hasChineseText(message: string) {
+  return /[\u4e00-\u9fff]/.test(message);
+}
+
+function publicErrorMessage(code: string, message: string) {
+  const trimmed = message.trim();
+
+  if (code === "missing_auth") return "请先登录后再继续。";
+  if (code === "invalid_auth") return "登录状态已过期，请重新登录。";
+  if (code === "supabase_not_configured") return "云端服务暂时不可用，请稍后再试。";
+  if (code === "unsupported_media_type" || code === "invalid_json") {
+    return "请求格式有点问题，请更新 App 后再试。";
+  }
+  if (code === "method_not_allowed" || code === "not_found") {
+    return "这个操作暂时不可用，请更新 App 后再试。";
+  }
+
+  if (/image too large/i.test(trimmed)) {
+    return "图片太大了，请换一张小一点的照片再试。";
+  }
+
+  if (/invalid image|invalid media/i.test(trimmed)) {
+    return "媒体读取失败，请换一个文件再试。";
+  }
+
+  if (trimmed && hasChineseText(trimmed) && !containsInternalDetails(trimmed)) {
+    return trimmed;
+  }
+
+  if (/timeout|aborted|fetch failed|network|econn|etimedout/i.test(trimmed)) {
+    return "服务响应有点慢，请稍后再试。";
+  }
+
+  if (containsInternalDetails(trimmed)) {
+    return "服务暂时不可用，请稍后再试。";
+  }
+
+  return "操作失败，请稍后再试。";
+}
+
 function getEnvValue(env: unknown, name: string) {
   const workerValue = (env as EnvLike | undefined)?.[name];
   if (workerValue) return workerValue;
@@ -157,14 +203,15 @@ export async function handleIOSAPIRequest(request: Request, env: unknown) {
     return errorResponse(404, "not_found", "Unknown iOS API endpoint");
   } catch (error) {
     if (error instanceof APIError || error instanceof IOSAuthError || error instanceof IOSCloudError) {
-      return errorResponse(error.status, error.code, error.message);
+      return errorResponse(error.status, error.code, publicErrorMessage(error.code, error.message));
     }
 
     console.error("NEKO iOS API failed", error);
+    const rawMessage = error instanceof Error ? error.message : "";
     return errorResponse(
       500,
       "internal_error",
-      error instanceof Error ? error.message : "Unknown server error",
+      publicErrorMessage("internal_error", rawMessage),
     );
   }
 }

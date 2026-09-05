@@ -346,6 +346,45 @@ function providerLabel(provider: AIProvider) {
   return "OpenAI";
 }
 
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error || "");
+}
+
+function isTimeoutLikeError(error: unknown) {
+  const message = getErrorMessage(error).toLowerCase();
+  return (
+    (error instanceof Error && error.name === "AbortError") ||
+    message.includes("timeout") ||
+    message.includes("aborted") ||
+    message.includes("fetch failed") ||
+    message.includes("network") ||
+    message.includes("econn") ||
+    message.includes("etimedout")
+  );
+}
+
+function getUserFacingAIMessage(kind: "persona" | "voice", error: unknown) {
+  const message = getErrorMessage(error).toLowerCase();
+
+  if (message.includes("image too large")) {
+    return "图片太大了，请换一张小一点的照片再试。";
+  }
+
+  if (message.includes("invalid image") || message.includes("missing profile")) {
+    return "猫咪资料读取失败，请返回检查后再试。";
+  }
+
+  if (isTimeoutLikeError(error)) {
+    return kind === "voice"
+      ? "AI 现在有点忙，猫咪心声暂时没有生成成功，请稍后再试。"
+      : "AI 现在有点忙，人格档案暂时没有生成成功，请稍后再试。";
+  }
+
+  return kind === "voice"
+    ? "AI 心声暂时没有生成成功，请稍后再试。"
+    : "AI 人格档案暂时没有生成成功，请稍后再试。";
+}
+
 async function getProviderModel(provider: AIProvider, mode: "text" | "vision" = "text") {
   if (provider === "deepseek") return (await getServerEnv("DEEPSEEK_MODEL")) || "deepseek-v4-flash";
   if (provider === "qwen") return (await getServerEnv("QWEN_VL_MODEL")) || "qwen-vl-plus";
@@ -571,7 +610,7 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
   } catch (error) {
     console.error("NEKO persona AI failed", error);
     if (await shouldRequireRealAI())
-      throw new Error(`AI 人格生成失败：${error instanceof Error ? error.message : "未知错误"}`);
+      throw new Error(getUserFacingAIMessage("persona", error));
     return buildStablePersona(data.profile);
   }
 }
@@ -626,7 +665,7 @@ export async function generateCatVoiceServer(input: VoiceInput): Promise<Voice> 
   } catch (error) {
     console.error("NEKO voice AI failed", error);
     if (await shouldRequireRealAI())
-      throw new Error(`AI 心声生成失败：${error instanceof Error ? error.message : "未知错误"}`);
+      throw new Error(getUserFacingAIMessage("voice", error));
     return buildStableVoice(data.profile, data.imageDataUrl, data.scene);
   }
 }

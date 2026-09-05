@@ -92,6 +92,52 @@ function providerLabel(provider: AIProvider) {
   return "OpenAI";
 }
 
+function isAbortError(error: unknown) {
+  return error instanceof Error && error.name === "AbortError";
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error || "");
+}
+
+function getUserFacingCatFaceFailure(error: unknown) {
+  const message = getErrorMessage(error).toLowerCase();
+
+  if (message.includes("image too large")) {
+    return "图片太大了，请换一张小一点的照片再试。";
+  }
+
+  if (message.includes("invalid image")) {
+    return "图片读取失败，请换一张清晰照片再试。";
+  }
+
+  if (
+    isAbortError(error) ||
+    message.includes("timeout") ||
+    message.includes("aborted") ||
+    message.includes("fetch failed") ||
+    message.includes("network") ||
+    message.includes("econn") ||
+    message.includes("etimedout")
+  ) {
+    return "猫咪图片识别暂时没有完成，请稍后再试或换一张照片。";
+  }
+
+  return "猫咪图片识别暂时失败，请稍后再试或换一张照片。";
+}
+
+function getCatFaceTimeoutMs(provider: AIProvider, isPresence: boolean) {
+  if (isPresence) {
+    if (provider === "bytecat") return 8_000;
+    if (provider === "qwen") return 7_000;
+    return 5_500;
+  }
+
+  if (provider === "qwen") return 9_000;
+  if (provider === "bytecat") return 20_000;
+  return 5_500;
+}
+
 async function getProviderModel(provider: AIProvider) {
   if (provider === "qwen") return (await getServerEnv("QWEN_VL_MODEL")) || "qwen-vl-plus";
   if (provider === "deepseek") return (await getServerEnv("DEEPSEEK_MODEL")) || "deepseek-v4-flash";
@@ -149,7 +195,8 @@ export async function detectCatFaceServer(input: CatFaceInput): Promise<CatFaceR
       continue;
     }
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), isQwen ? 9000 : isBytecat ? 20_000 : 5500);
+    const timeoutMs = getCatFaceTimeoutMs(provider, isPresence);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
       const baseUrl = isQwen
@@ -209,17 +256,22 @@ export async function detectCatFaceServer(input: CatFaceInput): Promise<CatFaceR
       }
     } catch (error) {
       lastError = error;
-      if (!(error instanceof Error && error.name === "AbortError"))
+      if (isPresence && isAbortError(error)) {
+        return { isCat: true, reason: "timeout" };
+      }
+      if (!isAbortError(error))
         console.error(`NEKO ${providerLabel(provider)} vision failed`, error);
     } finally {
       clearTimeout(timer);
     }
   }
 
+  if (isPresence) {
+    return { isCat: true, reason: "vision_unavailable" };
+  }
+
   if (await shouldRequireRealAI()) {
-    throw new Error(
-      `猫咪图片识别失败：${lastError instanceof Error ? lastError.message : "AI 未返回结果"}`,
-    );
+    throw new Error(getUserFacingCatFaceFailure(lastError));
   }
   return { isCat: true, reason: "vision_unavailable" };
 }

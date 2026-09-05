@@ -119,9 +119,9 @@ export function AuthLoginScreen() {
           <StatusBar />
           <div className="absolute inset-0 flex items-center justify-center px-7">
             <div className="w-full rounded-[28px] bg-white/85 p-5 text-center backdrop-blur" style={{ boxShadow: "var(--shadow-soft)" }}>
-              <div className="text-[18px] font-medium text-foreground">Supabase 尚未配置</div>
+              <div className="text-[18px] font-medium text-foreground">云端登录暂不可用</div>
               <p className="mt-2 text-[12px] leading-relaxed text-[oklch(0.55_0.06_300)]">
-                需要配置 VITE_SUPABASE_URL 和 VITE_SUPABASE_PUBLISHABLE_KEY 后才能使用邮箱登录。
+                登录服务正在配置中，请稍后再试。
               </p>
               <Link to="/app/me" className="mt-5 inline-flex rounded-full px-5 py-2.5 text-[12px] font-medium text-white" style={{ background: "var(--gradient-cta)" }}>
                 返回我的
@@ -167,7 +167,7 @@ export function AuthLoginScreen() {
             <div className="text-[10px] tracking-[0.45em] text-[oklch(0.58_0.08_320)]">NEKO ACCOUNT</div>
             <h1 className="mt-3 text-[28px] font-light leading-tight text-foreground">邮箱验证码登录</h1>
             <p className="mt-2 text-[12.5px] leading-relaxed text-[oklch(0.55_0.06_300)]">
-              输入邮箱，我们会通过 Supabase Auth 给你发送 6 位验证码。
+              输入邮箱，我们会给你发送 6 位验证码。
             </p>
           </div>
 
@@ -347,7 +347,7 @@ export function AccountScreen() {
 
         <div className="mt-4 rounded-[22px] bg-white/80 p-4 backdrop-blur" style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}>
           <div className="text-[10px] tracking-[0.32em] text-[oklch(0.55_0.06_300)]">云端数据</div>
-          <p className="mt-2 text-[11.5px] leading-relaxed text-foreground/75">把当前设备上的猫咪档案和心声保存到 Supabase，或从云端恢复到本机。</p>
+          <p className="mt-2 text-[11.5px] leading-relaxed text-foreground/75">把当前设备上的猫咪档案和心声保存到云端，或从云端恢复到本机。</p>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <button
               disabled={busy === "saveCloud"}

@@ -30,7 +30,7 @@ function requireSupabaseConfig(env: unknown) {
     getEnvValue(env, "SUPABASE_PUBLISHABLE_KEY") || getEnvValue(env, "VITE_SUPABASE_PUBLISHABLE_KEY");
 
   if (!url || !publishableKey) {
-    throw new IOSAuthError(500, "supabase_not_configured", "Supabase is not configured");
+    throw new IOSAuthError(500, "supabase_not_configured", "云端登录服务暂时不可用，请稍后再试。");
   }
 
   return { url, publishableKey };
@@ -93,9 +93,9 @@ function mapSupabaseAuthError(error: { message?: string; code?: string; status?:
     return new IOSAuthError(400, error.code || "invalid_otp", "验证码不正确或已过期，请重新获取。");
   }
   if (lower.includes("phone") && lower.includes("disabled")) {
-    return new IOSAuthError(400, error.code || "phone_provider_disabled", "手机登录还没有启用，请先在 Supabase 开启 Phone provider。");
+    return new IOSAuthError(400, error.code || "phone_provider_disabled", "手机号登录暂时不可用，请稍后再试。");
   }
-  return new IOSAuthError(error.status || 400, error.code || "auth_failed", message);
+  return new IOSAuthError(error.status || 400, error.code || "auth_failed", "登录暂时失败，请稍后再试。");
 }
 
 function mapSession(data: {
@@ -114,7 +114,7 @@ function mapSession(data: {
   const session = data.session;
   const user = data.user;
   if (!session?.access_token || !session.refresh_token || !user?.id) {
-    throw new IOSAuthError(500, "invalid_auth_response", "Supabase 没有返回可识别的登录状态。");
+    throw new IOSAuthError(500, "invalid_auth_response", "登录状态解析失败，请重新获取验证码。");
   }
 
   const expiresAtSeconds =
