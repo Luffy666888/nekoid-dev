@@ -505,8 +505,8 @@ async function saveVoice(client: SupabaseClient, user: User, catId: string, voic
       text: voice.text,
       analysis: typeof voice.analysis === "string"
         ? voice.analysis
-        : [structuredAnalysis?.summary, structuredAnalysis?.personalityInterpretation].filter(Boolean).join("\n\n") || null,
-      analysis_summary: structuredAnalysis?.summary ?? null,
+        : [structuredAnalysis?.observation, structuredAnalysis?.personalityInterpretation].filter(Boolean).join("\n\n") || null,
+      analysis_summary: structuredAnalysis?.observation ?? null,
       personality_interpretation: structuredAnalysis?.personalityInterpretation ?? null,
       share_headline: voice.share?.headline ?? null,
       share_insight: voice.share?.insight ?? null,
@@ -641,7 +641,7 @@ export async function loadNekoFromCloud() {
       videoDuration: row.video_duration ?? undefined,
       analysis: row.analysis_summary || row.personality_interpretation
         ? {
-            summary: row.analysis_summary ?? row.analysis ?? "",
+            observation: row.analysis_summary ?? row.analysis ?? "",
             personalityInterpretation: row.personality_interpretation ?? "",
           }
         : row.analysis ?? undefined,

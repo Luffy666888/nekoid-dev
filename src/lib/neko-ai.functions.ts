@@ -294,7 +294,7 @@ function normalizeVoiceForProfile(
     : {};
   const legacyAnalysis = typeof input.analysis === "string" ? input.analysis : undefined;
   const analysisSummary = boundedCopy(normalizeCatFacts(
-    rawAnalysis.summary ?? legacyAnalysis,
+    rawAnalysis.observation ?? rawAnalysis.summary ?? legacyAnalysis,
     profile,
     `${profile.name}保持停留并注视周围，姿态放松，同时持续关注当前互动。`,
   ), `${profile.name}保持停留并注视周围，姿态放松，同时持续关注当前互动。`, 30, 60);
@@ -325,7 +325,7 @@ function normalizeVoiceForProfile(
     media: imageDataUrl ?? undefined,
     mediaType: "photo",
     analysis: {
-      summary: analysisSummary,
+      observation: analysisSummary,
       personalityInterpretation,
     },
     share: {
@@ -386,7 +386,7 @@ function buildStableVoice(
     {
       text,
       analysis: {
-        summary: analysisSummary,
+        observation: analysisSummary,
         personalityInterpretation: `它习惯先确认环境和你的反应，再决定是否靠近，体现了谨慎又有主见的性格。`,
       },
       share: {
@@ -720,7 +720,7 @@ export async function generateCatVoiceServer(input: VoiceInput): Promise<Voice> 
 {
   "text": "猫咪第一人称心声，15-35个中文字",
   "analysis": {
-    "summary": "客观画面与行为分析，30-60个中文字",
+    "observation": "客观画面与行为分析，25-50个中文字",
     "personalityInterpretation": "结合人格档案解释行为体现的性格，30-60个中文字"
   },
   "share": {
@@ -733,8 +733,8 @@ export async function generateCatVoiceServer(input: VoiceInput): Promise<Voice> 
   "tags": ["2-3个带 emoji 的标签"]
 }
 要求：
-1. analysis.summary只描述可观察到的姿态、表情、视线、互动对象与环境，准确优先，不写营销或文学套话。
-2. analysis.personalityInterpretation结合猫咪的MBTI、人格名称、人格标签和历史档案，回答“这个行为体现了什么性格”，不要重复summary。
+1. analysis.observation只描述可观察到的姿态、表情、视线、互动对象与环境，准确优先，不写营销或文学套话。
+2. analysis.personalityInterpretation结合猫咪的MBTI、人格名称、人格标签和历史档案，回答“这个行为体现了什么性格”，不要重复observation。
 3. share.headline更口语、有角色感和晒猫感，但不能编造画面中不存在的行为，不使用低俗梗或固定套话。
 4. share.insight比headline克制，解释行为背后的想法，不照搬analysis或headline。
 5. share.tags根据本次行为和人格动态生成，至少一个体现当前场景行为，不要硬编码。
@@ -768,7 +768,7 @@ export async function generateCatVoiceServer(input: VoiceInput): Promise<Voice> 
     if (
       !voice.text.trim() ||
       typeof voice.analysis === "string" ||
-      !voice.analysis?.summary.trim() ||
+      !voice.analysis?.observation.trim() ||
       !voice.analysis?.personalityInterpretation.trim() ||
       !voice.share?.headline.trim() ||
       !voice.share?.insight.trim() ||

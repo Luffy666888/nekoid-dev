@@ -17,7 +17,7 @@ export type Voice = {
   analysis?:
     | string
     | {
-        summary: string;
+        observation: string;
         personalityInterpretation: string;
       };
   share?: {
@@ -30,7 +30,7 @@ export type Voice = {
 export function voiceAnalysisText(voice?: Voice | null): string | undefined {
   if (!voice?.analysis) return undefined;
   if (typeof voice.analysis === "string") return voice.analysis;
-  return [voice.analysis.summary, voice.analysis.personalityInterpretation].filter(Boolean).join("\n\n");
+  return [voice.analysis.observation, voice.analysis.personalityInterpretation].filter(Boolean).join("\n\n");
 }
 
 const CAT_GRADIENTS = [

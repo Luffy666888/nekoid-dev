@@ -276,7 +276,7 @@ async function mapVoiceRow(client: SupabaseClient, row: VoiceRow) {
     videoDuration: row.video_duration ?? undefined,
     analysis: row.analysis_summary || row.personality_interpretation
       ? {
-          summary: row.analysis_summary ?? row.analysis ?? "",
+          observation: row.analysis_summary ?? row.analysis ?? "",
           personalityInterpretation: row.personality_interpretation ?? "",
         }
       : row.analysis ?? undefined,
@@ -555,7 +555,7 @@ async function saveVoice(client: SupabaseClient, user: IOSUser, body: JsonRecord
   const analysis = voice.analysis && typeof voice.analysis === "object" ? voice.analysis as JsonRecord : {};
   const share = voice.share && typeof voice.share === "object" ? voice.share as JsonRecord : {};
   const legacyAnalysis = typeof voice.analysis === "string" ? cleanString(voice.analysis) : "";
-  const analysisSummary = cleanString(analysis.summary);
+  const analysisSummary = cleanString(analysis.observation || analysis.summary);
   const personalityInterpretation = cleanString(analysis.personalityInterpretation);
   const { data, error } = await client
     .from("cat_voices")
