@@ -612,32 +612,61 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
   const data = validatePersonaInput(input);
   const profileFacts = `猫咪名称：${data.profile.name}；性别：${data.profile.gender}；年龄阶段：${data.profile.ageStage}`;
   const wrongGender = data.profile.gender === "小公猫" ? "小母猫、她、她的" : "小公猫、他、他的";
-  const prompt = `请为这只猫生成 NEKO.ID 的猫咪人格档案。猫咪资料：${JSON.stringify(data.profile)}。硬性资料事实：${profileFacts}。${data.imageDataUrl ? "用户已上传猫咪正脸照片；当前模型如无法直接读取图片，请主要依据猫咪基础资料进行拟人化创作。" : ""}输出严格 JSON，不要 Markdown。字段：
+  const prompt = `请为这只猫生成一份 NEKO.ID「喵懂」人格档案。
+
+输入资料：
+- 猫咪基础资料：${JSON.stringify(data.profile)}
+- 不可更改的事实：${profileFacts}
+- 照片：${data.imageDataUrl ? "已提供猫咪照片，可用于观察外观、姿态、视线与当下状态" : "未提供，不得虚构视觉细节"}
+
+判断优先级（从高到低）：
+1. 用户明确填写的名称、性别、年龄阶段；
+2. 问卷答案、视频数量及资料中已有的长期行为线索；
+3. 照片中能够直接观察到的姿态、视线和表情；
+4. 为形成完整人格而做的克制推断。
+
+照片只能证明当下可见状态，不能仅凭毛色、品种或一张静态照片断言长期性格。证据不足时使用“更倾向于”“可能会”等克制表达，不编造动作、经历、主人行为、健康状态或强烈情绪。
+
+输出严格 JSON，不要 Markdown，不要附加说明。字段：
 {
   "name": "猫名",
-  "type": "四到六字人格类型",
-  "mbti": "类似 INTJ-A 的趣味类型",
-  "matchScore": 88,
-  "monologue": "第一人称内心独白，温柔、有代入感，40字以内",
-  "analysis": "人格解析，80字以内",
-  "ownerRole": "它眼中的主人关系，80字以内",
-  "tags": ["6个短标签"],
-  "traits": [{"label":"粘人度","value":68},{"label":"独立性","value":90},{"label":"好奇心","value":82}],
-  "observations": [{"label":"观察依据","value":"一句短值"}],
-  "dailyMood": "首页今日情绪，一句话"
+  "type": "4-6个中文字、有辨识度的人格称号",
+  "mbti": "四字母加-A或-T的趣味人格类型",
+  "matchScore": "60-99的整数，表示现有证据与人格描述的匹配度",
+  "monologue": "猫咪第一人称独白，25-40个中文字",
+  "analysis": "基于证据的人格解析，60-100个中文字",
+  "ownerRole": "猫咪如何看待主人以及相处方式，35-70个中文字",
+  "tags": ["恰好6个、每个4-8个中文字的个体化标签"],
+  "traits": [{"label":"可观察的人格维度","value":"0-100整数"}],
+  "observations": [{"label":"证据类型","value":"对应的具体依据"}],
+  "dailyMood": "符合它性格的今日状态，12-24个中文字"
 }
+
 硬性要求：
 1. 性别和年龄阶段必须完全遵守用户填写的资料：${profileFacts}。
 2. 全文不要出现与资料冲突的表达，例如：${wrongGender}；描述猫咪时优先使用“它”。
 3. 不要把${data.profile.gender}写成另一种性别，不要把${data.profile.ageStage}写成其他年龄阶段。
-4. 基于行为学线索 + 拟人化创作，不做医疗诊断。语言适合小红书分享。`;
+4. traits恰好3项，选择最能区分这只猫的维度；数值必须有证据差异，禁止固定套用同一组维度或分数。
+5. observations生成3-4项，必须能追溯到问卷、用户资料或照片可见事实；不要把推测伪装成观察事实。
+6. tags不要使用“可爱、萌宠、治愈、快乐”等泛标签，应体现具体相处方式、行动节奏或表达习惯。
+7. type、tags、analysis和ownerRole之间要一致，但不要互相重复改写。
+
+【喵懂文风】
+聪明、克制、温柔、有观察力，带一点轻幽默和拟人感，但不矫情。让主人感到“它真的被认真观察过”，而不是收到一段通用萌宠文案。
+
+避免：
+- “绝绝子、谁懂、狠狠、救命、暴击”等网络营销词；
+- 大量感叹号、波浪号、“喵～”“人家”“本宝宝”等过度卖萌表达；
+- 鸡汤、强行煽情、恋爱化表达和空泛赞美；
+- 每只猫都套用“高冷但温柔”“表面独立其实粘人”等固定反差模板；
+- 医疗诊断或把单次状态直接等同于永久人格。`;
   try {
     const result = await callFirstAvailableJson<CatPersona>(
       (provider) => [
         {
           role: "system",
           content:
-            "你是 NEKO.ID 的猫咪人格设计师，擅长把猫咪照片和主人描述转化为温柔、有记忆感、可分享的人格档案。只返回 JSON。",
+            "你是 NEKO.ID「喵懂」的猫咪行为观察员和人格档案设计师。你先区分事实、行为证据与推断，再生成聪明、克制、有个体辨识度的人格档案。准确优先于可爱，不编造不可见事实，不做医疗诊断，不使用营销腔或过度卖萌表达。只返回合法 JSON。",
         },
         { role: "user", content: buildVisionContent(provider, prompt, data.imageDataUrl) },
       ],
