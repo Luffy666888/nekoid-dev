@@ -50,6 +50,11 @@ type VoiceRow = {
   id: string;
   text: string;
   analysis: string | null;
+  analysis_summary: string | null;
+  personality_interpretation: string | null;
+  share_headline: string | null;
+  share_insight: string | null;
+  share_tags: string[] | null;
   location: string | null;
   tags: string[] | null;
   media_object_key: string | null;
@@ -491,13 +496,21 @@ async function saveVoice(client: SupabaseClient, user: User, catId: string, voic
   );
 
   const createdAt = msToIso(voice.createdAt);
+  const structuredAnalysis = typeof voice.analysis === "object" ? voice.analysis : undefined;
   const { error } = await client.from("cat_voices").upsert(
     {
       id: voiceId,
       cat_id: catId,
       user_id: user.id,
       text: voice.text,
-      analysis: voice.analysis ?? null,
+      analysis: typeof voice.analysis === "string"
+        ? voice.analysis
+        : [structuredAnalysis?.summary, structuredAnalysis?.personalityInterpretation].filter(Boolean).join("\n\n") || null,
+      analysis_summary: structuredAnalysis?.summary ?? null,
+      personality_interpretation: structuredAnalysis?.personalityInterpretation ?? null,
+      share_headline: voice.share?.headline ?? null,
+      share_insight: voice.share?.insight ?? null,
+      share_tags: cleanStringList(voice.share?.tags),
       location: voice.location ?? null,
       tags: cleanStringList(voice.tags),
       media_object_key: mediaObjectKey ?? null,
@@ -571,7 +584,7 @@ export async function loadNekoFromCloud() {
       .maybeSingle(),
     client
       .from("cat_voices")
-      .select("id,text,analysis,location,tags,media_object_key,media_type,aspect,video_duration,grad,local_time_label,created_at")
+      .select("id,text,analysis,analysis_summary,personality_interpretation,share_headline,share_insight,share_tags,location,tags,media_object_key,media_type,aspect,video_duration,grad,local_time_label,created_at")
       .eq("cat_id", cat.id)
       .order("created_at", { ascending: false }),
   ]);
@@ -626,7 +639,19 @@ export async function loadNekoFromCloud() {
       mediaType: row.media_type ?? undefined,
       aspect: row.aspect ?? undefined,
       videoDuration: row.video_duration ?? undefined,
-      analysis: row.analysis ?? undefined,
+      analysis: row.analysis_summary || row.personality_interpretation
+        ? {
+            summary: row.analysis_summary ?? row.analysis ?? "",
+            personalityInterpretation: row.personality_interpretation ?? "",
+          }
+        : row.analysis ?? undefined,
+      share: row.share_headline || row.share_insight || row.share_tags?.length
+        ? {
+            headline: row.share_headline ?? row.text,
+            insight: row.share_insight ?? row.personality_interpretation ?? row.analysis ?? "",
+            tags: row.share_tags ?? row.tags ?? [],
+          }
+        : undefined,
     })),
   );
 

@@ -44,6 +44,11 @@ type VoiceRow = {
   id: string;
   text: string;
   analysis: string | null;
+  analysis_summary: string | null;
+  personality_interpretation: string | null;
+  share_headline: string | null;
+  share_insight: string | null;
+  share_tags: string[] | null;
   location: string | null;
   tags: string[] | null;
   media_object_key: string | null;
@@ -60,7 +65,7 @@ const CAT_COLUMNS = "id,name,gender,age_stage,avatar_object_key,quiz,updated_at"
 const PERSONA_COLUMNS =
   "id,cat_id,type,mbti,match_score,monologue,analysis,owner_role,tags,traits,observations,daily_mood,provider,model,updated_at";
 const VOICE_COLUMNS =
-  "id,text,analysis,location,tags,media_object_key,media_type,aspect,video_duration,grad,local_time_label,created_at";
+  "id,text,analysis,analysis_summary,personality_interpretation,share_headline,share_insight,share_tags,location,tags,media_object_key,media_type,aspect,video_duration,grad,local_time_label,created_at";
 const PROFILE_COLUMNS = "id,email,display_name,avatar_object_key,onboarding_completed_at,created_at,updated_at";
 
 export class IOSCloudError extends Error {
@@ -269,7 +274,19 @@ async function mapVoiceRow(client: SupabaseClient, row: VoiceRow) {
     mediaType: row.media_type ?? "photo",
     aspect: row.aspect ?? "3:4",
     videoDuration: row.video_duration ?? undefined,
-    analysis: row.analysis ?? undefined,
+    analysis: row.analysis_summary || row.personality_interpretation
+      ? {
+          summary: row.analysis_summary ?? row.analysis ?? "",
+          personalityInterpretation: row.personality_interpretation ?? "",
+        }
+      : row.analysis ?? undefined,
+    share: row.share_headline || row.share_insight || row.share_tags?.length
+      ? {
+          headline: row.share_headline ?? row.text,
+          insight: row.share_insight ?? row.personality_interpretation ?? row.analysis ?? "",
+          tags: row.share_tags ?? row.tags ?? [],
+        }
+      : undefined,
     mediaURL: await signedMediaUrl(client, row.media_object_key),
   };
 }
@@ -535,6 +552,11 @@ async function saveVoice(client: SupabaseClient, user: IOSUser, body: JsonRecord
 
   const mediaObjectKey = await uploadDataUrl(client, user.id, `voices/${voiceId}/media`, body.imageDataUrl, cleanString(voice.mediaObjectKey));
   const createdAt = msToIso(voice.createdAt);
+  const analysis = voice.analysis && typeof voice.analysis === "object" ? voice.analysis as JsonRecord : {};
+  const share = voice.share && typeof voice.share === "object" ? voice.share as JsonRecord : {};
+  const legacyAnalysis = typeof voice.analysis === "string" ? cleanString(voice.analysis) : "";
+  const analysisSummary = cleanString(analysis.summary);
+  const personalityInterpretation = cleanString(analysis.personalityInterpretation);
   const { data, error } = await client
     .from("cat_voices")
     .upsert(
@@ -543,7 +565,12 @@ async function saveVoice(client: SupabaseClient, user: IOSUser, body: JsonRecord
         cat_id: catId,
         user_id: user.id,
         text: cleanString(voice.text),
-        analysis: cleanString(voice.analysis) || null,
+        analysis: legacyAnalysis || [analysisSummary, personalityInterpretation].filter(Boolean).join("\n\n") || null,
+        analysis_summary: analysisSummary || null,
+        personality_interpretation: personalityInterpretation || null,
+        share_headline: cleanString(share.headline) || null,
+        share_insight: cleanString(share.insight) || null,
+        share_tags: cleanStringList(share.tags),
         location: cleanString(voice.location) || null,
         tags: cleanStringList(voice.tags),
         media_object_key: mediaObjectKey ?? null,

@@ -14,8 +14,24 @@ export type Voice = {
   mediaType?: "photo" | "video";
   aspect?: "9:16" | "4:5" | "3:4" | "1:1";
   videoDuration?: string;
-  analysis?: string;
+  analysis?:
+    | string
+    | {
+        summary: string;
+        personalityInterpretation: string;
+      };
+  share?: {
+    headline: string;
+    insight: string;
+    tags: string[];
+  };
 };
+
+export function voiceAnalysisText(voice?: Voice | null): string | undefined {
+  if (!voice?.analysis) return undefined;
+  if (typeof voice.analysis === "string") return voice.analysis;
+  return [voice.analysis.summary, voice.analysis.personalityInterpretation].filter(Boolean).join("\n\n");
+}
 
 const CAT_GRADIENTS = [
   "linear-gradient(135deg, oklch(0.92 0.05 320), oklch(0.9 0.06 0))",

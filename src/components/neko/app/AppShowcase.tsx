@@ -4,7 +4,7 @@ import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { ChevronLeft, Share2, Trash2 } from "lucide-react";
-import { CAT_GRADIENTS, useVoices, voicesStore } from "./voicesStore";
+import { CAT_GRADIENTS, useVoices, voiceAnalysisText, voicesStore } from "./voicesStore";
 import { useCatAvatar } from "../catAvatarStore";
 import { useCatName } from "../catNameStore";
 import { detectCatFace } from "@/lib/catface.functions";
@@ -429,7 +429,7 @@ const PosterTemplate = forwardRef<HTMLDivElement, { v: import("./voicesStore").V
           <span style={{ fontSize: 10, letterSpacing: 5, color: "#7B7290" }}>AI 心 声 解 析</span>
         </div>
         <div style={{ fontSize: 13, lineHeight: 1.75, color: "#3E315E" }}>
-          {v.analysis ?? "它似乎在表达：这个瞬间里，它正在用自己的方式向你靠近。"}
+          {voiceAnalysisText(v) ?? "它似乎在表达：这个瞬间里，它正在用自己的方式向你靠近。"}
         </div>
       </div>
 
@@ -782,7 +782,7 @@ export function ScreenVoiceDetail({ id = 0 }: { id?: number }) {
               <div className="text-[10px] tracking-[0.3em] text-[#7B7290]">AI 心 声 解 析</div>
             </div>
             <p className="mt-2 text-[12.5px] leading-[1.75] text-foreground/85">
-              {v.analysis ?? "它似乎在表达：这个瞬间里，它正在用自己的方式向你靠近。"}
+              {voiceAnalysisText(v) ?? "它似乎在表达：这个瞬间里，它正在用自己的方式向你靠近。"}
             </p>
             <div className="mt-2.5 flex flex-wrap gap-1.5">
               {(v.tags ?? ["💭 小心思", "✨ 想被看见"]).map((t) => (
@@ -1260,7 +1260,7 @@ export function ScreenPublish3() {
             <div className="absolute inset-x-4 bottom-4 z-10 rounded-[22px] bg-white/85 p-4 backdrop-blur-md" style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}>
               <div className="text-[10px] tracking-[0.4em] text-[oklch(0.55_0.06_300)]">AI 心 声 解 析</div>
               <p className="mt-2 text-[12px] leading-[1.7] text-foreground/85">
-                {draftVoice?.analysis ?? "暂未获得 AI 心声解析，请点击重新识别。"}
+                {voiceAnalysisText(draftVoice) ?? "暂未获得 AI 心声解析，请点击重新识别。"}
               </p>
             </div>
           </div>
@@ -1374,7 +1374,7 @@ export function ScreenSuccess() {
             <div className="text-[10px] tracking-[0.4em] text-[oklch(0.55_0.06_300)]">AI 发 现</div>
           </div>
           <div className="mt-2.5 text-[12.5px] leading-[1.75] text-foreground/85">
-            {draftVoice?.analysis ?? `暂未获得${catName}的 AI 心声解析。`}
+            {voiceAnalysisText(draftVoice) ?? `暂未获得${catName}的 AI 心声解析。`}
           </div>
         </div>
 

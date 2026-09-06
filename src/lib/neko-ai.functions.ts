@@ -142,6 +142,20 @@ function normalizeCatFacts(value: unknown, profile: CatProfile, fallback = "") {
   return next;
 }
 
+function boundedCopy(value: string, fallback: string, min: number, max: number) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  const selected = Array.from(normalized).length >= min ? normalized : fallback;
+  return Array.from(selected).slice(0, max).join("");
+}
+
+function normalizeShareTag(value: unknown, profile: CatProfile) {
+  const normalized = normalizeCatFacts(value, profile)
+    .replace(/^#+/, "")
+    .replace(/[，。！？、,.!?:：；;\s]/g, "")
+    .trim();
+  return Array.from(normalized).slice(0, 8).join("");
+}
+
 function normalizePersonaForProfile(persona: CatPersona, profile: CatProfile): CatPersona {
   const parsedTags = Array.isArray(persona.tags) ? persona.tags : [];
   const parsedTraits = Array.isArray(persona.traits) ? persona.traits : [];
@@ -263,6 +277,7 @@ function normalizeVoiceForProfile(
   input: {
     text?: unknown;
     analysis?: unknown;
+    share?: unknown;
     mood?: unknown;
     location?: unknown;
     tags?: unknown;
@@ -274,6 +289,26 @@ function normalizeVoiceForProfile(
     ? input.tags.map((tag) => normalizeCatFacts(tag, profile)).filter(Boolean)
     : [];
   const mood = normalizeCatFacts(input.mood, profile, "想被关注");
+  const rawAnalysis = input.analysis && typeof input.analysis === "object"
+    ? input.analysis as Record<string, unknown>
+    : {};
+  const legacyAnalysis = typeof input.analysis === "string" ? input.analysis : undefined;
+  const analysisSummary = boundedCopy(normalizeCatFacts(
+    rawAnalysis.summary ?? legacyAnalysis,
+    profile,
+    `${profile.name}保持停留并注视周围，姿态放松，同时持续关注当前互动。`,
+  ), `${profile.name}保持停留并注视周围，姿态放松，同时持续关注当前互动。`, 30, 60);
+  const personalityInterpretation = boundedCopy(normalizeCatFacts(
+    rawAnalysis.personalityInterpretation,
+    profile,
+    `这种先观察再回应的方式，体现了它谨慎、有主见，也愿意在安心时靠近。`,
+  ), `这种先观察再回应的方式，体现了它谨慎、有主见，也愿意在安心时靠近。`, 30, 60);
+  const rawShare = input.share && typeof input.share === "object"
+    ? input.share as Record<string, unknown>
+    : {};
+  const shareTags = Array.isArray(rawShare.tags)
+    ? rawShare.tags.map((tag) => normalizeShareTag(tag, profile)).filter((tag) => Array.from(tag).length >= 4).slice(0, 3)
+    : [];
   return {
     time: "刚刚",
     createdAt: Date.now(),
@@ -281,17 +316,38 @@ function normalizeVoiceForProfile(
     grad: "linear-gradient(135deg, oklch(0.9 0.06 280), oklch(0.92 0.05 320))",
     tags: (tags.length ? tags : [`💭 ${mood}`, "✨ 小心思"]).slice(0, 3),
     aspect: "3:4",
-    text:
-      normalizeCatFacts(input.text, profile, `靠近一点嘛，今天也想被你看见。`) ||
+    text: boundedCopy(
+      normalizeCatFacts(input.text, profile, `靠近一点嘛，今天也想被你看见。`),
       `靠近一点嘛，今天也想被你看见。`,
+      15,
+      35,
+    ),
     media: imageDataUrl ?? undefined,
     mediaType: "photo",
-    analysis:
-      normalizeCatFacts(
-        input.analysis,
-        profile,
-        `${profile.name}的表情和停留姿态给人一种想被关注、又保持自己节奏的感觉。`,
-      ) || `${profile.name}的表情和停留姿态给人一种想被关注、又保持自己节奏的感觉。`,
+    analysis: {
+      summary: analysisSummary,
+      personalityInterpretation,
+    },
+    share: {
+      headline: boundedCopy(
+        normalizeCatFacts(rawShare.headline, profile, asText(input.text)),
+        `看似安静，其实一直有自己的小主意`,
+        12,
+        24,
+      ),
+      insight: boundedCopy(
+        normalizeCatFacts(rawShare.insight, profile, personalityInterpretation),
+        `它不是没有反应，只是在按自己的节奏确认是否靠近。`,
+        18,
+        35,
+      ),
+      tags: shareTags.length >= 2
+        ? shareTags
+        : [...tags, `${mood}时刻`, `${profile.ageStage}小观察`]
+            .map((tag) => normalizeShareTag(tag, profile))
+            .filter((tag, index, list) => Array.from(tag).length >= 4 && list.indexOf(tag) === index)
+            .slice(0, 3),
+    },
   } as Voice;
 }
 
@@ -323,13 +379,21 @@ function buildStableVoice(
   } else if (sceneText) {
     text = `我在认真感受这一刻，也在悄悄等你靠近。`;
   }
-  const analysis = sceneText
+  const analysisSummary = sceneText
     ? `结合你补充的场景，${profile.name}的停留和注视更像是在回应当下互动，而不是单纯发呆。`
     : `${profile.name}是${profile.ageStage}里的${profile.gender}，画面里的停留和注视适合解读为想被关注。`;
   return normalizeVoiceForProfile(
     {
       text,
-      analysis,
+      analysis: {
+        summary: analysisSummary,
+        personalityInterpretation: `它习惯先确认环境和你的反应，再决定是否靠近，体现了谨慎又有主见的性格。`,
+      },
+      share: {
+        headline: text,
+        insight: `它不是没有反应，只是在用自己的节奏确认这一刻是否值得靠近。`,
+        tags: [`${mood}观察员`, "先观察再回应", "这一刻有主意"],
+      },
       mood,
       location: "家里",
       tags: [`💭 ${mood}`, "🐾 想靠近", "✨ 小心思"],
@@ -625,17 +689,32 @@ export async function generateCatVoiceServer(input: VoiceInput): Promise<Voice> 
 你必须先观察图片里的猫咪姿态、表情、视线、周围物品/环境，再生成内容。不要写泛泛的“等待心声”“AI会结合照片”等占位文案。不要机械复述用户补充场景，不要出现“给它新买了…”这种主人视角陈述；气泡文案必须像猫咪自己短短说出的小心思。
 输出严格 JSON：
 {
-  "text": "猫咪第一人称心声，1-2句，32字以内；要自然、机灵、温柔，像猫在说话；必须贴合画面中的具体动作/表情/环境",
-  "analysis": "AI心声解析，70字以内；说明你从照片哪些可见细节推断出这段心声",
+  "text": "猫咪第一人称心声，15-35个中文字",
+  "analysis": {
+    "summary": "客观画面与行为分析，30-60个中文字",
+    "personalityInterpretation": "结合人格档案解释行为体现的性格，30-60个中文字"
+  },
+  "share": {
+    "headline": "分享卡核心文案，12-24个中文字",
+    "insight": "行为背后的小心思，18-35个中文字",
+    "tags": ["2-3个动态标签，每个4-8个中文字"]
+  },
   "mood": "情绪短语",
   "location": "地点短语",
   "tags": ["2-3个带 emoji 的标签"]
 }
-要求：温柔、拟人化、适合小红书卡片；只做情绪陪伴和行为想象，不做医疗诊断；只返回 JSON。`;
+要求：
+1. analysis.summary只描述可观察到的姿态、表情、视线、互动对象与环境，准确优先，不写营销或文学套话。
+2. analysis.personalityInterpretation结合猫咪的MBTI、人格名称、人格标签和历史档案，回答“这个行为体现了什么性格”，不要重复summary。
+3. share.headline更口语、有角色感和晒猫感，但不能编造画面中不存在的行为，不使用低俗梗或固定套话。
+4. share.insight比headline克制，解释行为背后的想法，不照搬analysis或headline。
+5. share.tags根据本次行为和人格动态生成，至少一个体现当前场景行为，不要硬编码。
+6. 同一次请求完成全部字段，只做情绪陪伴和行为想象，不做医疗诊断；只返回JSON。`;
   try {
     const result = await callFirstAvailableJson<{
       text?: unknown;
       analysis?: unknown;
+      share?: unknown;
       mood?: unknown;
       location?: unknown;
       tags?: unknown;
@@ -649,7 +728,7 @@ export async function generateCatVoiceServer(input: VoiceInput): Promise<Voice> 
         { role: "user", content: buildVisionContent(provider, prompt, data.imageDataUrl) },
       ],
       {
-        maxTokens: 320,
+        maxTokens: 560,
         temperature: 0.5,
         timeoutMs: data.imageDataUrl ? 45_000 : 14_000,
         modelMode: data.imageDataUrl ? "vision" : "text",
@@ -657,7 +736,15 @@ export async function generateCatVoiceServer(input: VoiceInput): Promise<Voice> 
     );
     const parsed = result.parsed;
     const voice = normalizeVoiceForProfile(parsed, data.profile, data.imageDataUrl);
-    if (!voice.text.trim() || !voice.analysis?.trim()) {
+    if (
+      !voice.text.trim() ||
+      typeof voice.analysis === "string" ||
+      !voice.analysis?.summary.trim() ||
+      !voice.analysis?.personalityInterpretation.trim() ||
+      !voice.share?.headline.trim() ||
+      !voice.share?.insight.trim() ||
+      !voice.share?.tags.length
+    ) {
       if (await shouldRequireRealAI()) throw new Error("AI voice JSON missing required fields");
       return buildStableVoice(data.profile, data.imageDataUrl, data.scene);
     }
