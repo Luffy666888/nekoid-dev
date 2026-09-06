@@ -1,7 +1,7 @@
 import hero from "@/assets/neko-hero.jpg";
 import { useNavigate } from "@tanstack/react-router";
 import { Share2 } from "lucide-react";
-import { Sparkles } from "../screens/_shared";
+import { SafeAreaTopBar, Sparkles } from "../screens/_shared";
 import { useRef, useState } from "react";
 import { toPng } from "html-to-image";
 import { toast } from "sonner";
@@ -153,39 +153,45 @@ export function Screen6Result({
 
       {/* ================= SCREEN 1 : 这是我的猫 ================= */}
       <div className="relative z-10 shrink-0">
-        <div className="absolute left-0 right-0 top-0 z-30 flex items-center justify-between px-5 pt-[50px]">
-          {onBack ? (
+        <SafeAreaTopBar
+          left={
+            onBack ? (
+              <button
+                type="button"
+                aria-label="返回"
+                onClick={onBack}
+                className="flex h-11 w-11 items-center justify-center rounded-full bg-white/80 text-[oklch(0.45_0.12_305)] backdrop-blur-md transition-transform active:scale-95"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M15 6l-6 6 6 6"
+                    stroke="oklch(0.45 0.12 305)"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            ) : (
+              <span className="block h-11 w-11" />
+            )
+          }
+          center={
+            <span className="text-[10px] font-medium tracking-[0.5em] text-[oklch(0.55_0.06_320)]">
+              NEKO.ID
+            </span>
+          }
+          right={
             <button
               type="button"
-              aria-label="返回"
-              onClick={onBack}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-white/80 backdrop-blur-md transition-transform active:scale-95"
+              aria-label="分享"
+              onClick={() => setShareOpen(true)}
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-white/80 text-[oklch(0.45_0.12_305)] backdrop-blur-md transition-transform active:scale-95"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M15 6l-6 6 6 6"
-                  stroke="oklch(0.45 0.12 305)"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              <Share2 className="h-[16px] w-[16px]" strokeWidth={2} />
             </button>
-          ) : (
-            <span />
-          )}
-          <span className="text-[10px] tracking-[0.5em] font-medium text-[oklch(0.55_0.06_320)]">
-            NEKO.ID
-          </span>
-          <button
-            type="button"
-            aria-label="分享"
-            onClick={() => setShareOpen(true)}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/80 backdrop-blur-md text-[oklch(0.45_0.12_305)] transition-transform active:scale-95"
-          >
-            <Share2 className="h-[16px] w-[16px]" strokeWidth={2} />
-          </button>
-        </div>
+          }
+        />
 
         {/* HERO */}
         <div className="relative h-[520px] w-full overflow-hidden">
