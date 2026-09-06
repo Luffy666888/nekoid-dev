@@ -252,23 +252,27 @@ export function ScreenHome() {
       <StatusBar />
       <div className="absolute inset-0 overflow-y-auto scrollbar-none pt-[52px] pb-[120px]">
         {/* ── SECTION 1 · Compact cat profile ─────────────── */}
-        <div className="mx-5 overflow-hidden rounded-[22px] px-4 py-3"
-          style={{ background: "linear-gradient(135deg, oklch(0.98 0.02 320 / 0.95), oklch(0.96 0.035 270 / 0.9))", boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}>
-          <div className="flex items-center gap-3">
-            <CatAvatar size={60} usePhoto />
+        <div
+          data-cat-context-header
+          className="mx-5 rounded-[20px] border border-white/65 bg-[oklch(0.98_0.018_315_/_0.72)] px-3.5 py-2.5 backdrop-blur-md"
+        >
+          <div className="flex min-h-[56px] items-center gap-3">
+            <div className="shrink-0" aria-label={`当前猫咪：${catName}`}>
+              <CatAvatar size={56} usePhoto />
+            </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
                 <div className="text-[18px] font-semibold text-foreground">{catName}</div>
-                <span className="rounded-full bg-white/85 px-2 py-0.5 text-[13px] tracking-[0.08em] text-[oklch(0.5_0.1_320)]">{persona?.mbti ?? "INTJ-A"}</span>
+                <span className="rounded-full bg-white/65 px-2 py-0.5 text-[13px] tracking-[0.06em] text-[oklch(0.52_0.08_320)]">{persona?.mbti ?? "INTJ-A"}</span>
               </div>
               <div className="mt-1 text-[15px] text-[oklch(0.55_0.05_300)]">{persona?.type ?? "高冷观察者"}</div>
             </div>
-            <Link to="/app/profile" className="shrink-0 rounded-full bg-white/85 px-3 py-1.5 text-[14px] text-[oklch(0.5_0.1_320)] active:bg-white/95 active:scale-[0.98] transition-all duration-150">查看人格 ›</Link>
+            <Link to="/app/profile" className="flex min-h-11 shrink-0 items-center px-1 text-[14px] font-medium text-[oklch(0.5_0.1_320)] active:opacity-60">查看人格&nbsp;›</Link>
           </div>
         </div>
 
         {/* ── SECTION 2 · 猫咪心声 title only ─────────────── */}
-        <div className="mt-6 flex items-center px-4">
+        <div className="mt-5 flex items-center px-4">
           <div className="flex items-center gap-2 text-[23px] font-semibold text-foreground">
             <span className="text-[22px]">💭</span>
             <span>猫咪心声</span>
