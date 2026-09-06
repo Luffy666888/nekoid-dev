@@ -144,7 +144,7 @@ export function AuthLoginScreen() {
               <div className="text-[18px] font-medium text-foreground">已经登录啦</div>
               <p className="mt-2 truncate text-[12px] text-[oklch(0.55_0.06_300)]">{auth.user.email}</p>
               <div className="mt-5 grid grid-cols-2 gap-2">
-                <Link to="/app/account" className="rounded-full bg-white px-4 py-2.5 text-[12px] text-foreground">账号中心</Link>
+                <Link to="/app/account" className="rounded-full bg-white px-4 py-2.5 text-[12px] text-foreground">账号与数据</Link>
                 <Link to="/app/me" className="rounded-full px-4 py-2.5 text-[12px] font-medium text-white" style={{ background: "var(--gradient-cta)" }}>返回我的</Link>
               </div>
             </div>
@@ -304,7 +304,7 @@ export function AccountScreen() {
           <button onClick={() => navigate({ to: "/app/me" })} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/80 text-[oklch(0.5_0.1_320)] backdrop-blur" style={{ boxShadow: "var(--shadow-soft)" }}>
             ‹
           </button>
-          <div className="text-[13px] font-medium text-foreground">账号中心</div>
+          <div className="text-[13px] font-medium text-foreground">账号与数据</div>
           <div className="h-9 w-9" />
         </div>
 

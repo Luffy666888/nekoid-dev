@@ -85,19 +85,20 @@ export function CatAvatar({ size = 44, grad = CAT_GRADIENTS[0], usePhoto = false
 export function TabBar({ active }: { active: "home" | "publish" | "me" }) {
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 pointer-events-none">
-      <div className="pointer-events-auto relative mx-4 mb-[max(20px,env(safe-area-inset-bottom))] flex items-center justify-between rounded-[32px] bg-white/85 px-9 py-3 backdrop-blur-xl"
-        style={{ boxShadow: "0 16px 36px -18px oklch(0.70 0.14 305 / 0.42), inset 0 0 0 1px oklch(1 0 0 / 0.75)" }}>
-        <Link to="/app"><TabIcon label="首页" active={active === "home"} Icon={CatVoiceIcon} /></Link>
-        <div className="relative -mt-10">
-          <div className="absolute inset-0 -m-1.5 rounded-full opacity-70 blur-md animate-breathe"
-            style={{ background: "var(--gradient-cta)" }} />
-          <Link aria-label="发布猫咪心声" to="/app/publish" className="relative flex h-[58px] w-[58px] items-center justify-center rounded-full text-white text-[26px] leading-none active:scale-[0.92] active:brightness-[0.92] transition-all duration-150"
-            style={{ background: "var(--gradient-cta)", boxShadow: "0 14px 28px -10px oklch(0.70 0.14 305 / 0.7), inset 0 0 0 2px oklch(1 0 0 / 0.65)" }}>
-            ＋
-          </Link>
-        </div>
-        <Link to="/app/me"><TabIcon label="我的" active={active === "me"} Icon={CatHeadIcon} /></Link>
+      <div className="pointer-events-auto flex items-center justify-around border-t border-white/70 bg-white/88 px-6 pb-[max(8px,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl"
+        style={{ boxShadow: "0 -10px 30px -20px oklch(0.55 0.1 305 / 0.35)" }}>
+        <Link to="/app"><SimpleTabIcon symbol="⌂" label="首页" active={active === "home"} /></Link>
+        <Link to="/app/publish"><SimpleTabIcon symbol="♡" label="心声" active={active === "publish"} /></Link>
+        <Link to="/app/me"><SimpleTabIcon symbol="♙" label="我的" active={active === "me"} /></Link>
       </div>
+    </div>
+  );
+}
+function SimpleTabIcon({ symbol, label, active }: { symbol: string; label: string; active: boolean }) {
+  return (
+    <div className="flex min-w-[64px] flex-col items-center gap-0.5 py-1" style={{ color: active ? "#9B76CB" : "#7B7290" }}>
+      <span className="text-[20px] leading-none">{symbol}</span>
+      <span className="text-[10px] font-medium tracking-[0.16em]">{label}</span>
     </div>
   );
 }
@@ -267,7 +268,7 @@ export function ScreenHome() {
             <span className="text-[14px] leading-none">😺</span>
             <span className="flex-1 text-[12px] leading-snug text-foreground">{persona?.dailyMood ?? "今天好像有点想你"}</span>
           </div>
-        </div>
+          </div>
 
         {/* ── SECTION 2 · 猫咪心声 title only ─────────────── */}
         <div className="mt-6 flex items-center px-5">
@@ -1515,11 +1516,8 @@ export function ScreenMe() {
   return (
     <ScreenShell>
       <StatusBar />
-      <div className="absolute inset-0 overflow-y-auto scrollbar-none pt-[52px] pb-[120px]">
-        <div className="flex items-center justify-between px-6">
-          <div className="text-[17px] font-light tracking-wide text-foreground">我的</div>
-          <button onClick={() => toast("设置中心即将上线 ⚙️")} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/80 text-[14px] backdrop-blur active:bg-white/95 active:scale-[0.95] transition-all duration-150" style={{ boxShadow: "var(--shadow-soft)" }}>⚙</button>
-        </div>
+      <div className="absolute inset-0 overflow-y-auto scrollbar-none pt-[52px] pb-[110px]">
+        <div className="px-6 text-[22px] font-light tracking-wide text-foreground">我的</div>
 
         <div className="mx-5 mt-4 overflow-hidden rounded-[26px] p-5"
           style={{ background: "linear-gradient(135deg, oklch(0.96 0.035 320), oklch(0.95 0.04 280))", boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}>
@@ -1528,45 +1526,53 @@ export function ScreenMe() {
               <div className="absolute -inset-1 rounded-full bg-white/60 blur" />
               <div className="relative"><CatAvatar size={72} usePhoto /></div>
             </div>
-            <div className="flex-1">
+            <div className="min-w-0 flex-1">
               <div className="text-[18px] font-medium text-foreground">{catName}</div>
-              <div className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-white/80 px-2 py-0.5 text-[10px] tracking-[0.2em] text-[oklch(0.5_0.1_320)]">
-                <span className="text-soul">✦</span> {persona?.type ?? "高冷观察者"} · {persona?.mbti ?? "INTJ-A"}
-              </div>
+              <div className="mt-1 text-[11px] font-medium tracking-[0.12em] text-[oklch(0.5_0.1_320)]">{persona?.mbti ?? "INTJ-A"}</div>
+              <div className="mt-0.5 truncate text-[12px] text-foreground/80">{persona?.type ?? "高冷观察者"}</div>
             </div>
           </div>
-          <div className="mt-4 rounded-[16px] bg-white/65 px-3.5 py-2.5 text-[11px] leading-relaxed text-foreground/80">
-            "{persona?.monologue ?? "它喜欢在窗边看世界，但只要你叫它的名字，它就会立刻回头。"}"
+          <div className="mt-3 line-clamp-2 text-[11.5px] leading-relaxed text-foreground/75">
+            {persona?.analysis ?? "安静观察，也一直留意着你的一举一动。"}
           </div>
+          <Link to="/app/profile" className="mt-3 flex justify-end text-[11.5px] font-medium text-[oklch(0.5_0.1_320)]">查看人格&nbsp; ›</Link>
         </div>
 
-        <CloudSyncPanel />
+        <section className="mx-5 mt-6">
+          <h2 className="mb-2 px-1 text-[11px] font-medium tracking-[0.2em] text-[oklch(0.55_0.06_300)]">我的猫咪</h2>
+          <div className="overflow-hidden rounded-[22px] bg-white/78 backdrop-blur" style={{ border: "1px solid oklch(1 0 0 / 0.75)" }}>
+            <SettingsRow to="/app/me/edit" icon="✎" title="猫咪档案" subtitle="基本信息与人格" />
+            <SettingsRow to="/app/me/voices" icon="♡" title="猫咪心声" subtitle="查看和管理所有心声" border />
+          </div>
+        </section>
 
-        <div className="mx-5 mt-5 flex flex-col gap-2.5">
-          <MeRow to="/app/account" icon="☁" title="账号与云端数据" sub="邮箱登录、昵称和同步管理" />
-          <MeRow to="/app/me/edit" icon="✎" title="修改人格档案" sub="编辑猫咪基本信息" />
-          <MeRow to="/app/me/voices" icon="♡" title="管理猫咪心声" sub="查看和管理所有心声" />
-        </div>
+        <section className="mx-5 mt-6">
+          <h2 className="mb-2 px-1 text-[11px] font-medium tracking-[0.2em] text-[oklch(0.55_0.06_300)]">账号与设置</h2>
+          <div className="overflow-hidden rounded-[22px] bg-white/78 backdrop-blur" style={{ border: "1px solid oklch(1 0 0 / 0.75)" }}>
+            <SettingsRow to="/app/account" icon="◎" title="账号与数据" subtitle="手机号、数据与账号管理" />
+            <SettingsRow to="/app/settings" icon="⚙" title="设置" subtitle="隐私、协议与 App 设置" border />
+          </div>
+        </section>
       </div>
       <TabBar active="me" />
     </ScreenShell>
   );
 }
-function MeRow({ icon, title, sub, to }: { icon: string; title: string; sub: string; to: "/app/account" | "/app/me/edit" | "/app/me/voices" }) {
+function SettingsRow({ icon, title, subtitle, to, border = false }: { icon: string; title: string; subtitle: string; to: "/app/account" | "/app/me/edit" | "/app/me/voices" | "/app/settings"; border?: boolean }) {
   return (
-    <Link to={to} className="flex items-center gap-3 rounded-[20px] bg-white/80 px-4 py-3.5 text-left backdrop-blur active:bg-white/95 active:scale-[0.99] transition-all duration-150" style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}>
-      <div className="flex h-10 w-10 items-center justify-center rounded-2xl text-[16px] text-[oklch(0.5_0.1_320)]"
+    <Link to={to} className={`flex min-h-[68px] items-center gap-3 px-4 py-3 text-left transition-colors active:bg-white/75 ${border ? "border-t border-[oklch(0.9_0.02_300)]" : ""}`}>
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[15px] text-[oklch(0.5_0.1_320)]"
         style={{ background: "linear-gradient(135deg, oklch(0.96 0.04 320), oklch(0.95 0.04 280))" }}>{icon}</div>
       <div className="flex-1">
         <div className="text-[13.5px] font-medium text-foreground">{title}</div>
-        <div className="mt-0.5 text-[10.5px] text-[oklch(0.55_0.05_300)]">{sub}</div>
+        <div className="mt-0.5 text-[10.5px] text-[oklch(0.55_0.05_300)]">{subtitle}</div>
       </div>
       <span className="text-[14px] text-[oklch(0.65_0.04_300)]">›</span>
     </Link>
   );
 }
 
-// ---------- Screen 8: 修改人格档案 ----------
+// ---------- Screen 8: 猫咪档案 ----------
 export function ScreenEditProfile() {
   const navigate = useNavigate();
   const profile = getCatProfile();
@@ -1612,7 +1618,7 @@ export function ScreenEditProfile() {
       <div className="absolute inset-0 overflow-y-auto scrollbar-none pt-[52px] pb-8">
         <div className="flex items-center justify-between px-6">
           <AppBackButton to="/app/me" />
-          <div className="text-[13px] font-medium text-foreground">修改人格档案</div>
+          <div className="text-[13px] font-medium text-foreground">猫咪档案</div>
           <div className="h-9 w-9" />
         </div>
 
@@ -1842,7 +1848,7 @@ const SCREENS = [
   { id: "pub3", index: "05", title: "发布 · 预览", subtitle: "Publish · Step 3", Component: ScreenPublish3 },
   { id: "success", index: "06", title: "发布成功", subtitle: "Success", Component: ScreenSuccess },
   { id: "me", index: "07", title: "我的", subtitle: "Profile", Component: ScreenMe },
-  { id: "edit", index: "08", title: "修改人格档案", subtitle: "Edit Profile", Component: ScreenEditProfile },
+  { id: "edit", index: "08", title: "猫咪档案", subtitle: "Cat Profile", Component: ScreenEditProfile },
   { id: "manage", index: "09", title: "管理心声", subtitle: "Manage Voices", Component: ScreenManageVoices },
 ];
 

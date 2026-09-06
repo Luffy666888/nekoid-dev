@@ -13,6 +13,7 @@ import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AuthLoginRouteImport } from './routes/auth.login'
+import { Route as AppSettingsRouteImport } from './routes/app.settings'
 import { Route as AppProfileRouteImport } from './routes/app.profile'
 import { Route as AppAccountRouteImport } from './routes/app.account'
 import { Route as AppPublishIndexRouteImport } from './routes/app.publish.index'
@@ -43,6 +44,11 @@ const AuthLoginRoute = AuthLoginRouteImport.update({
   id: '/auth/login',
   path: '/auth/login',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppProfileRoute = AppProfileRouteImport.update({
   id: '/profile',
@@ -100,6 +106,7 @@ export interface FileRoutesByFullPath {
   '/app': typeof AppRouteWithChildren
   '/app/account': typeof AppAccountRoute
   '/app/profile': typeof AppProfileRoute
+  '/app/settings': typeof AppSettingsRoute
   '/auth/login': typeof AuthLoginRoute
   '/app/': typeof AppIndexRoute
   '/app/me/edit': typeof AppMeEditRoute
@@ -115,6 +122,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/app/account': typeof AppAccountRoute
   '/app/profile': typeof AppProfileRoute
+  '/app/settings': typeof AppSettingsRoute
   '/auth/login': typeof AuthLoginRoute
   '/app': typeof AppIndexRoute
   '/app/me/edit': typeof AppMeEditRoute
@@ -132,6 +140,7 @@ export interface FileRoutesById {
   '/app': typeof AppRouteWithChildren
   '/app/account': typeof AppAccountRoute
   '/app/profile': typeof AppProfileRoute
+  '/app/settings': typeof AppSettingsRoute
   '/auth/login': typeof AuthLoginRoute
   '/app/': typeof AppIndexRoute
   '/app/me/edit': typeof AppMeEditRoute
@@ -150,6 +159,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/app/account'
     | '/app/profile'
+    | '/app/settings'
     | '/auth/login'
     | '/app/'
     | '/app/me/edit'
@@ -165,6 +175,7 @@ export interface FileRouteTypes {
     | '/'
     | '/app/account'
     | '/app/profile'
+    | '/app/settings'
     | '/auth/login'
     | '/app'
     | '/app/me/edit'
@@ -181,6 +192,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/app/account'
     | '/app/profile'
+    | '/app/settings'
     | '/auth/login'
     | '/app/'
     | '/app/me/edit'
@@ -228,6 +240,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/auth/login'
       preLoaderRoute: typeof AuthLoginRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/app/settings': {
+      id: '/app/settings'
+      path: '/settings'
+      fullPath: '/app/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
     }
     '/app/profile': {
       id: '/app/profile'
@@ -305,6 +324,7 @@ declare module '@tanstack/react-router' {
 interface AppRouteChildren {
   AppAccountRoute: typeof AppAccountRoute
   AppProfileRoute: typeof AppProfileRoute
+  AppSettingsRoute: typeof AppSettingsRoute
   AppIndexRoute: typeof AppIndexRoute
   AppMeEditRoute: typeof AppMeEditRoute
   AppMeVoicesRoute: typeof AppMeVoicesRoute
@@ -319,6 +339,7 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppAccountRoute: AppAccountRoute,
   AppProfileRoute: AppProfileRoute,
+  AppSettingsRoute: AppSettingsRoute,
   AppIndexRoute: AppIndexRoute,
   AppMeEditRoute: AppMeEditRoute,
   AppMeVoicesRoute: AppMeVoicesRoute,
