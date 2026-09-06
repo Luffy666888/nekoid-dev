@@ -182,7 +182,7 @@ function normalizePersonaForProfile(persona: CatPersona, profile: CatProfile): C
         };
       })
       .filter((trait) => trait.label)
-      .slice(0, 3),
+      .slice(0, 4),
     observations: parsedObservations
       .map((observation) => {
         const raw = observation as { label?: unknown; value?: unknown; v?: unknown } | string;
@@ -194,7 +194,8 @@ function normalizePersonaForProfile(persona: CatPersona, profile: CatProfile): C
           value: normalizeCatFacts(raw?.value ?? raw?.v, profile),
         };
       })
-      .filter((observation) => observation.value),
+      .filter((observation) => observation.value)
+      .slice(0, 3),
   };
 }
 
@@ -612,20 +613,32 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
   const data = validatePersonaInput(input);
   const profileFacts = `猫咪名称：${data.profile.name}；性别：${data.profile.gender}；年龄阶段：${data.profile.ageStage}`;
   const wrongGender = data.profile.gender === "小公猫" ? "小母猫、她、她的" : "小公猫、他、他的";
-  const prompt = `请为这只猫生成一份 NEKO.ID「喵懂」人格档案。
+  const prompt = `你是「喵懂」的猫咪性格观察者。你的任务不是给猫套通用人格模板，也不是只描述照片，而是结合基础资料、照片中真实可见的行为、姿态、表情、视线、身体状态和环境互动，推测这只猫最有辨识度的人格特点。
 
-输入资料：
-- 猫咪基础资料：${JSON.stringify(data.profile)}
-- 不可更改的事实：${profileFacts}
-- 照片：${data.imageDataUrl ? "已提供猫咪照片，可用于观察外观、姿态、视线与当下状态" : "未提供，不得虚构视觉细节"}
+猫咪基础资料：${JSON.stringify(data.profile)}
+硬性资料事实：${profileFacts}
+照片状态：${data.imageDataUrl ? "已提供；必须优先依据照片中的可见事实" : "未提供；不得虚构任何视觉细节"}
 
-判断优先级（从高到低）：
-1. 用户明确填写的名称、性别、年龄阶段；
-2. 问卷答案、视频数量及资料中已有的长期行为线索；
-3. 照片中能够直接观察到的姿态、视线和表情；
-4. 为形成完整人格而做的克制推断。
+最终结果要让真正养它的主人觉得“对，就是它”，而不是换一只猫也成立。
 
-照片只能证明当下可见状态，不能仅凭毛色、品种或一张静态照片断言长期性格。证据不足时使用“更倾向于”“可能会”等克制表达，不编造动作、经历、主人行为、健康状态或强烈情绪。
+请先在内部按以下顺序推理，但不要输出推理过程：
+照片事实 → 行为线索 → 性格倾向 → 最有辨识度的人格特点 → 它可能如何看待主人。
+禁止先决定 MBTI 再寻找证据。
+
+观察时优先抓住 2–4 个真正有辨识度的细节，例如视线、眼睛和耳朵状态、坐趴姿势、松弛或警觉程度、与物体/环境/主人的位置和互动。不要罗列所有物体，不要只写“安静观察、温柔细腻、有自己的节奏”等空泛判断。每个人格结论都应能回答“为什么”。
+
+如果证据支持，优先提炼“A，但是 B”的真实反差，例如想靠近却保留距离；但绝不能为了反差虚构画面、动作、经历、主人行为或长期习惯。
+
+字段要求：
+- type：4–6 个中文字符，有行为模式、反差、社交方式或小脾气，有趣但不幼稚；避免“温柔观察家、安静守护者、好奇探索家、治愈陪伴者”等通用模板。
+- mbti：完成人格判断后再选择最接近的趣味标签，格式必须为 XXXX-A 或 XXXX-T；不要把它当科学测量或用刻板印象改写事实。
+- matchScore：60–99 的整数，反映现有证据与结论的匹配程度。
+- monologue：最重要的分享文案。第一人称，优先 20–35 个中文字，结合具体场景，像这只猫此刻会说的话；允许一点小脾气、小傲娇和幽默，不写 AI 散文、鸡汤或泛宠物文学。
+- analysis：50–80 个中文字，必须包含至少一个具体可见细节，再说明它可能意味着什么，并形成一个有辨识度的人格判断；不要堆抽象形容词。
+- ownerRole：60–90 个中文字，帮助主人重新理解熟悉的小行为。只有存在主人互动证据时才能作较明确判断；证据不足必须使用“如果平时也经常这样”“它可能”等有限推测，禁止套用“专属管家、安全港湾、背景音”等万能关系文案。
+- tags：恰好 6 个短标签，混合 2 个性格、2 个行为模式、1 个反差、1 个有趣人格标签；不要全是正面形容词，不要使用“可爱、萌宠、治愈、快乐”等泛标签。
+- traits：恰好 4 项，每项 value 为 0–100 整数。根据本次证据从粘人度、独立性、好奇心、警觉度、社交主动性、观察欲、撒娇度、边界感、探索欲、情绪外露度、主人关注度、行动派程度等维度中动态选择最有区分度的 4 项，禁止固定套用同一组维度或分数。
+- observations：2–3 项，每项必须采用“真实可观察事实 → 简短解释”，禁止把推测包装成事实。
 
 输出严格 JSON，不要 Markdown，不要附加说明。字段：
 {
@@ -633,44 +646,58 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
   "type": "4-6个中文字、有辨识度的人格称号",
   "mbti": "四字母加-A或-T的趣味人格类型",
   "matchScore": "60-99的整数，表示现有证据与人格描述的匹配度",
-  "monologue": "猫咪第一人称独白，25-40个中文字",
-  "analysis": "基于证据的人格解析，60-100个中文字",
-  "ownerRole": "猫咪如何看待主人以及相处方式，35-70个中文字",
-  "tags": ["恰好6个、每个4-8个中文字的个体化标签"],
-  "traits": [{"label":"可观察的人格维度","value":"0-100整数"}],
-  "observations": [{"label":"证据类型","value":"对应的具体依据"}],
-  "dailyMood": "符合它性格的今日状态，12-24个中文字"
+  "monologue": "猫咪第一人称心声",
+  "analysis": "基于照片具体细节的人格解析",
+  "ownerRole": "它与主人关系的个性化解读",
+  "tags": ["标签1", "标签2", "标签3", "标签4", "标签5", "标签6"],
+  "traits": [
+    {"label":"观察欲","value":88},
+    {"label":"边界感","value":72},
+    {"label":"主人关注度","value":81},
+    {"label":"行动派程度","value":46}
+  ],
+  "observations": [
+    {"label":"具体可见行为1","value":"这个行为可能意味着什么"},
+    {"label":"具体可见行为2","value":"这个行为可能意味着什么"}
+  ]
 }
 
-硬性要求：
+事实与推测边界：
+照片只能证明当下可见行为，不能仅凭一张照片确定长期是否粘人、是否喜欢主人、是否胆小或嫉妒、是否有分离焦虑、是否把主人当妈妈或长期社交习惯。可以人格化推测，但必须明确不确定性。不要做医疗诊断。不要生成 dailyMood。
+
+硬性资料约束：
 1. 性别和年龄阶段必须完全遵守用户填写的资料：${profileFacts}。
 2. 全文不要出现与资料冲突的表达，例如：${wrongGender}；描述猫咪时优先使用“它”。
 3. 不要把${data.profile.gender}写成另一种性别，不要把${data.profile.ageStage}写成其他年龄阶段。
-4. traits恰好3项，选择最能区分这只猫的维度；数值必须有证据差异，禁止固定套用同一组维度或分数。
-5. observations生成3-4项，必须能追溯到问卷、用户资料或照片可见事实；不要把推测伪装成观察事实。
-6. tags不要使用“可爱、萌宠、治愈、快乐”等泛标签，应体现具体相处方式、行动节奏或表达习惯。
-7. type、tags、analysis和ownerRole之间要一致，但不要互相重复改写。
+4. type、tags、analysis 和 ownerRole 必须彼此一致，但不能互相重复改写。
 
 【喵懂文风】
-聪明、克制、温柔、有观察力，带一点轻幽默和拟人感，但不矫情。让主人感到“它真的被认真观察过”，而不是收到一段通用萌宠文案。
+具体、自然、有观察力，有一点幽默和温柔，像真正养猫的人会说的话。让主人感觉“AI 好像真的观察了一会儿我的猫”，而不是收到心理测试报告、宠物公众号或营销文案。
 
 避免：
-- “绝绝子、谁懂、狠狠、救命、暴击”等网络营销词；
-- 大量感叹号、波浪号、“喵～”“人家”“本宝宝”等过度卖萌表达；
-- 鸡汤、强行煽情、恋爱化表达和空泛赞美；
-- 每只猫都套用“高冷但温柔”“表面独立其实粘人”等固定反差模板；
-- 医疗诊断或把单次状态直接等同于永久人格。`;
+- AI 腔、报告腔、公众号腔、鸡汤、过度文艺、营销热梗；
+- 连续堆形容词、大量感叹号和波浪号、“喵～”“人家”“本宝宝”等过度卖萌；
+- 强行煽情、恋爱化表达、把单次状态直接等同于永久人格；
+- 每只猫都套用相同反差句式。
+
+输出前请在内部自检：
+1. 换成另一只猫是否仍成立；若是，请重写得更具体。
+2. analysis 是否引用至少一个真实可见细节；若没有，请重写。
+3. monologue 是否像猫真的会说的话；若不是，请重写。
+4. ownerRole 是否在证据不足时假装确定；若是，请降低确定性。
+5. 是否大量使用“温柔、敏感、细腻、陪伴、治愈”等通用词；若是，请换成具体行为。
+6. 是否提炼出一个有证据支持的独特特点或反差；若没有，请重新判断。`;
   try {
     const result = await callFirstAvailableJson<CatPersona>(
       (provider) => [
         {
           role: "system",
           content:
-            "你是 NEKO.ID「喵懂」的猫咪行为观察员和人格档案设计师。你先区分事实、行为证据与推断，再生成聪明、克制、有个体辨识度的人格档案。准确优先于可爱，不编造不可见事实，不做医疗诊断，不使用营销腔或过度卖萌表达。只返回合法 JSON。",
+            "你是「喵懂」的猫咪性格观察者。先从照片事实提取行为线索，再做克制的人格推测；准确和个体辨识度优先于可爱。严格区分可见事实与推断，不虚构、不做医疗诊断、不使用模板化营销或过度卖萌表达。只返回合法 JSON。",
         },
         { role: "user", content: buildVisionContent(provider, prompt, data.imageDataUrl) },
       ],
-      { maxTokens: 720, temperature: 0.58, modelMode: data.imageDataUrl ? "vision" : "text" },
+      { maxTokens: 1000, temperature: 0.62, modelMode: data.imageDataUrl ? "vision" : "text" },
     );
     const parsed = result.parsed;
     const normalized = normalizePersonaForProfile(
@@ -684,17 +711,17 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
           parsed.analysis || `${data.profile.name}会先观察环境，再用停留、靠近和注视表达亲近。`,
         ownerRole: parsed.ownerRole || `你是${data.profile.name}确认世界安全的小坐标。`,
         tags: (Array.isArray(parsed.tags) ? parsed.tags : []).slice(0, 6),
-        traits: (Array.isArray(parsed.traits) ? parsed.traits : []).slice(0, 3),
-        observations: (Array.isArray(parsed.observations) ? parsed.observations : []).slice(0, 4),
-        dailyMood: parsed.dailyMood || "今天好像有点想你",
+        traits: (Array.isArray(parsed.traits) ? parsed.traits : []).slice(0, 4),
+        observations: (Array.isArray(parsed.observations) ? parsed.observations : []).slice(0, 3),
+        dailyMood: "",
         savedAt: Date.now(),
       },
       data.profile,
     );
     if (
-      !normalized.tags.length ||
-      normalized.traits.length < 3 ||
-      !normalized.observations.length
+      normalized.tags.length !== 6 ||
+      normalized.traits.length !== 4 ||
+      normalized.observations.length < 2
     ) {
       if (await shouldRequireRealAI()) throw new Error("AI persona JSON missing required fields");
       return buildStablePersona(data.profile);
