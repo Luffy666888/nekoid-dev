@@ -277,6 +277,7 @@ function buildStablePersona(profile: CatProfile): CatPersona {
 function normalizeVoiceForProfile(
   input: {
     text?: unknown;
+    subtext?: unknown;
     analysis?: unknown;
     share?: unknown;
     mood?: unknown;
@@ -298,12 +299,18 @@ function normalizeVoiceForProfile(
     rawAnalysis.observation ?? rawAnalysis.summary ?? legacyAnalysis,
     profile,
     `${profile.name}保持停留并注视周围，姿态放松，同时持续关注当前互动。`,
-  ), `${profile.name}保持停留并注视周围，姿态放松，同时持续关注当前互动。`, 30, 60);
+  ), `${profile.name}保持停留并注视周围，姿态放松，同时持续关注当前互动。`, 45, 70);
+  const subtext = boundedCopy(
+    normalizeCatFacts(input.subtext, profile, "它没有急着行动，像是在等一个符合自己节奏的时机。"),
+    "它没有急着行动，像是在等一个符合自己节奏的时机。",
+    15,
+    35,
+  );
   const personalityInterpretation = boundedCopy(normalizeCatFacts(
-    rawAnalysis.personalityInterpretation,
+    rawAnalysis.personalityInterpretation ?? input.subtext,
     profile,
-    `这种先观察再回应的方式，体现了它谨慎、有主见，也愿意在安心时靠近。`,
-  ), `这种先观察再回应的方式，体现了它谨慎、有主见，也愿意在安心时靠近。`, 30, 60);
+    subtext,
+  ), subtext, 15, 60);
   const rawShare = input.share && typeof input.share === "object"
     ? input.share as Record<string, unknown>
     : {};
@@ -320,8 +327,8 @@ function normalizeVoiceForProfile(
     text: boundedCopy(
       normalizeCatFacts(input.text, profile, `靠近一点嘛，今天也想被你看见。`),
       `靠近一点嘛，今天也想被你看见。`,
-      15,
-      35,
+      12,
+      30,
     ),
     media: imageDataUrl ?? undefined,
     mediaType: "photo",
@@ -337,8 +344,8 @@ function normalizeVoiceForProfile(
         24,
       ),
       insight: boundedCopy(
-        normalizeCatFacts(rawShare.insight, profile, personalityInterpretation),
-        `它不是没有反应，只是在按自己的节奏确认是否靠近。`,
+        normalizeCatFacts(rawShare.insight ?? input.subtext, profile, subtext),
+        subtext,
         18,
         35,
       ),
@@ -741,34 +748,62 @@ export const generateCatPersona = createServerFn({ method: "POST" })
 
 export async function generateCatVoiceServer(input: VoiceInput): Promise<Voice> {
   const data = validateVoiceInput(input);
-  const prompt = `请基于用户上传的猫咪照片，为 NEKO.ID 生成一条真实、有画面依据的“猫咪心声”。猫咪资料：${JSON.stringify(data.profile)}。人格档案：${JSON.stringify(data.persona)}。用户补充场景：${data.scene || "无"}。
-你必须先观察图片里的猫咪姿态、表情、视线、周围物品/环境，再生成内容。不要写泛泛的“等待心声”“AI会结合照片”等占位文案。不要机械复述用户补充场景，不要出现“给它新买了…”这种主人视角陈述；气泡文案必须像猫咪自己短短说出的小心思。
-输出严格 JSON：
+  const prompt = `你是「喵懂」的猫咪心声观察者。你不是在描述照片，也不是给照片配一句通用的可爱宠物文案。
+
+你要从猫咪当前真实可见的动作、表情、视线和环境互动中，找出这一刻最有意思、最有辨识度的一个行为细节，再结合已有的人格档案，推测它正在关注什么、可能想做什么、为什么还没有行动，以及它会如何评价眼前发生的事。
+
+【猫咪资料】
+${JSON.stringify(data.profile)}
+
+【已有猫咪人格】
+${JSON.stringify(data.persona)}
+
+【用户补充场景】
+${data.scene || "无补充场景"}
+
+请先在内部判断，不输出推理过程：
+1. 猫正在看什么？身体是在放松、准备行动、观察还是回避？
+2. 哪个物体、人或动作最吸引它？
+3. 是否存在“想靠近但没靠近、想行动但还在等、表面不在意却一直盯着”等有证据的反差？
+4. 当前行为与已有的人格有哪些一致或反差？
+优先选择其中最有戏的一个点，不要试图一次解释整张照片。
+
+人格档案只影响它说话的口吻、反应方式、行动节奏和表达亲近的方式。不要机械重复 persona 中“温柔、观察型、慢热”等标签，也不要先套人格再改写照片事实。同样的对象，应让冲动型、观察型、傲娇型猫表现出不同态度。
+
+字段要求：
+- text：最重要字段。第一人称猫咪口吻，优先 12–30 个中文字，最多 2 句；必须针对照片中的一个具体对象或行为，口语化，有一点猫的脾气、幽默或反差。写它对眼前事情的态度，不写“我喜欢你、我要陪你、我很开心”等泛泛情感。
+- subtext：15–35 个中文字，第三人称或旁白，比 text 克制；揭示表面行为之下的小反差，让主人觉得“它确实经常这样”，不能换句话重复 text。
+- analysis：45–70 个中文字。结构必须是“一个具体可见细节 + 这个细节可能意味着什么 + 结合人格的克制推测”。不要复述整张照片，不罗列与行为无关的花、家具或装饰。
+- mood：2–6 个中文字，描述当前行为状态，例如观察中、跃跃欲试、假装淡定、正在评估、想玩但端着、警觉围观；禁止只写开心、温柔、治愈、平静等抽象情绪。
+- tags：2–3 个短标签，体现“当前行为 × 猫咪人格”，至少一个必须指向这一刻的具体行为；不要使用可爱猫咪、萌宠、治愈等泛标签。
+
+优先寻找有事实支撑的“A，但其实 B”，但不能为了搞笑虚构画面中不存在的动作、人物、情绪事件或长期习惯。照片只能证明可见行为，不能据此确定它喜欢或讨厌谁、嫉妒、想念主人、长期粘人或有心理问题。证据不足时，宁可写一个具体的小心思，也不要上升到深刻情感或医疗判断。
+
+避免固定套用“别看我、我只是、表面其实、你继续我先、不是不只是”等句式。请在内部形成至少 3 个不同角度的候选表达，最终只选最符合当前照片、人格且最不像模板的一条。
+
+【喵懂文风】
+聪明、克制、轻幽默、有猫味、具体、有一点小脾气，让主人会心一笑。禁止 AI 腔、看图作文、宠物公众号文案、鸡汤、过度煽情、小红书营销腔、大量“喵～”，以及“绝绝子、谁懂、可爱暴击、治愈一整天”等表达。
+
+严格返回 JSON，不要 Markdown，不要附加说明：
 {
-  "text": "猫咪第一人称心声，15-35个中文字",
-  "analysis": {
-    "observation": "客观画面与行为分析，25-50个中文字",
-    "personalityInterpretation": "结合人格档案解释行为体现的性格，30-60个中文字"
-  },
-  "share": {
-    "headline": "分享卡核心文案，12-24个中文字",
-    "insight": "行为背后的小心思，18-35个中文字",
-    "tags": ["2-3个动态标签，每个4-8个中文字"]
-  },
-  "mood": "情绪短语",
-  "location": "地点短语",
-  "tags": ["2-3个带 emoji 的标签"]
+  "text": "猫咪第一人称心声",
+  "subtext": "它没说出口的小心思",
+  "analysis": "基于具体画面细节的AI解读",
+  "mood": "当前行为状态",
+  "tags": ["标签1", "标签2", "标签3"]
 }
-要求：
-1. analysis.observation只描述可观察到的姿态、表情、视线、互动对象与环境，准确优先，不写营销或文学套话。
-2. analysis.personalityInterpretation结合猫咪的MBTI、人格名称、人格标签和历史档案，回答“这个行为体现了什么性格”，不要重复observation。
-3. share.headline更口语、有角色感和晒猫感，但不能编造画面中不存在的行为，不使用低俗梗或固定套话。
-4. share.insight比headline克制，解释行为背后的想法，不照搬analysis或headline。
-5. share.tags根据本次行为和人格动态生成，至少一个体现当前场景行为，不要硬编码。
-6. 同一次请求完成全部字段，只做情绪陪伴和行为想象，不做医疗诊断；只返回JSON。`;
+
+输出前在内部自检：
+1. text 换成另一只猫是否仍成立；若成立，请重写。
+2. text 是否针对照片中的具体行为或物体；若没有，请重写。
+3. analysis 是否提供了超越表面描述的新理解；若只是看图作文，请重写。
+4. subtext 是否多揭示了一层小心思；若只是重复 text，请重写。
+5. tags 是否体现这一刻；若只是通用人格词，请重写。
+6. 是否为了温柔牺牲了这只猫的脾气和个性；若是，请重写。`;
   try {
     const result = await callFirstAvailableJson<{
       text?: unknown;
+      subtext?: unknown;
       analysis?: unknown;
       share?: unknown;
       mood?: unknown;
@@ -779,13 +814,13 @@ export async function generateCatVoiceServer(input: VoiceInput): Promise<Voice> 
         {
           role: "system",
           content:
-            "你是猫咪心声翻译官和宠物照片观察员。必须基于图片可见信息生成猫咪第一人称心声，并给出简短 AI 解析。只返回 JSON。",
+            "你是「喵懂」的猫咪心声观察者。先观察可见行为，再结合既有人格创作具体、有猫味、轻幽默的心声。事实优先，不看图作文、不套模板、不虚构、不做医疗判断。只返回合法 JSON。",
         },
         { role: "user", content: buildVisionContent(provider, prompt, data.imageDataUrl) },
       ],
       {
-        maxTokens: 560,
-        temperature: 0.5,
+        maxTokens: 620,
+        temperature: 0.62,
         timeoutMs: data.imageDataUrl ? 45_000 : 14_000,
         modelMode: data.imageDataUrl ? "vision" : "text",
       },
