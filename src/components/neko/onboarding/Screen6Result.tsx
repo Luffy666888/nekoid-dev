@@ -201,41 +201,40 @@ export function Screen6Result({
                 "linear-gradient(180deg, transparent 0%, oklch(0.97 0.025 320 / 0.6) 50%, oklch(0.965 0.03 300) 100%)",
             }}
           />
+          <div
+            aria-hidden="true"
+            className="absolute bottom-0 left-0 z-[1] h-[245px] w-[88%]"
+            style={{
+              background:
+                "linear-gradient(90deg, rgb(253 249 253 / 0.9) 0%, rgb(248 242 252 / 0.86) 34%, rgb(248 242 252 / 0.56) 68%, transparent 100%)",
+              maskImage: "linear-gradient(180deg, transparent 0%, black 22%, black 100%)",
+              WebkitMaskImage: "linear-gradient(180deg, transparent 0%, black 22%, black 100%)",
+            }}
+          />
 
           <div className="absolute left-6 right-6 bottom-5 z-10">
-            <div
-              className="text-[15px] font-medium leading-none tracking-[0.02em] text-[oklch(0.5_0.045_300)]"
-              style={{ textShadow: "0 2px 14px oklch(1 0 0 / 0.9)" }}
-            >
+            <div className="text-[15px] font-medium leading-none tracking-[0.02em] text-[#4F485F]">
               {catName}
             </div>
             <div className="mt-1.5 flex flex-col gap-1.5">
               <span
                 className="text-[26px] font-semibold leading-tight"
                 style={{
-                  background: "linear-gradient(90deg, #A88BEA 0%, #C896E0 45%, #EFAFC8 100%)",
+                  background: "linear-gradient(90deg, #7659C5 0%, #9869BC 48%, #C47D9F 100%)",
                   WebkitBackgroundClip: "text",
                   WebkitTextFillColor: "transparent",
                 }}
               >
                 {personaType}
               </span>
-              <span
-                className="flex items-baseline gap-2"
-                style={{ textShadow: "0 2px 10px oklch(1 0 0 / 0.9)" }}
-              >
-                <span className="text-[11px] font-normal tracking-[0.24em] text-[oklch(0.62_0.04_300)]">
+              <span className="flex items-baseline gap-2">
+                <span className="text-[11px] font-medium tracking-[0.24em] text-[#746B80]">
                   MBTI
                 </span>
-                <span className="text-[15px] font-medium text-[oklch(0.45_0.11_300)]">
-                  {personaMbti}
-                </span>
+                <span className="text-[15px] font-medium text-[#584A68]">{personaMbti}</span>
               </span>
             </div>
-            <p
-              className="mt-3 text-[14px] font-normal leading-[1.7] text-[oklch(0.42_0.045_300)]"
-              style={{ textShadow: "0 1px 6px oklch(1 0 0 / 0.95)" }}
-            >
+            <p className="mt-3 text-[14px] font-medium leading-[1.7] text-[#4F485F]">
               “{persona?.monologue ?? "不黏人，但永远会待在离你不远的地方。"}”
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
