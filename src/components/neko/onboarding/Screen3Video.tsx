@@ -47,7 +47,7 @@ export function Screen3Video({ onNext, onPrev }: { onNext?: () => void; onPrev?:
     const oversized = candidates.filter((file) => getOnboardingVideoLimitError(file));
     const picked = candidates.filter((file) => !getOnboardingVideoLimitError(file));
     if (files.length > remain) toast("最多只能上传 3 个视频哦~");
-    if (files.length > 1) toast("为了更快返回页面，NEKO 会一次处理 1 个视频，可继续添加喵～");
+    if (files.length > 1) toast("为了更快返回页面，喵懂会一次处理 1 个视频，可继续添加喵～");
     if (oversized.length) {
       toast(oversized.length === 1 ? getOnboardingVideoLimitError(oversized[0])! : `${oversized.length} 个视频超过 ${NEKO_MAX_ONBOARDING_VIDEO_LABEL}，已跳过`, { icon: "🎞️" });
     }
@@ -94,10 +94,10 @@ export function Screen3Video({ onNext, onPrev }: { onNext?: () => void; onPrev?:
         return;
       }
       if (result.reason === "timeout") {
-        toast("NEKO 先记下这段视频，稍后再慢慢观察它的小动作～", { icon: "✨" });
+        toast("喵懂先记下这段视频，稍后再慢慢观察它的小动作～", { icon: "✨" });
       }
     } catch {
-      toast("NEKO 先收下这段视频，稍后再细看它的小动作～", { icon: "✨" });
+      toast("喵懂先收下这段视频，稍后再细看它的小动作～", { icon: "✨" });
     } finally {
       setChecking(false);
     }

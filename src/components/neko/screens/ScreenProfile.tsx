@@ -17,7 +17,7 @@ export function ScreenProfile() {
 
       <div className="relative z-10 px-6 flex items-center justify-between">
         <span className="text-[18px] text-[oklch(0.55_0.04_300)]">‹</span>
-        <span className="text-[10px] tracking-[0.4em] text-[oklch(0.55_0.04_300)]">NEKO PROFILE</span>
+        <span className="text-[10px] tracking-[0.4em] text-[oklch(0.55_0.04_300)]">喵懂人格档案</span>
         <span className="text-[14px]">⋯</span>
       </div>
 

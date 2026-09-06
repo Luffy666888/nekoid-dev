@@ -382,7 +382,7 @@ const PosterTemplate = forwardRef<HTMLDivElement, { v: import("./voicesStore").V
       {/* header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
         <div>
-          <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: 4, background: "linear-gradient(135deg, #B69AEF, #E6B8CF)", WebkitBackgroundClip: "text", color: "transparent" }}>NEKO.ID</div>
+          <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: 4, background: "linear-gradient(135deg, #B69AEF, #E6B8CF)", WebkitBackgroundClip: "text", color: "transparent" }}>喵懂</div>
           <div style={{ fontSize: 12, color: "#8a7fa0", marginTop: 4, letterSpacing: 2 }}>读懂它的小世界</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 14px", background: "rgba(255,255,255,0.7)", borderRadius: 999 }}>
@@ -435,7 +435,7 @@ const PosterTemplate = forwardRef<HTMLDivElement, { v: import("./voicesStore").V
 
       {/* footer */}
       <div style={{ marginTop: 30, paddingTop: 22, borderTop: "1px dashed rgba(180,160,220,0.5)", textAlign: "center" }}>
-        <div style={{ fontSize: 10, letterSpacing: 6, color: "#a39ab5" }}>FROM · NEKO.ID</div>
+        <div style={{ fontSize: 10, letterSpacing: 6, color: "#a39ab5" }}>来自 · 喵懂</div>
         <div style={{ fontSize: 13, color: "#5a4d75", marginTop: 8, lineHeight: 1.7 }}>如果猫会说话，<br />它也许会这样告诉你。</div>
       </div>
     </div>
@@ -1861,7 +1861,7 @@ export function AppShowcase() {
             <div className="absolute inset-[8px] rounded-full bg-gradient-to-br from-[oklch(0.82_0.11_320)] to-[oklch(0.84_0.09_0)] animate-breathe" />
           </div>
           <div className="leading-tight">
-            <div className="text-[15px] font-medium tracking-[0.32em] text-foreground">NEKO.ID</div>
+            <div className="text-[15px] font-medium tracking-[0.32em] text-foreground">喵懂</div>
             <div className="text-[10px] tracking-[0.4em] text-muted-foreground">PRODUCT DEMO · 9 SCREENS</div>
           </div>
         </div>
@@ -1912,7 +1912,7 @@ export function AppShowcase() {
 
       <footer className="relative z-10 border-t border-border/40">
         <div className="mx-auto flex max-w-[1600px] items-center justify-between px-8 py-8 text-[11px] tracking-[0.3em] text-muted-foreground md:px-14">
-          <span>© NEKO.ID — 听懂它的小心声</span>
+          <span>喵懂 · 读懂它的小世界</span>
           <span>PRODUCT DEMO · 9 / 9</span>
         </div>
       </footer>

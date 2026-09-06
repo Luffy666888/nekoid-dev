@@ -118,11 +118,11 @@ export function Screen2Photo({ onNext, onPrev }: { onNext?: () => void; onPrev?:
 
   const onContinue = async () => {
     if (!pendingDataUrl) {
-      toast("猫咪头像还没上传哦，先让 NEKO 见见它的小脸吧～", { icon: "📷" });
+      toast("猫咪头像还没上传哦，先让喵懂见见它的小脸吧～", { icon: "📷" });
       return;
     }
     if (!name.trim()) {
-      toast("还不知道猫咪叫什么呢，把它的名字告诉 NEKO 吧～", { icon: "🐾" });
+      toast("还不知道猫咪叫什么呢，把它的名字告诉喵懂吧～", { icon: "🐾" });
       nameRef.current?.focus();
       return;
     }
@@ -131,7 +131,7 @@ export function Screen2Photo({ onNext, onPrev }: { onNext?: () => void; onPrev?:
       return;
     }
     if (age === null) {
-      toast("猫咪年龄阶段还没选，NEKO 想更懂它一点～", { icon: "🎂" });
+      toast("猫咪年龄阶段还没选，喵懂想更懂它一点～", { icon: "🎂" });
       return;
     }
     if (!verified) {
@@ -150,7 +150,7 @@ export function Screen2Photo({ onNext, onPrev }: { onNext?: () => void; onPrev?:
         toast.dismiss(loadingId);
         setVerified(true);
         setCatAvatar(pendingDataUrl);
-        toast("NEKO 刚刚眨了下眼，先帮你记下这张可爱脸～", { icon: "✨" });
+        toast("喵懂刚刚眨了下眼，先帮你记下这张可爱脸～", { icon: "✨" });
       } finally {
         setChecking(false);
       }

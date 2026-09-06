@@ -134,7 +134,7 @@ function cleanQuiz(value: unknown) {
 }
 
 function fallbackDisplayName(user: IOSUser) {
-  return user.email?.split("@")[0] || "NEKO 用户";
+  return user.email?.split("@")[0] || "喵懂用户";
 }
 
 function isoToMs(value: string | null | undefined) {
