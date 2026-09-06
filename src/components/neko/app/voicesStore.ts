@@ -14,6 +14,8 @@ export type Voice = {
   mediaType?: "photo" | "video";
   aspect?: "9:16" | "4:5" | "3:4" | "1:1";
   videoDuration?: string;
+  focalPointX?: number;
+  focalPointY?: number;
   analysis?:
     | string
     | {

@@ -213,6 +213,7 @@ export function ScreenHome() {
   const groups = groupByDay(voices);
   const [moreIdx, setMoreIdx] = useState<number | null>(null);
   const [confirmDelIdx, setConfirmDelIdx] = useState<number | null>(null);
+  const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const posterRef = useRef<HTMLDivElement>(null);
   const sharingVoice = moreIdx !== null ? voices[moreIdx] : null;
@@ -251,29 +252,25 @@ export function ScreenHome() {
       <StatusBar />
       <div className="absolute inset-0 overflow-y-auto scrollbar-none pt-[52px] pb-[120px]">
         {/* ── SECTION 1 · Compact cat profile ─────────────── */}
-        <div className="mx-5 overflow-hidden rounded-[24px] p-3.5"
+        <div className="mx-5 overflow-hidden rounded-[22px] px-4 py-3"
           style={{ background: "linear-gradient(135deg, oklch(0.98 0.02 320 / 0.95), oklch(0.96 0.035 270 / 0.9))", boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}>
           <div className="flex items-center gap-3">
-            <CatAvatar size={46} usePhoto />
+            <CatAvatar size={60} usePhoto />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <div className="text-[14px] font-medium text-foreground">{catName}</div>
-                <span className="rounded-full bg-white/85 px-1.5 py-[1px] text-[8.5px] tracking-[0.15em] text-[oklch(0.5_0.1_320)]">{persona?.mbti ?? "INTJ-A"}</span>
+                <div className="text-[18px] font-semibold text-foreground">{catName}</div>
+                <span className="rounded-full bg-white/85 px-2 py-0.5 text-[13px] tracking-[0.08em] text-[oklch(0.5_0.1_320)]">{persona?.mbti ?? "INTJ-A"}</span>
               </div>
-              <div className="mt-0.5 text-[10.5px] text-[oklch(0.55_0.05_300)]">{persona?.type ?? "高冷观察者"}</div>
+              <div className="mt-1 text-[15px] text-[oklch(0.55_0.05_300)]">{persona?.type ?? "高冷观察者"}</div>
             </div>
-            <Link to="/app/profile" className="rounded-full bg-white/85 px-2.5 py-1 text-[10px] tracking-[0.18em] text-[oklch(0.5_0.1_320)] active:bg-white/95 active:scale-[0.98] transition-all duration-150">查看人格 ›</Link>
+            <Link to="/app/profile" className="shrink-0 rounded-full bg-white/85 px-3 py-1.5 text-[14px] text-[oklch(0.5_0.1_320)] active:bg-white/95 active:scale-[0.98] transition-all duration-150">查看人格 ›</Link>
           </div>
-          <div className="mt-2.5 flex w-full items-center gap-2 rounded-2xl bg-white/70 px-3.5 py-2.5">
-            <span className="text-[14px] leading-none">😺</span>
-            <span className="flex-1 text-[12px] leading-snug text-foreground">{persona?.dailyMood ?? "今天好像有点想你"}</span>
-          </div>
-          </div>
+        </div>
 
         {/* ── SECTION 2 · 猫咪心声 title only ─────────────── */}
-        <div className="mt-6 flex items-center px-5">
-          <div className="flex items-center gap-1.5 text-[16px] font-medium text-foreground">
-            <span className="text-[18px]">💭</span>
+        <div className="mt-6 flex items-center px-4">
+          <div className="flex items-center gap-2 text-[23px] font-semibold text-foreground">
+            <span className="text-[22px]">💭</span>
             <span>猫咪心声</span>
           </div>
         </div>
@@ -282,13 +279,13 @@ export function ScreenHome() {
         {voices.length === 0 ? (
           <EmptyFeed />
         ) : (
-          <div className="mt-4 px-5">
+          <div className="mt-3 px-3">
             {groups.map((g) => (
               <div key={g.label} className="mb-2">
                 <DayDivider label={g.label} />
                 <div className="flex flex-col gap-5">
                   {g.items.map(({ v, idx }) => (
-                    <TimelineRow key={idx} v={v} idx={idx} onMore={setMoreIdx} />
+                    <TimelineRow key={idx} v={v} idx={idx} onMore={setMoreIdx} onPhotoClick={setPreviewPhoto} />
                   ))}
                 </div>
               </div>
@@ -297,6 +294,13 @@ export function ScreenHome() {
         )}
       </div>
       <TabBar active="home" />
+
+      {previewPhoto && (
+        <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/92" onClick={() => setPreviewPhoto(null)}>
+          <button type="button" aria-label="关闭原图" className="absolute left-4 top-[max(16px,env(safe-area-inset-top))] flex h-11 w-11 items-center justify-center rounded-full bg-black/40 text-[26px] text-white">×</button>
+          <img src={previewPhoto} alt="猫咪完整原图" className="h-full w-full object-contain" />
+        </div>
+      )}
 
       {/* minimal manage sheet — 生成长图 + 删除 */}
       {moreIdx !== null && sharingVoice && (
@@ -351,7 +355,7 @@ function DayDivider({ label }: { label: string }) {
   return (
     <div className="my-3 flex items-center gap-3">
       <div className="h-px flex-1" style={{ background: "linear-gradient(90deg, transparent, oklch(0.85 0.04 305 / 0.6))" }} />
-      <div className="rounded-full bg-white/80 px-3 py-1 text-[10px] tracking-[0.3em] text-[oklch(0.5_0.08_305)] backdrop-blur" style={{ boxShadow: "0 4px 12px -8px oklch(0.7 0.12 305 / 0.5)" }}>
+      <div className="rounded-full bg-white/80 px-3 py-1 text-[13px] tracking-[0.12em] text-[oklch(0.58_0.06_305)] backdrop-blur" style={{ boxShadow: "0 4px 12px -8px oklch(0.7 0.12 305 / 0.5)" }}>
         {label}
       </div>
       <div className="h-px flex-1" style={{ background: "linear-gradient(270deg, transparent, oklch(0.85 0.04 305 / 0.6))" }} />
@@ -444,24 +448,24 @@ const PosterTemplate = forwardRef<HTMLDivElement, { v: import("./voicesStore").V
 });
 
 
-function TimelineRow({ v, idx, onMore }: { v: import("./voicesStore").Voice; idx: number; onMore?: (idx: number) => void }) {
+function TimelineRow({ v, idx, onMore, onPhotoClick }: { v: import("./voicesStore").Voice; idx: number; onMore?: (idx: number) => void; onPhotoClick?: (src: string) => void }) {
   const hhmm = formatHHMM(v);
   return (
-    <div className="relative flex gap-3">
+    <div className="relative flex gap-2">
       {/* time rail */}
-      <div className="flex w-[42px] shrink-0 flex-col items-center pt-1">
-        <span className="tabular-nums text-[11px] tracking-wider text-[oklch(0.5_0.07_305)]">{hhmm}</span>
+      <div className="flex w-[38px] shrink-0 flex-col items-center pt-1">
+        <span className="tabular-nums text-[13px] text-[oklch(0.62_0.04_305)]">{hhmm}</span>
         <span className="mt-1.5 h-1.5 w-1.5 rounded-full" style={{ background: "var(--gradient-cta)", boxShadow: "0 0 0 3px oklch(1 0 0 / 0.7)" }} />
-        <span className="mt-1 w-px flex-1" style={{ background: "linear-gradient(180deg, oklch(0.85 0.04 305 / 0.7), transparent)" }} />
+        <span className="mt-1 w-px flex-1" style={{ background: "linear-gradient(180deg, oklch(0.88 0.025 305 / 0.45), transparent)" }} />
       </div>
       <div className="min-w-0 flex-1">
-        <VoiceCard v={v} idx={idx} onMore={onMore} />
+        <VoiceCard v={v} idx={idx} onMore={onMore} onPhotoClick={onPhotoClick} />
       </div>
     </div>
   );
 }
 
-function VoiceCard({ v, idx, onMore }: { v: import("./voicesStore").Voice; idx: number; onMore?: (idx: number) => void }) {
+function VoiceCard({ v, idx, onMore, onPhotoClick }: { v: import("./voicesStore").Voice; idx: number; onMore?: (idx: number) => void; onPhotoClick?: (src: string) => void }) {
   const isVideo = v.mediaType === "video";
   const uploadedPhoto = usePublishPhoto();
   const photoSrc = v.media ?? (!isVideo ? uploadedPhoto : null);
@@ -473,14 +477,15 @@ function VoiceCard({ v, idx, onMore }: { v: import("./voicesStore").Voice; idx: 
       className="block overflow-hidden rounded-[24px] bg-white/85 backdrop-blur active:bg-white/95 active:scale-[0.995] transition-all duration-150"
       style={{ boxShadow: "0 16px 36px -18px oklch(0.55 0.1 305 / 0.45)", border: "1px solid oklch(1 0 0 / 0.7)" }}
     >
-      {/* Media area — fixed width, adapts to user photo aspect */}
-      <div className="relative w-full overflow-hidden" style={{ background: "linear-gradient(135deg, oklch(0.97 0.03 320), oklch(0.95 0.04 285))" }}>
+      <div className="relative aspect-[4/5] w-full overflow-hidden" style={{ background: "linear-gradient(135deg, oklch(0.97 0.03 320), oklch(0.95 0.04 285))" }}>
         {isVideo && v.media ? (
-          <video src={v.media} className={"block w-full " + aspectToClass(v.aspect) + " object-cover"} muted playsInline preload="metadata" />
+          <video src={v.media} className="block h-full w-full object-cover" style={{ objectPosition: `${v.focalPointX ?? 50}% ${v.focalPointY ?? 50}%` }} muted playsInline preload="metadata" />
         ) : photoSrc ? (
-          <img src={photoSrc} alt="" className="block h-auto w-full max-h-[420px] object-contain" />
+          <button type="button" className="block h-full w-full" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPhotoClick?.(photoSrc); }}>
+            <img src={photoSrc} alt="" className="h-full w-full object-cover" style={{ objectPosition: `${v.focalPointX ?? 50}% ${v.focalPointY ?? 50}%` }} />
+          </button>
         ) : (
-          <div className={"relative w-full " + aspectToClass(v.aspect) + " flex items-center justify-center"} style={{ background: v.grad }}>
+          <div className="relative flex h-full w-full items-center justify-center" style={{ background: v.grad }}>
             <CatAvatar size={108} grad={v.grad} usePhoto />
           </div>
         )}
@@ -503,8 +508,8 @@ function VoiceCard({ v, idx, onMore }: { v: import("./voicesStore").Voice; idx: 
         <div className="absolute left-3.5 right-10 top-3.5 z-10">
           <div className="relative inline-block max-w-full rounded-[20px] rounded-bl-[6px] bg-white/95 px-3.5 py-2.5 backdrop-blur-md"
             style={{ boxShadow: "0 14px 28px -14px oklch(0.3 0.05 300 / 0.45)" }}>
-            <div className="mb-0.5 text-[8px] tracking-[0.35em] text-[oklch(0.55_0.06_300)]">{catName}</div>
-            <p className="text-[12.5px] leading-[1.55] text-foreground">
+            <div className="mb-1 text-[14px] font-medium text-[oklch(0.55_0.06_300)]">{catName}</div>
+            <p className="text-[17px] font-medium leading-[1.5] text-foreground">
               <span className="mr-1">💭</span>{v.text}
             </p>
           </div>
@@ -514,18 +519,18 @@ function VoiceCard({ v, idx, onMore }: { v: import("./voicesStore").Voice; idx: 
       {/* Below media — tags, meta, more */}
       <div className="flex items-center justify-between gap-2 px-3.5 pb-3 pt-2.5">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
-          {(v.tags ?? []).slice(0, 2).map((t) => (
-            <span key={t} className="shrink-0 rounded-full px-2 py-[3px] text-[10.5px] font-medium text-[oklch(0.45_0.1_305)]"
+          {(v.share?.tags ?? v.tags ?? []).slice(0, 3).map((t) => (
+            <span key={t} className="shrink-0 rounded-full px-2 py-1 text-[13px] font-medium text-[oklch(0.45_0.1_305)]"
               style={{ background: "linear-gradient(135deg, oklch(0.96 0.04 320), oklch(0.95 0.05 270))" }}>{t}</span>
           ))}
           {v.location && (
-            <span className="ml-1 truncate text-[10.5px] text-[oklch(0.55_0.06_300)]">· {v.location}</span>
+            <span className="ml-1 truncate text-[14px] text-[oklch(0.55_0.06_300)]">· {v.location}</span>
           )}
         </div>
         <button
           aria-label="更多"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); onMore?.(idx); }}
-          className="-mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[14px] leading-none text-[oklch(0.55_0.05_300)] active:bg-[oklch(0.96_0.02_300)] active:scale-95 transition-all duration-150"
+          className="-mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[20px] leading-none text-[oklch(0.55_0.05_300)] active:bg-[oklch(0.96_0.02_300)] active:scale-95 transition-all duration-150"
         >
           ⋯
         </button>
