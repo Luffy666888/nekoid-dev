@@ -1,8 +1,4 @@
 import hero from "@/assets/neko-hero.jpg";
-import sceneA from "@/assets/neko-noble.jpg";
-import sceneB from "@/assets/neko-magic.jpg";
-import sceneC from "@/assets/neko-pink.jpg";
-import bond from "@/assets/neko-bond.jpg";
 import { useNavigate } from "@tanstack/react-router";
 import { Share2 } from "lucide-react";
 import { Sparkles } from "../screens/_shared";
@@ -15,6 +11,11 @@ import { persistCatResult, useCatPersona, useCatProfile } from "../catProfileSto
 import { voicesStore } from "../app/voicesStore";
 import { saveLocalNekoToCloud } from "@/lib/neko-cloud";
 import { getPhotoDraft } from "./onboardingDraftStore";
+import {
+  generateLittleWorldPrompts,
+  type LittleWorldImage,
+  type LittleWorldScene,
+} from "./littleWorldPrompts";
 
 const KEYWORDS = ["温柔观察者", "慢热", "安静陪伴"];
 
@@ -23,6 +24,18 @@ const INSIGHTS = [
   { emoji: "🏠", title: "很需要自己的安全区", desc: "熟悉的位置和气味会让它安心。" },
   { emoji: "❤️", title: "喜欢你，但不一定黏着你", desc: "待在附近，就是它表达亲近的方式。" },
 ];
+
+function compactSentence(value: string | undefined, fallback: string, maxLength = 24) {
+  const normalized = (value || fallback).replace(/[“”"]/g, "").replace(/\s+/g, "").trim();
+  const firstSentence = normalized.split(/[。！？]/)[0] || fallback;
+  return firstSentence.length > maxLength ? `${firstSentence.slice(0, maxLength)}…` : firstSentence;
+}
+
+function compactOwnerRole(value: string | undefined) {
+  const normalized = (value || "").replace(/[“”"]/g, "").trim();
+  const matched = normalized.match(/你是(?:它)?([^，。！？]{2,8})/);
+  return matched?.[1] || (normalized.length <= 8 ? normalized : "生活主理人") || "生活主理人";
+}
 
 export function Screen6Result({
   onRestart,
@@ -58,12 +71,27 @@ export function Screen6Result({
         desc: item.value,
       }))
     : INSIGHTS;
-
-  const SCENES = [
-    { src: sceneA, title: "靠窗发呆", line: "我喜欢你在，但不用一直陪我。" },
-    { src: sceneB, title: "偷偷陪伴", line: "你忙你的，我在旁边就好。" },
-    { src: sceneC, title: "睡前守候", line: "等你睡了，我再走。" },
-  ];
+  const generatedPrompts = generateLittleWorldPrompts({
+    catName,
+    mbti: personaMbti,
+    tags: personaKeywords,
+    description: persona?.analysis ?? persona?.monologue ?? "温柔地观察世界，也珍惜熟悉的陪伴。",
+  });
+  const generatedImages = (
+    persona as (typeof persona & { littleWorldImages?: LittleWorldImage[] }) | null
+  )?.littleWorldImages;
+  const scenes = generatedPrompts.map((scene, index) => ({
+    ...scene,
+    src: generatedImages?.[index]?.url || avatarSrc,
+    prompt: generatedImages?.[index]?.prompt || scene.prompt,
+  }));
+  const [activeScene, setActiveScene] = useState(0);
+  const ownerBadge = compactOwnerRole(persona?.ownerRole);
+  const ownerDescription = compactSentence(
+    persona?.ownerRole || persona?.analysis,
+    "你让它放心做自己，也给它稳稳的安全感",
+  );
+  const ownerMonologue = compactSentence(persona?.monologue, "只要你在，我就知道这里是家", 28);
 
   const closeShare = () => setShareOpen(false);
 
@@ -235,20 +263,38 @@ export function Screen6Result({
             LITTLE · WORLD
           </span>
         </h2>
-        <div className="mt-3.5 flex snap-x snap-mandatory gap-3.5 overflow-x-auto scrollbar-none pl-6 pr-[12%] pb-2">
-          {SCENES.map((s, i) => (
-            <SceneCard key={s.title} scene={s} index={i} total={SCENES.length} />
+        <div
+          className="mt-2.5 flex snap-x snap-mandatory gap-3 overflow-x-auto scrollbar-none px-[15%] pb-1"
+          onScroll={(event) => {
+            const element = event.currentTarget;
+            const cards = Array.from(element.children) as HTMLElement[];
+            const center = element.scrollLeft + element.clientWidth / 2;
+            const nearest = cards.reduce(
+              (best, card, index) => {
+                const cardCenter = card.offsetLeft + card.offsetWidth / 2;
+                const distance = Math.abs(cardCenter - center);
+                return distance < best.distance ? { index, distance } : best;
+              },
+              { index: 0, distance: Number.POSITIVE_INFINITY },
+            );
+            setActiveScene(nearest.index);
+          }}
+        >
+          {scenes.map((scene, index) => (
+            <SceneCard key={scene.id} scene={scene} index={index} total={scenes.length} />
           ))}
         </div>
-        <div className="mt-3 flex justify-center gap-1.5">
-          {SCENES.map((s, i) => (
+        <div className="mt-1.5 flex justify-center gap-1.5">
+          {scenes.map((scene, index) => (
             <span
-              key={s.title}
+              key={scene.id}
               className="h-[5px] rounded-full"
               style={{
-                width: i === 0 ? 16 : 5,
+                width: index === activeScene ? 16 : 5,
                 background:
-                  i === 0 ? "linear-gradient(90deg,#B69AEF,#E6B8CF)" : "oklch(0.86 0.04 310)",
+                  index === activeScene
+                    ? "linear-gradient(90deg,#B69AEF,#E6B8CF)"
+                    : "oklch(0.86 0.04 310)",
               }}
             />
           ))}
@@ -300,9 +346,9 @@ export function Screen6Result({
           boxShadow: "0 20px 44px -26px oklch(0.6 0.14 305 / 0.6)",
         }}
       >
-        <div className="flex min-h-[168px] items-stretch">
+        <div className="grid min-h-[168px] grid-cols-[3fr_2fr] items-stretch">
           {/* 左侧：文字 */}
-          <div className="flex-1 min-w-0 px-5 py-5">
+          <div className="min-w-0 px-5 py-5">
             <div className="flex items-start gap-2">
               <span className="shrink-0 text-[15px] leading-[1.5] pt-[3px]">❤️</span>
               <h2 className="min-w-0 flex-1 break-words text-[16px] font-semibold leading-[1.5] text-[oklch(0.32_0.05_300)]">
@@ -313,20 +359,23 @@ export function Screen6Result({
               className="mt-3 inline-flex rounded-full px-3.5 py-1.5 text-[13px] font-medium text-white"
               style={{ background: "linear-gradient(90deg, #B69AEF, #E6B8CF)" }}
             >
-              {persona?.ownerRole ?? "我的安全区"}
+              {ownerBadge}
             </div>
-            <p className="mt-3 text-[13px] leading-[1.75] text-[oklch(0.45_0.04_300)]">
-              “{persona?.analysis ?? "我不一定每次都跑向你，但如果你在家，我会睡得更安心。"}”
+            <p className="mt-3 text-[14px] font-medium leading-[1.55] text-[oklch(0.4_0.045_300)]">
+              {ownerDescription}
+            </p>
+            <p className="mt-2 border-l-2 border-[oklch(0.72_0.1_305)] pl-3 text-[12.5px] italic leading-[1.6] text-[oklch(0.52_0.055_300)]">
+              “{ownerMonologue}”
             </p>
           </div>
 
           {/* 右侧：图片 */}
-          <div className="relative w-[40%] min-w-[130px] overflow-hidden">
+          <div className="relative min-w-0 overflow-hidden">
             <img
-              src={bond}
-              alt=""
+              src={avatarSrc}
+              alt={`${catName}的头像`}
               loading="lazy"
-              className="absolute inset-0 h-full w-full object-cover"
+              className="absolute inset-0 h-full w-full object-cover object-center"
             />
             <div
               className="absolute inset-y-0 left-0 w-[28px]"
@@ -382,24 +431,31 @@ function SceneCard({
   index,
   total,
 }: {
-  scene: { src: string; title: string; line: string };
+  scene: LittleWorldScene & { src: string };
   index: number;
   total: number;
 }) {
   return (
     <article
-      className="relative w-[88vw] max-w-[340px] shrink-0 snap-start overflow-hidden rounded-[24px]"
+      className="relative h-[260px] w-[70vw] max-w-[274px] shrink-0 snap-center overflow-hidden rounded-[24px]"
+      data-ai-prompt={scene.prompt}
       style={{
         border: "1px solid oklch(1 0 0 / 0.85)",
         boxShadow: "0 18px 36px -26px oklch(0.6 0.12 305 / 0.55)",
       }}
     >
-      <div className="relative aspect-[4/5] w-full overflow-hidden">
+      <div className="relative h-full w-full overflow-hidden bg-[oklch(0.93_0.035_305)]">
+        <img
+          src={scene.src}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 h-full w-full scale-110 object-cover opacity-35 blur-xl"
+        />
         <img
           src={scene.src}
           alt={scene.title}
           loading="lazy"
-          className="absolute inset-0 h-full w-full object-cover"
+          className="absolute inset-y-0 left-1/2 h-full aspect-[3/4] -translate-x-1/2 object-contain object-center"
         />
         <div
           className="absolute inset-x-0 bottom-0 h-[52%]"
