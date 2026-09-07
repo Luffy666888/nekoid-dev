@@ -130,7 +130,7 @@ async function buildAliyunSignedBody(
     .join("&");
   const stringToSign = `POST&%2F&${percentEncode(canonicalizedQuery)}`;
   const signature = await hmacSha1Base64(accessKeySecret, stringToSign);
-  const signedParams = { Signature: signature, ...params };
+  const signedParams: Record<string, string> = { Signature: signature, ...params };
 
   return Object.keys(signedParams)
     .sort()
