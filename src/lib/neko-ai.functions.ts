@@ -457,6 +457,86 @@ function getUserFacingAIMessage(kind: "persona" | "voice", error: unknown) {
     : "AI 人格档案暂时没有生成成功，请稍后再试。";
 }
 
+const BYTECAT_DEFAULT_TEXT_MODELS = [
+  "gpt-5.6-luna",
+  "gemini-3.7-flash",
+  "gemini-3-flash-preview",
+  "gpt-5.5",
+  "gpt-5.6-sol",
+] as const;
+
+const BYTECAT_DEFAULT_VISION_MODELS = [
+  "gpt-5.6-terra",
+  "gemini-3.7-flash",
+  "gemini-3-flash-preview",
+  "gpt-5.6-sol",
+  "gpt-5.5",
+] as const;
+
+function parseModelList(value?: string | null) {
+  return (value ?? "")
+    .split(/[,\s]+/)
+    .map((model) => model.trim())
+    .filter(Boolean);
+}
+
+function uniqueModels(models: Array<string | undefined | null>) {
+  const seen = new Set<string>();
+  return models.filter((model): model is string => {
+    if (!model || seen.has(model)) return false;
+    seen.add(model);
+    return true;
+  });
+}
+
+function parsePositiveInt(value?: string | null) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : undefined;
+}
+
+function isByteCatGeminiModel(model?: string | null) {
+  return /^gemini-/i.test(model ?? "");
+}
+
+function normalizeOpenAICompatibleBaseUrl(baseUrl: string) {
+  const trimmed = baseUrl.trim().replace(/\/+$/, "");
+  try {
+    const url = new URL(trimmed);
+    return /\/v\d+(?:beta)?$/i.test(url.pathname) ? trimmed : `${trimmed}/v1`;
+  } catch {
+    return trimmed;
+  }
+}
+
+function normalizeGeminiBaseUrl(baseUrl: string) {
+  const trimmed = baseUrl.trim().replace(/\/+$/, "");
+  try {
+    const url = new URL(trimmed);
+    url.pathname = url.pathname.replace(/\/v\d+(?:beta)?$/i, "") || "/";
+    return url.toString().replace(/\/+$/, "");
+  } catch {
+    return trimmed.replace(/\/v\d+(?:beta)?$/i, "");
+  }
+}
+
+async function getByteCatApiKey(model?: string | null) {
+  if (isByteCatGeminiModel(model)) {
+    return (
+      (await getServerEnv("BYTECAT_GEMINI_API_KEY")) || (await getServerEnv("BYTECAT_API_KEY"))
+    );
+  }
+  return getServerEnv("BYTECAT_API_KEY");
+}
+
+async function getByteCatBaseUrl(model?: string | null) {
+  const baseUrl = isByteCatGeminiModel(model)
+    ? (await getServerEnv("BYTECAT_GEMINI_BASE_URL")) || "https://bytecat.lamclod.cn"
+    : (await getServerEnv("BYTECAT_BASE_URL")) || "https://www.bytecatcode.org/v1";
+  return isByteCatGeminiModel(model)
+    ? normalizeGeminiBaseUrl(baseUrl)
+    : normalizeOpenAICompatibleBaseUrl(baseUrl);
+}
+
 async function getProviderModel(provider: AIProvider, mode: "text" | "vision" = "text") {
   if (provider === "deepseek") return (await getServerEnv("DEEPSEEK_MODEL")) || "deepseek-v4-flash";
   if (provider === "qwen") return (await getServerEnv("QWEN_VL_MODEL")) || "qwen-vl-plus";
@@ -474,6 +554,161 @@ async function getProviderModel(provider: AIProvider, mode: "text" | "vision" = 
     : (await getServerEnv("OPENAI_MODEL")) || "gpt-4o-mini";
 }
 
+async function getProviderModels(provider: AIProvider, mode: "text" | "vision" = "text") {
+  if (provider !== "bytecat") {
+    return [await getProviderModel(provider, mode)];
+  }
+
+  if (mode === "vision") {
+    return uniqueModels([
+      await getServerEnv("BYTECAT_VISION_MODEL"),
+      ...parseModelList(await getServerEnv("BYTECAT_VISION_FALLBACK_MODELS")),
+      ...BYTECAT_DEFAULT_VISION_MODELS,
+    ]);
+  }
+
+  return uniqueModels([
+    await getServerEnv("BYTECAT_MODEL"),
+    ...parseModelList(await getServerEnv("BYTECAT_TEXT_FALLBACK_MODELS")),
+    ...BYTECAT_DEFAULT_TEXT_MODELS,
+  ]);
+}
+
+async function getChatTimeoutMs(
+  provider: AIProvider,
+  mode: "text" | "vision" | undefined,
+  requestedTimeoutMs?: number,
+  model?: string,
+) {
+  if (provider !== "bytecat") return requestedTimeoutMs ?? 18_000;
+
+  const timeoutMs =
+    parsePositiveInt(
+      await getServerEnv(
+        mode === "vision" ? "BYTECAT_VISION_TIMEOUT_MS" : "BYTECAT_TEXT_TIMEOUT_MS",
+      ),
+    ) ??
+    requestedTimeoutMs ??
+    (mode === "vision" ? 22_000 : 18_000);
+  const primaryTimeoutMs = parsePositiveInt(await getServerEnv("BYTECAT_PRIMARY_TIMEOUT_MS"));
+  return primaryTimeoutMs && model === (await getProviderModel(provider, mode))
+    ? Math.min(primaryTimeoutMs, timeoutMs)
+    : timeoutMs;
+}
+
+function getObjectRecord(value: unknown) {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+}
+
+function dataUrlToGeminiInlineData(url: string) {
+  const match = url.match(/^data:([^;,]+)(?:;[^,]*)?;base64,(.*)$/);
+  if (!match) return null;
+  return { mimeType: match[1], data: match[2] };
+}
+
+function chatContentToGeminiParts(content: unknown) {
+  if (typeof content === "string") return [{ text: content }];
+  if (!Array.isArray(content)) return [];
+
+  return content
+    .map((part) => {
+      if (typeof part === "string") return { text: part };
+      const partObject = getObjectRecord(part);
+      if (!partObject) return null;
+
+      if (partObject.type === "text" && typeof partObject.text === "string") {
+        return { text: partObject.text };
+      }
+
+      if (partObject.type === "image_url") {
+        const imageUrl =
+          typeof partObject.image_url === "string"
+            ? partObject.image_url
+            : getObjectRecord(partObject.image_url)?.url;
+        if (typeof imageUrl !== "string") return null;
+
+        const inlineData = dataUrlToGeminiInlineData(imageUrl);
+        if (inlineData) return { inlineData };
+
+        return { fileData: { fileUri: imageUrl, mimeType: "image/jpeg" } };
+      }
+
+      return null;
+    })
+    .filter(
+      (
+        part,
+      ): part is
+        | { text: string }
+        | { inlineData: { mimeType: string; data: string } }
+        | { fileData: { fileUri: string; mimeType: string } } => Boolean(part),
+    );
+}
+
+function chatMessagesToGeminiPayload(
+  messages: unknown[],
+  options: {
+    maxTokens?: number;
+    temperature?: number;
+  },
+) {
+  const systemParts: Array<{ text: string }> = [];
+  const contents: Array<{
+    role: "user" | "model";
+    parts: ReturnType<typeof chatContentToGeminiParts>;
+  }> = [];
+
+  messages.forEach((message) => {
+    const messageObject = getObjectRecord(message);
+    if (!messageObject) return;
+
+    const role = typeof messageObject.role === "string" ? messageObject.role : "user";
+    const parts = chatContentToGeminiParts(messageObject.content);
+    if (!parts.length) return;
+
+    if (role === "system") {
+      systemParts.push(...parts.filter((part): part is { text: string } => "text" in part));
+      return;
+    }
+
+    contents.push({
+      role: role === "assistant" ? "model" : "user",
+      parts,
+    });
+  });
+
+  return {
+    ...(systemParts.length ? { systemInstruction: { parts: systemParts } } : {}),
+    contents: contents.length ? contents : [{ role: "user" as const, parts: [{ text: "" }] }],
+    generationConfig: {
+      temperature: options.temperature ?? 0.82,
+      ...(options.maxTokens ? { maxOutputTokens: options.maxTokens + 1024 } : {}),
+      responseMimeType: "application/json",
+      thinkingConfig: { includeThoughts: false },
+    },
+  };
+}
+
+function extractGeminiText(json: unknown) {
+  const response = json as {
+    candidates?: Array<{
+      finishReason?: string;
+      content?: { parts?: Array<{ text?: string; thought?: boolean }> };
+    }>;
+  };
+  const candidate = response?.candidates?.[0];
+  if (candidate?.finishReason && candidate.finishReason !== "STOP") {
+    throw new Error(`Gemini response incomplete: ${candidate.finishReason}`);
+  }
+  const text = candidate?.content?.parts
+    ?.filter((part) => !part.thought && typeof part.text === "string")
+    .map((part) => part.text)
+    .join("")
+    .trim();
+  if (!text) throw new Error("Gemini returned no answer text");
+  return text;
+}
+
 async function callChatCompletion(
   provider: AIProvider,
   messages: unknown[],
@@ -482,17 +717,19 @@ async function callChatCompletion(
     temperature?: number;
     timeoutMs?: number;
     modelMode?: "text" | "vision";
+    model?: string;
   } = {},
 ) {
   const isDeepSeek = provider === "deepseek";
   const isQwen = provider === "qwen";
   const isBytecat = provider === "bytecat";
+  const model = options.model ?? (await getProviderModel(provider, options.modelMode));
   const apiKey = isQwen
     ? await getServerEnv("DASHSCOPE_API_KEY")
     : isDeepSeek
       ? await getServerEnv("DEEPSEEK_API_KEY")
       : isBytecat
-        ? await getServerEnv("BYTECAT_API_KEY")
+        ? await getByteCatApiKey(model)
         : await getServerEnv("OPENAI_API_KEY");
   if (!apiKey) {
     throw new Error(
@@ -501,7 +738,9 @@ async function callChatCompletion(
         : isDeepSeek
           ? "Missing DEEPSEEK_API_KEY"
           : isBytecat
-            ? "Missing BYTECAT_API_KEY"
+            ? isByteCatGeminiModel(model)
+              ? "Missing BYTECAT_GEMINI_API_KEY or BYTECAT_API_KEY"
+              : "Missing BYTECAT_API_KEY"
             : "Missing OPENAI_API_KEY",
     );
   }
@@ -512,52 +751,75 @@ async function callChatCompletion(
     : isDeepSeek
       ? (await getServerEnv("DEEPSEEK_BASE_URL")) || "https://api.deepseek.com"
       : isBytecat
-        ? (await getServerEnv("BYTECAT_BASE_URL")) || "https://www.bytecatcode.org/v1"
+        ? await getByteCatBaseUrl(model)
         : (await getServerEnv("OPENAI_BASE_URL")) || "https://api.openai.com/v1";
-  const model = await getProviderModel(provider, options.modelMode);
-  const timeoutMs =
-    options.timeoutMs ?? (isBytecat && options.modelMode === "vision" ? 45_000 : 18_000);
+  const timeoutMs = await getChatTimeoutMs(provider, options.modelMode, options.timeoutMs, model);
   const controller = new AbortController();
   const startedAt = Date.now();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const isGeminiGenerateContent = isBytecat && isByteCatGeminiModel(model);
   let res: Response;
   try {
-    res = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
-      method: "POST",
-      signal: controller.signal,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        temperature: options.temperature ?? 0.82,
-        ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
-        response_format: { type: "json_object" },
-        messages,
-      }),
-    });
+    if (isGeminiGenerateContent) {
+      res = await fetch(
+        `${baseUrl.replace(/\/$/, "")}/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+        {
+          method: "POST",
+          signal: controller.signal,
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": apiKey,
+          },
+          body: JSON.stringify(chatMessagesToGeminiPayload(messages, options)),
+        },
+      );
+    } else {
+      res = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          temperature: options.temperature ?? 0.82,
+          ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
+          response_format: { type: "json_object" },
+          messages,
+        }),
+      });
+    }
+
+    if (!res.ok) {
+      const text = await res.text();
+      const label = providerLabel(provider);
+      throw new Error(`${label} ${model} error ${res.status}: ${text.slice(0, 300)}`);
+    }
+
+    // Keep the deadline active until the entire response body has arrived.
+    const json = await res.json();
+    const content = isGeminiGenerateContent
+      ? extractGeminiText(json)
+      : json.choices?.[0]?.message?.content;
+    if (typeof content !== "string" || !content.trim()) {
+      throw new Error(`${providerLabel(provider)} ${model} returned no answer text`);
+    }
+    if (!isGeminiGenerateContent && json.choices?.[0]?.finish_reason === "length") {
+      throw new Error(`${providerLabel(provider)} ${model} response truncated`);
+    }
+    console.info(
+      `NEKO ${providerLabel(provider)} success model=${model} duration=${Date.now() - startedAt}ms`,
+    );
+    return content;
   } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new Error(`${providerLabel(provider)} timeout after ${timeoutMs}ms`);
+    if (controller.signal.aborted) {
+      throw new Error(`${providerLabel(provider)} ${model} timeout after ${timeoutMs}ms`);
     }
     throw error;
   } finally {
     clearTimeout(timer);
   }
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    const label = providerLabel(provider);
-    console.error(`NEKO ${label} error ${res.status}: ${text.slice(0, 500)}`);
-    throw new Error(`${label} error ${res.status}: ${text.slice(0, 300)}`);
-  }
-
-  const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  console.info(
-    `NEKO ${providerLabel(provider)} success model=${model} duration=${Date.now() - startedAt}ms`,
-  );
-  return json.choices?.[0]?.message?.content ?? "{}";
 }
 
 function buildVisionContent(provider: AIProvider, prompt: string, imageDataUrl?: string | null) {
@@ -577,20 +839,39 @@ async function callFirstAvailableJson<T>(
     temperature?: number;
     timeoutMs?: number;
     modelMode?: "text" | "vision";
+    validate?: (parsed: T) => boolean;
   },
-): Promise<{ parsed: T; provider: AIProvider }> {
+): Promise<{ parsed: T; provider: AIProvider; model: string }> {
   const providers = await getAIProviderOrder();
   let lastError: unknown;
   for (const provider of providers) {
-    try {
-      const raw = await callChatCompletion(provider, buildMessages(provider), options);
-      return { parsed: extractJson<T>(raw), provider };
-    } catch (error) {
-      lastError = error;
-      console.error(
-        `NEKO ${providerLabel(provider)} failed, ${providers.length > 1 ? "trying next provider" : "no fallback provider"}`,
-        error,
-      );
+    const models = await getProviderModels(provider, options.modelMode);
+    for (const model of models) {
+      try {
+        const raw = await callChatCompletion(provider, buildMessages(provider), {
+          ...options,
+          model,
+        });
+        const parsed = extractJson<T>(raw);
+        if (!parsed || (options.validate && !options.validate(parsed))) {
+          throw new Error(`${providerLabel(provider)} ${model} JSON missing required fields`);
+        }
+        return { parsed, provider, model };
+      } catch (error) {
+        lastError = error;
+        const hasNextModel = models.indexOf(model) < models.length - 1;
+        const hasNextProvider = providers.indexOf(provider) < providers.length - 1;
+        console.error(
+          `NEKO ${providerLabel(provider)} model=${model} failed, ${
+            hasNextModel
+              ? "trying next model"
+              : hasNextProvider
+                ? "trying next provider"
+                : "no fallback left"
+          }`,
+          error,
+        );
+      }
     }
   }
   throw lastError instanceof Error ? lastError : new Error("AI provider failed");
@@ -601,8 +882,7 @@ function validatePersonaInput(input: unknown): PersonaInput {
   if (!data?.profile?.name) throw new Error("missing profile");
   if (data.imageDataUrl && !data.imageDataUrl.startsWith("data:image/"))
     throw new Error("invalid image");
-  if (data.imageDataUrl && data.imageDataUrl.length > 8_000_000)
-    throw new Error("image too large");
+  if (data.imageDataUrl && data.imageDataUrl.length > 8_000_000) throw new Error("image too large");
   return data;
 }
 
@@ -611,8 +891,7 @@ function validateVoiceInput(input: unknown): VoiceInput {
   if (!data?.profile?.name) throw new Error("missing profile");
   if (data.imageDataUrl && !data.imageDataUrl.startsWith("data:image/"))
     throw new Error("invalid image");
-  if (data.imageDataUrl && data.imageDataUrl.length > 8_000_000)
-    throw new Error("image too large");
+  if (data.imageDataUrl && data.imageDataUrl.length > 8_000_000) throw new Error("image too large");
   return data;
 }
 
@@ -704,7 +983,22 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
         },
         { role: "user", content: buildVisionContent(provider, prompt, data.imageDataUrl) },
       ],
-      { maxTokens: 1000, temperature: 0.62, modelMode: data.imageDataUrl ? "vision" : "text" },
+      {
+        maxTokens: 1000,
+        temperature: 0.62,
+        modelMode: data.imageDataUrl ? "vision" : "text",
+        validate: (parsed) =>
+          Boolean(
+            parsed.monologue?.trim() &&
+              parsed.analysis?.trim() &&
+              Array.isArray(parsed.tags) &&
+              parsed.tags.length >= 6 &&
+              Array.isArray(parsed.traits) &&
+              parsed.traits.length >= 4 &&
+              Array.isArray(parsed.observations) &&
+              parsed.observations.length >= 2,
+          ),
+      },
     );
     const parsed = result.parsed;
     const normalized = normalizePersonaForProfile(
@@ -736,8 +1030,7 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
     return normalized;
   } catch (error) {
     console.error("NEKO persona AI failed", error);
-    if (await shouldRequireRealAI())
-      throw new Error(getUserFacingAIMessage("persona", error));
+    if (await shouldRequireRealAI()) throw new Error(getUserFacingAIMessage("persona", error));
     return buildStablePersona(data.profile);
   }
 }
@@ -821,8 +1114,15 @@ ${data.scene || "无补充场景"}
       {
         maxTokens: 620,
         temperature: 0.62,
-        timeoutMs: data.imageDataUrl ? 45_000 : 14_000,
+        timeoutMs: data.imageDataUrl ? 22_000 : 14_000,
         modelMode: data.imageDataUrl ? "vision" : "text",
+        validate: (parsed) => {
+          const analysis = getObjectRecord(parsed.analysis);
+          return Boolean(
+            asText(parsed.text) &&
+              (asText(parsed.analysis) || asText(analysis?.observation ?? analysis?.summary)),
+          );
+        },
       },
     );
     const parsed = result.parsed;
@@ -842,8 +1142,7 @@ ${data.scene || "无补充场景"}
     return voice;
   } catch (error) {
     console.error("NEKO voice AI failed", error);
-    if (await shouldRequireRealAI())
-      throw new Error(getUserFacingAIMessage("voice", error));
+    if (await shouldRequireRealAI()) throw new Error(getUserFacingAIMessage("voice", error));
     return buildStableVoice(data.profile, data.imageDataUrl, data.scene);
   }
 }

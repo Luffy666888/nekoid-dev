@@ -12,7 +12,7 @@ import { clearPublishPhoto, getPublishPhoto, setPublishPhoto, usePublishPhoto } 
 import { generateCatVoice } from "@/lib/neko-ai.functions";
 import { clearCatPersona, getCatPersona, getCatProfile, updateCatProfile, useCatPersona } from "../catProfileStore";
 import { clearPublishDraft, getPublishScene, getPublishVoice, setPublishScene, setPublishVoice } from "./publishDraftStore";
-import { deleteCloudVoice, loadNekoFromCloud, saveLocalNekoToCloud, signOutNekoCloud, useNekoCloudAuth } from "@/lib/neko-cloud";
+import { deleteCloudVoice, saveLocalNekoToCloud, signOutNekoCloud, useNekoCloudAuth } from "@/lib/neko-cloud";
 import { getNekoUploadLimitError, NEKO_MAX_UPLOAD_LABEL } from "@/lib/neko-upload-limits";
 export { CAT_GRADIENTS };
 
@@ -1411,19 +1411,16 @@ export function ScreenSuccess() {
 
 function CloudSyncPanel() {
   const auth = useNekoCloudAuth();
-  const [busy, setBusy] = useState<"save" | "load" | "signout" | null>(null);
+  const [busy, setBusy] = useState<"signout" | null>(null);
 
-  const run = async (kind: typeof busy, task: () => Promise<void>) => {
+  const run = async (kind: "signout", task: () => Promise<void>) => {
     if (busy) return;
     setBusy(kind);
     try {
       await task();
     } catch (error) {
       console.error("NEKO cloud action failed", error);
-      const message = error instanceof Error && error.message.includes("NEKO_UPLOAD_TOO_LARGE")
-        ? `云端同步失败：图片或视频不能超过 ${NEKO_MAX_UPLOAD_LABEL}`
-        : "云端同步失败，请稍后再试";
-      toast.error(message);
+      toast.error("操作失败，请稍后再试");
     } finally {
       setBusy(null);
     }
@@ -1433,7 +1430,7 @@ function CloudSyncPanel() {
     return (
       <div className="mx-5 mt-4 rounded-[22px] bg-white/75 p-4 text-[11.5px] leading-relaxed text-[oklch(0.55_0.06_300)] backdrop-blur"
         style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}>
-        云端记忆已预留，配置 <span className="font-medium text-foreground">VITE_SUPABASE_URL</span> 和 <span className="font-medium text-foreground">VITE_SUPABASE_PUBLISHABLE_KEY</span> 后即可登录同步。
+        账号登录暂不可用，请稍后再试。
       </div>
     );
   }
@@ -1442,7 +1439,7 @@ function CloudSyncPanel() {
     return (
       <div className="mx-5 mt-4 rounded-[22px] bg-white/75 p-4 text-[12px] text-[oklch(0.55_0.06_300)] backdrop-blur"
         style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}>
-        正在检查云端记忆…
+        正在检查登录状态…
       </div>
     );
   }
@@ -1453,10 +1450,10 @@ function CloudSyncPanel() {
         style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}>
         <div className="flex items-center gap-2">
           <span className="text-soul text-[13px]">✦</span>
-          <div className="text-[10px] tracking-[0.35em] text-[oklch(0.55_0.06_300)]">云 端 记 忆</div>
+          <div className="text-[10px] tracking-[0.35em] text-[oklch(0.55_0.06_300)]">账 号 同 步</div>
         </div>
         <p className="mt-2 text-[11.5px] leading-relaxed text-foreground/75">
-          登录后，猫咪档案、人格和心声会安全保存到云端。现在支持验证码登录。
+          登录后，猫咪档案、人格和心声会自动绑定到你的账号。现在支持验证码登录。
         </p>
         <Link to="/auth/login" className="mt-3 flex w-full items-center justify-center rounded-full px-4 py-2.5 text-[12px] font-medium text-white"
           style={{ background: "var(--gradient-cta)" }}>
@@ -1473,7 +1470,7 @@ function CloudSyncPanel() {
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-soul text-[13px]">✦</span>
-            <div className="text-[10px] tracking-[0.35em] text-[oklch(0.55_0.06_300)]">云 端 记 忆</div>
+            <div className="text-[10px] tracking-[0.35em] text-[oklch(0.55_0.06_300)]">账 号 同 步</div>
           </div>
           <div className="mt-1 truncate text-[12px] text-foreground/80">{auth.user.email}</div>
         </div>
@@ -1491,29 +1488,6 @@ function CloudSyncPanel() {
       <Link to="/app/account" className="mt-3 flex w-full items-center justify-center rounded-full bg-white/90 px-4 py-2.5 text-[12px] text-foreground">
         账号中心
       </Link>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <button
-          disabled={busy === "save"}
-          onClick={() => void run("save", async () => {
-            const result = await saveLocalNekoToCloud();
-            toast.success(`已保存到云端 · ${result.voicesCount} 条心声`);
-          })}
-          className="rounded-full px-3 py-2.5 text-[12px] font-medium text-white disabled:opacity-60"
-          style={{ background: "var(--gradient-cta)" }}
-        >
-          {busy === "save" ? "保存中" : "保存到云端"}
-        </button>
-        <button
-          disabled={busy === "load"}
-          onClick={() => void run("load", async () => {
-            const result = await loadNekoFromCloud();
-            toast.success(result.restored ? `已恢复云端记忆 · ${result.voicesCount} 条心声` : "云端暂时还没有猫咪档案");
-          })}
-          className="rounded-full bg-white/90 px-3 py-2.5 text-[12px] text-foreground disabled:opacity-60"
-        >
-          {busy === "load" ? "恢复中" : "从云端恢复"}
-        </button>
-      </div>
     </div>
   );
 }
@@ -1558,7 +1532,7 @@ export function ScreenMe() {
         <section className="mx-5 mt-6">
           <h2 className="mb-2 px-1 text-[11px] font-medium tracking-[0.2em] text-[oklch(0.55_0.06_300)]">账号与设置</h2>
           <div className="overflow-hidden rounded-[22px] bg-white/78 backdrop-blur" style={{ border: "1px solid oklch(1 0 0 / 0.75)" }}>
-            <SettingsRow to="/app/account" icon="◎" title="账号与数据" subtitle="手机号、数据与账号管理" />
+            <SettingsRow to="/app/account" icon="◎" title="账号与数据" subtitle="邮箱登录、昵称和账号管理" />
             <SettingsRow to="/app/settings" icon="⚙" title="设置" subtitle="隐私、协议与 App 设置" border />
           </div>
         </section>

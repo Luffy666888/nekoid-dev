@@ -8,7 +8,6 @@ import {
   loadNekoAccountSummary,
   loadNekoFromCloud,
   requestNekoLoginCode,
-  saveLocalNekoToCloud,
   signOutNekoCloud,
   updateNekoUserProfile,
   useNekoCloudAuth,
@@ -235,7 +234,7 @@ export function AccountScreen() {
   const auth = useNekoCloudAuth();
   const [summary, setSummary] = useState<NekoAccountSummary | null>(null);
   const [displayName, setDisplayName] = useState("");
-  const [busy, setBusy] = useState<"load" | "saveName" | "saveCloud" | "restoreCloud" | "signout" | null>("load");
+  const [busy, setBusy] = useState<"load" | "saveName" | "signout" | null>("load");
 
   const reload = async () => {
     setBusy("load");
@@ -286,7 +285,7 @@ export function AccountScreen() {
         <div className="absolute inset-0 flex items-center justify-center px-7">
           <div className="w-full rounded-[28px] bg-white/85 p-5 text-center backdrop-blur" style={{ boxShadow: "var(--shadow-soft)" }}>
             <div className="text-[18px] font-medium text-foreground">需要先登录</div>
-            <p className="mt-2 text-[12px] leading-relaxed text-[oklch(0.55_0.06_300)]">登录后才能管理账号和云端数据。</p>
+            <p className="mt-2 text-[12px] leading-relaxed text-[oklch(0.55_0.06_300)]">登录后才能管理账号数据。</p>
             <Link to="/auth/login" className="mt-5 inline-flex rounded-full px-5 py-2.5 text-[12px] font-medium text-white" style={{ background: "var(--gradient-cta)" }}>
               去邮箱登录
             </Link>
@@ -318,7 +317,7 @@ export function AccountScreen() {
           </div>
           <div className="mt-4 grid grid-cols-2 gap-2">
             <StatCard label="猫咪档案" value={summary?.catCount ?? 0} />
-            <StatCard label="云端心声" value={summary?.voiceCount ?? 0} />
+            <StatCard label="猫咪心声" value={summary?.voiceCount ?? 0} />
           </div>
         </div>
 
@@ -346,33 +345,8 @@ export function AccountScreen() {
         </div>
 
         <div className="mt-4 rounded-[22px] bg-white/80 p-4 backdrop-blur" style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}>
-          <div className="text-[10px] tracking-[0.32em] text-[oklch(0.55_0.06_300)]">云端数据</div>
-          <p className="mt-2 text-[11.5px] leading-relaxed text-foreground/75">把当前设备上的猫咪档案和心声保存到云端，或从云端恢复到本机。</p>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <button
-              disabled={busy === "saveCloud"}
-              onClick={() => void run("saveCloud", async () => {
-                const result = await saveLocalNekoToCloud();
-                toast.success(`已保存到云端 · ${result.voicesCount} 条心声`);
-                await reload();
-              })}
-              className="rounded-full px-3 py-2.5 text-[12px] font-medium text-white disabled:opacity-60"
-              style={{ background: "var(--gradient-cta)" }}
-            >
-              保存云端
-            </button>
-            <button
-              disabled={busy === "restoreCloud"}
-              onClick={() => void run("restoreCloud", async () => {
-                const result = await loadNekoFromCloud();
-                toast.success(result.restored ? `已恢复 · ${result.voicesCount} 条心声` : "云端暂时还没有猫咪档案");
-                await reload();
-              })}
-              className="rounded-full bg-white px-3 py-2.5 text-[12px] text-foreground disabled:opacity-60"
-            >
-              恢复本机
-            </button>
-          </div>
+          <div className="text-[10px] tracking-[0.32em] text-[oklch(0.55_0.06_300)]">自动同步</div>
+          <p className="mt-2 text-[11.5px] leading-relaxed text-foreground/75">登录后，猫咪档案、人格和心声会自动绑定到当前账号。换设备登录时，会优先读取账号里的历史档案。</p>
         </div>
 
         <button

@@ -28,8 +28,16 @@ AI_PROVIDER=bytecat
 AI_REQUIRE_REAL=true
 BYTECAT_API_KEY=...
 BYTECAT_BASE_URL=https://www.bytecatcode.org/v1
+BYTECAT_GEMINI_BASE_URL=https://bytecat.lamclod.cn
+# Dedicated token for the Gemini endpoint. Keep the real value server-only.
+BYTECAT_GEMINI_API_KEY=...
 BYTECAT_MODEL=gpt-5.6-luna
 BYTECAT_VISION_MODEL=gpt-5.6-terra
+BYTECAT_TEXT_FALLBACK_MODELS=gemini-3.7-flash,gemini-3-flash-preview,gpt-5.5,gpt-5.6-sol
+BYTECAT_VISION_FALLBACK_MODELS=gemini-3.7-flash,gemini-3-flash-preview,gpt-5.6-sol,gpt-5.5
+BYTECAT_PRIMARY_TIMEOUT_MS=8000
+BYTECAT_TEXT_TIMEOUT_MS=18000
+BYTECAT_VISION_TIMEOUT_MS=22000
 VITE_SUPABASE_URL=https://jbjgrkivscrombvnlcrl.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=...
 SUPABASE_URL=https://jbjgrkivscrombvnlcrl.supabase.co
@@ -47,6 +55,18 @@ pnpm dlx wrangler@latest secret bulk .env.local --name nekoid
 `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` are public browser config and must be available during `pnpm build`; the Supabase secret key must only be uploaded as a Worker secret or kept in local `.env.local`.
 
 Supabase persistence uses project `jbjgrkivscrombvnlcrl` and the private Storage bucket `neko-media`. Apply database changes through committed files under `supabase/migrations/` before deploying code that depends on them.
+
+ByteCat backup integration was deployed and verified in production on 2026-09-12.
+Current verified Worker version: `78332390-403a-4a57-b501-28a9f57a3881`.
+The `split_cat_voice_analysis_and_share` migration was applied before deployment;
+its production history version is `20260912130236`.
+
+- GPT models use `BYTECAT_BASE_URL` with `/chat/completions` and a Bearer token.
+- Gemini models use `BYTECAT_GEMINI_BASE_URL` with `/v1beta/models/{model}:generateContent` and `x-goog-api-key`. The dedicated Gemini token resolved the earlier “no available channel” responses.
+- All four requested backups have returned valid text and cat detection results. Upstream latency varies; see [local test results](docs/bytecat-local-testing.md) for business-level results and limitations.
+- The configured primary model has an 8-second deadline. Text backups have an 18-second deadline, and image generation backups have a 22-second deadline. Cat detection uses 20 seconds for a face and 8 seconds for presence; the primary deadline can shorten these. Each deadline includes receiving the response body.
+- Failed, empty, truncated or invalid responses advance to the next model. Gemini thought parts are excluded from the answer. Presence detection retains its permissive result only after all configured candidates fail.
+- Keep Gemini secrets out of `VITE_*` variables. Run `pnpm test:ai` for offline regressions and `pnpm test:ai:live` for real ByteCat tests using `.env.local` (these consume API quota).
 
 ## Supabase Auth
 

@@ -126,7 +126,80 @@ function getUserFacingCatFaceFailure(error: unknown) {
   return "猫咪图片识别暂时失败，请稍后再试或换一张照片。";
 }
 
-function getCatFaceTimeoutMs(provider: AIProvider, isPresence: boolean) {
+const BYTECAT_DEFAULT_VISION_MODELS = [
+  "gpt-5.6-terra",
+  "gemini-3.7-flash",
+  "gemini-3-flash-preview",
+  "gpt-5.6-sol",
+  "gpt-5.5",
+] as const;
+
+function parseModelList(value?: string | null) {
+  return (value ?? "")
+    .split(/[,\s]+/)
+    .map((model) => model.trim())
+    .filter(Boolean);
+}
+
+function uniqueModels(models: Array<string | undefined | null>) {
+  const seen = new Set<string>();
+  return models.filter((model): model is string => {
+    if (!model || seen.has(model)) return false;
+    seen.add(model);
+    return true;
+  });
+}
+
+function isByteCatGeminiModel(model?: string | null) {
+  return /^gemini-/i.test(model ?? "");
+}
+
+function normalizeOpenAICompatibleBaseUrl(baseUrl: string) {
+  const trimmed = baseUrl.trim().replace(/\/+$/, "");
+  try {
+    const url = new URL(trimmed);
+    return /\/v\d+(?:beta)?$/i.test(url.pathname) ? trimmed : `${trimmed}/v1`;
+  } catch {
+    return trimmed;
+  }
+}
+
+function normalizeGeminiBaseUrl(baseUrl: string) {
+  const trimmed = baseUrl.trim().replace(/\/+$/, "");
+  try {
+    const url = new URL(trimmed);
+    url.pathname = url.pathname.replace(/\/v\d+(?:beta)?$/i, "") || "/";
+    return url.toString().replace(/\/+$/, "");
+  } catch {
+    return trimmed.replace(/\/v\d+(?:beta)?$/i, "");
+  }
+}
+
+async function getByteCatApiKey(model?: string | null) {
+  if (isByteCatGeminiModel(model)) {
+    return (
+      (await getServerEnv("BYTECAT_GEMINI_API_KEY")) || (await getServerEnv("BYTECAT_API_KEY"))
+    );
+  }
+  return getServerEnv("BYTECAT_API_KEY");
+}
+
+async function getByteCatBaseUrl(model?: string | null) {
+  const baseUrl = isByteCatGeminiModel(model)
+    ? (await getServerEnv("BYTECAT_GEMINI_BASE_URL")) || "https://bytecat.lamclod.cn"
+    : (await getServerEnv("BYTECAT_BASE_URL")) || "https://www.bytecatcode.org/v1";
+  return isByteCatGeminiModel(model)
+    ? normalizeGeminiBaseUrl(baseUrl)
+    : normalizeOpenAICompatibleBaseUrl(baseUrl);
+}
+
+async function getCatFaceTimeoutMs(provider: AIProvider, isPresence: boolean, model: string) {
+  if (provider === "bytecat" && model === (await getProviderModel(provider))) {
+    const primaryTimeoutMs = Number(await getServerEnv("BYTECAT_PRIMARY_TIMEOUT_MS"));
+    if (Number.isFinite(primaryTimeoutMs) && primaryTimeoutMs > 0) {
+      return Math.min(Math.max(1, Math.floor(primaryTimeoutMs)), isPresence ? 8_000 : 20_000);
+    }
+  }
   if (isPresence) {
     if (provider === "bytecat") return 8_000;
     if (provider === "qwen") return 7_000;
@@ -136,6 +209,17 @@ function getCatFaceTimeoutMs(provider: AIProvider, isPresence: boolean) {
   if (provider === "qwen") return 9_000;
   if (provider === "bytecat") return 20_000;
   return 5_500;
+}
+
+async function getProviderModels(provider: AIProvider) {
+  if (provider === "bytecat") {
+    return uniqueModels([
+      await getServerEnv("BYTECAT_VISION_MODEL"),
+      ...parseModelList(await getServerEnv("BYTECAT_VISION_FALLBACK_MODELS")),
+      ...BYTECAT_DEFAULT_VISION_MODELS,
+    ]);
+  }
+  return [await getProviderModel(provider)];
 }
 
 async function getProviderModel(provider: AIProvider) {
@@ -152,6 +236,58 @@ async function getProviderModel(provider: AIProvider) {
     (await getServerEnv("OPENAI_MODEL")) ||
     "gpt-4o-mini"
   );
+}
+
+function dataUrlToGeminiInlineData(url: string) {
+  const match = url.match(/^data:([^;,]+)(?:;[^,]*)?;base64,(.*)$/);
+  if (!match) return null;
+  return { mimeType: match[1], data: match[2] };
+}
+
+function buildGeminiCatFacePayload(data: CatFaceInput, isPresence: boolean) {
+  const inlineData = dataUrlToGeminiInlineData(data.imageDataUrl);
+  return {
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text: isPresence
+              ? '判断画面中是否出现猫。仅返回 JSON：{"isCat":true|false}。画面里有猫吗？'
+              : '判断图片中是否包含清晰猫咪正脸。仅返回 JSON：{"isCat":true|false}。图中有清晰猫咪正脸吗？',
+          },
+          ...(inlineData ? [{ inlineData }] : []),
+        ],
+      },
+    ],
+    generationConfig: {
+      temperature: 0,
+      // Gemini's output limit also needs room for internal reasoning.
+      maxOutputTokens: 1024,
+      responseMimeType: "application/json",
+      thinkingConfig: { includeThoughts: false },
+    },
+  };
+}
+
+function extractGeminiText(json: unknown) {
+  const response = json as {
+    candidates?: Array<{
+      finishReason?: string;
+      content?: { parts?: Array<{ text?: string; thought?: boolean }> };
+    }>;
+  };
+  const candidate = response?.candidates?.[0];
+  if (candidate?.finishReason && candidate.finishReason !== "STOP") {
+    throw new Error(`Gemini response incomplete: ${candidate.finishReason}`);
+  }
+  const text = candidate?.content?.parts
+    ?.filter((part) => !part.thought && typeof part.text === "string")
+    .map((part) => part.text)
+    .join("")
+    .trim();
+  if (!text) throw new Error("Gemini returned no answer text");
+  return text;
 }
 
 function validateCatFaceInput(input: unknown): CatFaceInput {
@@ -179,90 +315,124 @@ export async function detectCatFaceServer(input: CatFaceInput): Promise<CatFaceR
     if (provider === "deepseek") continue;
     const isQwen = provider === "qwen";
     const isBytecat = provider === "bytecat";
-    const apiKey = isQwen
-      ? await getServerEnv("DASHSCOPE_API_KEY")
-      : isBytecat
-        ? await getServerEnv("BYTECAT_API_KEY")
-        : await getServerEnv("OPENAI_API_KEY");
-    if (!apiKey) {
-      lastError = new Error(
-        isQwen
-          ? "Missing DASHSCOPE_API_KEY"
-          : isBytecat
-            ? "Missing BYTECAT_API_KEY"
-            : "Missing OPENAI_API_KEY",
-      );
-      continue;
-    }
-    const controller = new AbortController();
-    const timeoutMs = getCatFaceTimeoutMs(provider, isPresence);
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const models = await getProviderModels(provider);
 
-    try {
+    for (const model of models) {
+      const apiKey = isQwen
+        ? await getServerEnv("DASHSCOPE_API_KEY")
+        : isBytecat
+          ? await getByteCatApiKey(model)
+          : await getServerEnv("OPENAI_API_KEY");
+      if (!apiKey) {
+        lastError = new Error(
+          isQwen
+            ? "Missing DASHSCOPE_API_KEY"
+            : isBytecat
+              ? isByteCatGeminiModel(model)
+                ? "Missing BYTECAT_GEMINI_API_KEY or BYTECAT_API_KEY"
+                : "Missing BYTECAT_API_KEY"
+              : "Missing OPENAI_API_KEY",
+        );
+        continue;
+      }
       const baseUrl = isQwen
         ? (await getServerEnv("DASHSCOPE_BASE_URL")) ||
           "https://dashscope.aliyuncs.com/compatible-mode/v1"
         : isBytecat
-          ? (await getServerEnv("BYTECAT_BASE_URL")) || "https://www.bytecatcode.org/v1"
+          ? await getByteCatBaseUrl(model)
           : (await getServerEnv("OPENAI_BASE_URL")) || "https://api.openai.com/v1";
-      const res = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
-        method: "POST",
-        signal: controller.signal,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: await getProviderModel(provider),
-          temperature: 0,
-          max_tokens: 12,
-          messages: [
-            {
-              role: "system",
-              content: isPresence
-                ? '判断画面中是否出现猫。仅返回 JSON：{"isCat":true|false}。'
-                : '判断图片中是否包含清晰猫咪正脸。仅返回 JSON：{"isCat":true|false}。',
-            },
-            {
-              role: "user",
-              content: [
-                { type: "text", text: isPresence ? "画面里有猫吗？" : "图中有清晰猫咪正脸吗？" },
-                { type: "image_url", image_url: { url: data.imageDataUrl, detail: "low" } },
-              ],
-            },
-          ],
-          response_format: { type: "json_object" },
-        }),
-      });
+      const controller = new AbortController();
+      const timeoutMs = await getCatFaceTimeoutMs(provider, isPresence, model);
+      const startedAt = Date.now();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        lastError = new Error(
-          `${providerLabel(provider)} error ${res.status}: ${text.slice(0, 200)}`,
-        );
-        console.error(
-          `NEKO ${providerLabel(provider)} vision error ${res.status}: ${text.slice(0, 500)}`,
-        );
-        continue;
-      }
-
-      const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-      const content = json.choices?.[0]?.message?.content ?? "{}";
       try {
-        const parsed = JSON.parse(content) as { isCat?: boolean };
-        return { isCat: parsed.isCat === true };
-      } catch {
-        return { isCat: /true/i.test(content) };
+        const isGeminiGenerateContent = isBytecat && isByteCatGeminiModel(model);
+        const res = isGeminiGenerateContent
+          ? await fetch(
+              `${baseUrl.replace(/\/$/, "")}/v1beta/models/${encodeURIComponent(
+                model,
+              )}:generateContent`,
+              {
+                method: "POST",
+                signal: controller.signal,
+                headers: {
+                  "Content-Type": "application/json",
+                  "x-goog-api-key": apiKey,
+                },
+                body: JSON.stringify(buildGeminiCatFacePayload(data, isPresence)),
+              },
+            )
+          : await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
+              method: "POST",
+              signal: controller.signal,
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${apiKey}`,
+              },
+              body: JSON.stringify({
+                model,
+                temperature: 0,
+                max_tokens: isBytecat ? 128 : 12,
+                messages: [
+                  {
+                    role: "system",
+                    content: isPresence
+                      ? '判断画面中是否出现猫。仅返回 JSON：{"isCat":true|false}。'
+                      : '判断图片中是否包含清晰猫咪正脸。仅返回 JSON：{"isCat":true|false}。',
+                  },
+                  {
+                    role: "user",
+                    content: [
+                      {
+                        type: "text",
+                        text: isPresence ? "画面里有猫吗？" : "图中有清晰猫咪正脸吗？",
+                      },
+                      { type: "image_url", image_url: { url: data.imageDataUrl, detail: "low" } },
+                    ],
+                  },
+                ],
+                response_format: { type: "json_object" },
+              }),
+            });
+
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          lastError = new Error(
+            `${providerLabel(provider)} ${model} error ${res.status}: ${text.slice(0, 200)}`,
+          );
+          console.error(
+            `NEKO ${providerLabel(provider)} ${model} vision error ${res.status}: ${text.slice(
+              0,
+              500,
+            )}`,
+          );
+          continue;
+        }
+
+        const json = isGeminiGenerateContent
+          ? await res.json()
+          : ((await res.json()) as { choices?: Array<{ message?: { content?: string } }> });
+        const content = isGeminiGenerateContent
+          ? extractGeminiText(json)
+          : ((json as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message
+              ?.content ?? "{}");
+        const source = content.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1] ?? content;
+        const parsed = JSON.parse(source) as { isCat?: boolean };
+        if (typeof parsed?.isCat !== "boolean") {
+          throw new Error(`${providerLabel(provider)} ${model} returned invalid cat detection`);
+        }
+        console.info(
+          `NEKO ${providerLabel(provider)} detection success model=${model} duration=${Date.now() - startedAt}ms`,
+        );
+        return { isCat: parsed.isCat };
+      } catch (error) {
+        lastError = error;
+        if (!isAbortError(error))
+          console.error(`NEKO ${providerLabel(provider)} ${model} vision failed`, error);
+      } finally {
+        clearTimeout(timer);
       }
-    } catch (error) {
-      lastError = error;
-      if (isPresence && isAbortError(error)) {
-        return { isCat: true, reason: "timeout" };
-      }
-      if (!isAbortError(error))
-        console.error(`NEKO ${providerLabel(provider)} vision failed`, error);
-    } finally {
-      clearTimeout(timer);
     }
   }
 

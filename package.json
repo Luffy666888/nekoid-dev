@@ -12,7 +12,9 @@
     "preview": "vite preview",
     "start:china": "HOST=0.0.0.0 PORT=${PORT:-3000} node .output/server/index.mjs",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test:ai": "node --test scripts/test-bytecat.mjs",
+    "test:ai:live": "node scripts/test-bytecat-live.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
