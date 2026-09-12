@@ -21,6 +21,9 @@ dist-ssr
 .wrangler/
 .dev.vars
 
+# Production deploy secrets
+deploy/china/nekoid.env
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

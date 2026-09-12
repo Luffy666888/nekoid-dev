@@ -127,11 +127,8 @@ function getUserFacingCatFaceFailure(error: unknown) {
 }
 
 const BYTECAT_DEFAULT_VISION_MODELS = [
-  "gpt-5.6-terra",
-  "gemini-3.7-flash",
-  "gemini-3-flash-preview",
-  "gpt-5.6-sol",
   "gpt-5.5",
+  "gpt-5.6-terra",
 ] as const;
 
 function parseModelList(value?: string | null) {
@@ -195,6 +192,10 @@ async function getByteCatBaseUrl(model?: string | null) {
 
 async function getCatFaceTimeoutMs(provider: AIProvider, isPresence: boolean, model: string) {
   if (provider === "bytecat" && model === (await getProviderModel(provider))) {
+    const catFaceTimeoutMs = Number(await getServerEnv("BYTECAT_CATFACE_TIMEOUT_MS"));
+    if (Number.isFinite(catFaceTimeoutMs) && catFaceTimeoutMs > 0) {
+      return Math.min(Math.max(1, Math.floor(catFaceTimeoutMs)), isPresence ? 8_000 : 20_000);
+    }
     const primaryTimeoutMs = Number(await getServerEnv("BYTECAT_PRIMARY_TIMEOUT_MS"));
     if (Number.isFinite(primaryTimeoutMs) && primaryTimeoutMs > 0) {
       return Math.min(Math.max(1, Math.floor(primaryTimeoutMs)), isPresence ? 8_000 : 20_000);
@@ -213,11 +214,17 @@ async function getCatFaceTimeoutMs(provider: AIProvider, isPresence: boolean, mo
 
 async function getProviderModels(provider: AIProvider) {
   if (provider === "bytecat") {
-    return uniqueModels([
+    const catFaceModels = uniqueModels([
+      await getServerEnv("BYTECAT_CATFACE_MODEL"),
+      ...parseModelList(await getServerEnv("BYTECAT_CATFACE_FALLBACK_MODELS")),
+    ]);
+    if (catFaceModels.length) return catFaceModels;
+
+    const configuredModels = uniqueModels([
       await getServerEnv("BYTECAT_VISION_MODEL"),
       ...parseModelList(await getServerEnv("BYTECAT_VISION_FALLBACK_MODELS")),
-      ...BYTECAT_DEFAULT_VISION_MODELS,
     ]);
+    return configuredModels.length ? configuredModels : [...BYTECAT_DEFAULT_VISION_MODELS];
   }
   return [await getProviderModel(provider)];
 }
@@ -227,9 +234,10 @@ async function getProviderModel(provider: AIProvider) {
   if (provider === "deepseek") return (await getServerEnv("DEEPSEEK_MODEL")) || "deepseek-v4-flash";
   if (provider === "bytecat")
     return (
+      (await getServerEnv("BYTECAT_CATFACE_MODEL")) ||
       (await getServerEnv("BYTECAT_VISION_MODEL")) ||
       (await getServerEnv("BYTECAT_MODEL")) ||
-      "gpt-5.6-terra"
+      "gpt-5.5"
     );
   return (
     (await getServerEnv("OPENAI_VISION_MODEL")) ||

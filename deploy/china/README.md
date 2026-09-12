@@ -11,11 +11,15 @@ Give the operator these values before the first deploy:
 
 - ECS public IPv4 address, region, operating system, CPU architecture, and SSH port.
 - SSH username plus either a private key or a temporary password. The user must have `sudo`.
-- Domain names to bind, for example `api.nekoid.cn`, `www.nekoid.cn`, and `nekoid.cn`.
+- Domain names to bind. For the iOS API, use `api.nekoid.cn`; add `www.nekoid.cn` or `nekoid.cn` only after those hosts also point to the ECS instance.
 - DNS control for those domains, or exact DNS records that the domain owner will add.
 - Security group inbound rules for TCP `22`, `80`, and `443`. Restrict `22` to the operator IP when possible.
 - A production env file based on `deploy/china/env.example`.
 - TLS choice: Certbot/Let's Encrypt on the server, or a Volcengine certificate and private key.
+
+For the current iOS build, the production API base URL is `https://api.nekoid.cn`.
+Make sure DNS points this host to the Volcengine ECS public IP before shipping a
+TestFlight or App Store build for Mainland China.
 
 ## Build Locally
 
@@ -88,6 +92,43 @@ sudo systemctl reload nginx
 ```
 
 After DNS resolves to the ECS public IP, enable HTTPS with your chosen certificate flow.
+
+## SSH Deploy
+
+Create a local env file first. This file is ignored by git:
+
+```sh
+cp deploy/china/env.example deploy/china/nekoid.env
+```
+
+Fill `deploy/china/nekoid.env` with real production values, then run:
+
+```sh
+NEKOID_SSH_TARGET=root@1.2.3.4 \
+NEKOID_SSH_KEY=/absolute/path/to/key.pem \
+NEKOID_DOMAINS="api.nekoid.cn" \
+deploy/china/deploy-over-ssh.sh
+```
+
+The script uploads the current source, builds `NITRO_PRESET=node-server` on the
+server with Node.js 22, installs `/etc/systemd/system/nekoid.service`, preserves
+an existing `/etc/nginx/conf.d/nekoid.conf` by default, and checks
+`http://127.0.0.1:3000/api/ios/health`.
+
+Set `NEKOID_FORCE_NGINX=1` only when you intentionally want to overwrite the
+server Nginx config from `deploy/china/nginx.conf`.
+
+To enable HTTPS with an existing Certbot install after DNS is live:
+
+```sh
+NEKOID_ENABLE_CERTBOT=1 \
+NEKOID_CERTBOT_EMAIL=ops@example.com \
+NEKOID_SSH_TARGET=root@1.2.3.4 \
+deploy/china/deploy-over-ssh.sh
+```
+
+`NEKOID_CERTBOT_EMAIL` is recommended for certificate-expiry notices, but the
+script can still request a certificate without it.
 
 ## Verify
 

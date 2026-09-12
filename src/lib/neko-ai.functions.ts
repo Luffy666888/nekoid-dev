@@ -458,19 +458,13 @@ function getUserFacingAIMessage(kind: "persona" | "voice", error: unknown) {
 }
 
 const BYTECAT_DEFAULT_TEXT_MODELS = [
-  "gpt-5.6-luna",
-  "gemini-3.7-flash",
-  "gemini-3-flash-preview",
   "gpt-5.5",
-  "gpt-5.6-sol",
+  "gpt-5.6-terra",
 ] as const;
 
 const BYTECAT_DEFAULT_VISION_MODELS = [
-  "gpt-5.6-terra",
-  "gemini-3.7-flash",
-  "gemini-3-flash-preview",
-  "gpt-5.6-sol",
   "gpt-5.5",
+  "gpt-5.6-terra",
 ] as const;
 
 function parseModelList(value?: string | null) {
@@ -560,18 +554,18 @@ async function getProviderModels(provider: AIProvider, mode: "text" | "vision" =
   }
 
   if (mode === "vision") {
-    return uniqueModels([
+    const configuredModels = uniqueModels([
       await getServerEnv("BYTECAT_VISION_MODEL"),
       ...parseModelList(await getServerEnv("BYTECAT_VISION_FALLBACK_MODELS")),
-      ...BYTECAT_DEFAULT_VISION_MODELS,
     ]);
+    return configuredModels.length ? configuredModels : [...BYTECAT_DEFAULT_VISION_MODELS];
   }
 
-  return uniqueModels([
+  const configuredModels = uniqueModels([
     await getServerEnv("BYTECAT_MODEL"),
     ...parseModelList(await getServerEnv("BYTECAT_TEXT_FALLBACK_MODELS")),
-    ...BYTECAT_DEFAULT_TEXT_MODELS,
   ]);
+  return configuredModels.length ? configuredModels : [...BYTECAT_DEFAULT_TEXT_MODELS];
 }
 
 async function getChatTimeoutMs(

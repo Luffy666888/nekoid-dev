@@ -9,7 +9,8 @@ User=nekoid
 Group=nekoid
 WorkingDirectory=/opt/nekoid/current
 EnvironmentFile=/etc/nekoid/nekoid.env
-ExecStart=/usr/bin/node .output/server/index.mjs
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/usr/bin/env node .output/server/index.mjs
 Restart=always
 RestartSec=5
 KillSignal=SIGINT
