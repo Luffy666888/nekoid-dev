@@ -8,7 +8,7 @@ import { ScreenPlaza } from "./screens/ScreenPlaza";
 const SCREENS = [
   { id: "home", index: "01", title: "人格同步状态", subtitle: "Home / Soul Sync", Component: ScreenHome },
   { id: "generating", index: "02", title: "AI 人格生成中", subtitle: "Awakening", Component: ScreenGenerating },
-  { id: "profile", index: "03", title: "喵懂人格档案", subtitle: "人格档案", Component: ScreenProfile },
+  { id: "profile", index: "03", title: "喵一下人格档案", subtitle: "人格档案", Component: ScreenProfile },
   { id: "universe", index: "04", title: "Parallel Universe", subtitle: "平行宇宙剧情", Component: ScreenUniverse },
   { id: "share", index: "05", title: "人格分享卡", subtitle: "Share Identity", Component: ScreenShareCard },
   { id: "plaza", index: "06", title: "人格宇宙广场", subtitle: "Soul Plaza", Component: ScreenPlaza },
@@ -42,7 +42,7 @@ export function NekoShowcase() {
             <div className="absolute inset-[8px] rounded-full bg-gradient-to-br from-[oklch(0.82_0.11_320)] to-[oklch(0.84_0.09_0)] animate-breathe" />
           </div>
           <div className="leading-tight">
-            <div className="text-[15px] font-medium tracking-[0.32em] text-foreground">喵懂</div>
+            <div className="text-[15px] font-medium tracking-[0.32em] text-foreground">喵一下</div>
             <div className="text-[10px] tracking-[0.4em] text-muted-foreground">AI PET SOUL UNIVERSE</div>
           </div>
         </div>
@@ -65,7 +65,7 @@ export function NekoShowcase() {
             一个温柔的 <span className="text-soul font-normal italic">数字灵魂</span>。
           </h1>
           <p className="mt-6 max-w-xl text-[15px] leading-relaxed text-muted-foreground">
-            喵懂是一个温柔的 AI 宠物人格宇宙 —— 它持续观察、感受、理解你的猫，
+            喵一下是一个温柔的 AI 宠物人格宇宙 —— 它持续观察、感受、理解你的猫，
             把它的情绪、记忆与小心思，编织成一个独一无二、属于你们之间的小灵魂。
           </p>
         </div>
@@ -95,7 +95,7 @@ export function NekoShowcase() {
 
       <footer className="relative z-10 border-t border-border/40">
         <div className="mx-auto flex max-w-[1600px] items-center justify-between px-8 py-8 text-[11px] tracking-[0.3em] text-muted-foreground md:px-14">
-          <span>喵懂 · 读懂它的小世界</span>
+          <span>喵一下 · 读懂它的小世界</span>
           <span>DESIGNED WITH LOVE · 在一个柔软的夜晚</span>
         </div>
       </footer>

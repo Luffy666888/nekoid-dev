@@ -5,9 +5,9 @@ export const Route = createFileRoute("/app")({
   head: () => ({
     meta: [
       { name: "viewport", content: "width=device-width, initial-scale=1, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" },
-      { title: "喵懂 — 听懂它的小心声" },
-      { name: "description", content: "喵懂移动端 —— 听懂猫咪的小心声。" },
-      { property: "og:title", content: "喵懂 — 听懂它的小心声" },
+      { title: "喵一下 — 听懂它的小心声" },
+      { name: "description", content: "喵一下移动端 —— 听懂猫咪的小心声。" },
+      { property: "og:title", content: "喵一下 — 听懂它的小心声" },
       { property: "og:description", content: "一个温柔的 AI 伙伴，陪你走进猫咪的小世界。" },
     ],
   }),

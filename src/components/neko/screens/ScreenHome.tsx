@@ -69,7 +69,7 @@ export function ScreenHome() {
           “你回家后，<br />她在门口停留了 <span className="font-medium text-[oklch(0.6_0.12_320)]">7 分钟</span>，<br />然后悄悄跟到了沙发边。”
         </p>
         <div className="mt-3 flex items-center justify-between text-[10px] tracking-[0.25em] text-[oklch(0.55_0.05_300)]">
-          <span>— 喵懂 · 19:42</span>
+          <span>— 喵一下 · 19:42</span>
           <span>查看完整观察 →</span>
         </div>
       </div>

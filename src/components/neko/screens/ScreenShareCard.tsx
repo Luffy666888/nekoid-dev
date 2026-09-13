@@ -22,7 +22,7 @@ export function ScreenShareCard() {
 
         <div className="relative p-6">
           <div className="flex items-center justify-between text-[10px] tracking-[0.4em] text-[oklch(0.55_0.08_320)]">
-            <span className="font-medium">喵懂</span>
+            <span className="font-medium">喵一下</span>
             <span>2026 · 05 · 27</span>
           </div>
 
@@ -75,7 +75,7 @@ export function ScreenShareCard() {
           <div className="mt-5 flex items-center justify-between border-t border-[oklch(0.92_0.025_320)] pt-4">
             <div>
               <div className="text-[10px] tracking-[0.3em] text-[oklch(0.55_0.06_300)]">发现它的灵魂</div>
-              <div className="mt-0.5 text-[11px] tracking-[0.28em] text-[oklch(0.45_0.08_320)]">喵懂 · 读懂它的小世界</div>
+              <div className="mt-0.5 text-[11px] tracking-[0.28em] text-[oklch(0.45_0.08_320)]">喵一下 · 读懂它的小世界</div>
             </div>
             <div className="grid h-12 w-12 grid-cols-4 grid-rows-4 gap-[2px] rounded-md bg-[oklch(0.45_0.08_320)] p-1.5">
               {Array.from({ length: 16 }).map((_, i) => (

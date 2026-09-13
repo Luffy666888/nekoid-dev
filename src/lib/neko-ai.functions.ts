@@ -987,7 +987,7 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
   const combinationInsights = buildCombinationInsights(behaviorProfile);
   const profileFacts = `猫咪名称：${data.profile.name}；性别：${data.profile.gender}；年龄阶段：${data.profile.ageStage}`;
   const wrongGender = data.profile.gender === "小公猫" ? "小母猫、她、她的" : "小公猫、他、他的";
-  const prompt = `你是「喵懂」的猫咪性格观察者。你不是在做图像描述，也不是在做宠物性格测试报告。你要从猫咪真实行为、照片细节和问卷答案中，找到 2–3 个主人平时可能感受到、但未必总结出来的行为模式。
+  const prompt = `你是「喵一下」的猫咪性格观察者。你不是在做图像描述，也不是在做宠物性格测试报告。你要从猫咪真实行为、照片细节和问卷答案中，找到 2–3 个主人平时可能感受到、但未必总结出来的行为模式。
 
 猫咪基础资料：${JSON.stringify(data.profile)}
 结构化行为画像：${JSON.stringify(behaviorProfile)}
@@ -1057,7 +1057,7 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
 3. 不要把${data.profile.gender}写成另一种性别，不要把${data.profile.ageStage}写成其他年龄阶段。
 4. type、tags、misunderstanding、loveLanguage 和 ownerRole 必须彼此一致，但不能互相重复改写。
 
-【喵懂文风】
+【喵一下文风】
 具体、自然、有观察力，有一点幽默和温柔，像真正养猫的人会说的话。让主人感觉“AI 好像真的观察了一会儿我的猫”，而不是收到心理测试报告、宠物公众号或营销文案。
 
 避免：
@@ -1080,7 +1080,7 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
         {
           role: "system",
           content:
-            "你是「喵懂」的猫咪性格观察者。先从照片事实提取行为线索，再做克制的人格推测；准确和个体辨识度优先于可爱。严格区分可见事实与推断，不虚构、不做医疗诊断、不使用模板化营销或过度卖萌表达。只返回合法 JSON。",
+            "你是「喵一下」的猫咪性格观察者。先从照片事实提取行为线索，再做克制的人格推测；准确和个体辨识度优先于可爱。严格区分可见事实与推断，不虚构、不做医疗诊断、不使用模板化营销或过度卖萌表达。只返回合法 JSON。",
         },
         { role: "user", content: buildVisionContent(provider, prompt, data.imageDataUrl) },
       ],
@@ -1159,7 +1159,7 @@ export const generateCatPersona = createServerFn({ method: "POST" })
 
 export async function generateCatVoiceServer(input: VoiceInput): Promise<Voice> {
   const data = validateVoiceInput(input);
-  const prompt = `你是「喵懂」的猫咪心声观察者。你不是在描述照片，也不是给照片配一句通用的可爱宠物文案。
+  const prompt = `你是「喵一下」的猫咪心声观察者。你不是在描述照片，也不是给照片配一句通用的可爱宠物文案。
 
 你要从猫咪当前真实可见的动作、表情、视线和环境互动中，找出这一刻最有意思、最有辨识度的一个行为细节，再结合已有的人格档案，推测它正在关注什么、可能想做什么、为什么还没有行动，以及它会如何评价眼前发生的事。
 
@@ -1194,7 +1194,7 @@ ${data.scene || "无补充场景"}
 
 避免固定套用“别看我、我只是、表面其实、你继续我先、不是不只是”等句式。请在内部形成至少 3 个不同角度的候选表达，最终只选最符合当前照片、人格且最不像模板的一条。
 
-【喵懂文风】
+【喵一下文风】
 聪明、克制、轻幽默、有猫味、具体、有一点小脾气，让主人会心一笑。禁止 AI 腔、看图作文、宠物公众号文案、鸡汤、过度煽情、小红书营销腔、大量“喵～”，以及“绝绝子、谁懂、可爱暴击、治愈一整天”等表达。
 
 严格返回 JSON，不要 Markdown，不要附加说明：
@@ -1230,7 +1230,7 @@ ${data.scene || "无补充场景"}
         {
           role: "system",
           content:
-            "你是「喵懂」的猫咪心声观察者。先观察可见行为，再结合既有人格创作具体、有猫味、轻幽默的心声。事实优先，不看图作文、不套模板、不虚构、不做医疗判断。只返回合法 JSON。",
+            "你是「喵一下」的猫咪心声观察者。先观察可见行为，再结合既有人格创作具体、有猫味、轻幽默的心声。事实优先，不看图作文、不套模板、不虚构、不做医疗判断。只返回合法 JSON。",
         },
         { role: "user", content: buildVisionContent(provider, prompt, data.imageDataUrl) },
       ],

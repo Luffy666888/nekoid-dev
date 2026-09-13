@@ -201,7 +201,7 @@ export function isNekoCloudConfigured() {
 
 function fallbackDisplayName(user: User) {
   const metadataName = typeof user.user_metadata?.name === "string" ? user.user_metadata.name : "";
-  return metadataName.trim() || user.email?.split("@")[0] || "喵懂用户";
+  return metadataName.trim() || user.email?.split("@")[0] || "喵一下用户";
 }
 
 function mapProfileRow(row: Record<string, unknown>): NekoUserProfile {

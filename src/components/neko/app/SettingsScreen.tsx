@@ -5,9 +5,9 @@ import { ScreenShell, StatusBar } from "./AppShowcase";
 
 const rows = [
   { icon: "◇", title: "隐私政策", subtitle: "了解数据与隐私保护方式" },
-  { icon: "▤", title: "用户服务协议", subtitle: "查看使用喵懂的相关条款" },
+  { icon: "▤", title: "用户服务协议", subtitle: "查看使用喵一下的相关条款" },
   { icon: "◎", title: "权限说明", subtitle: "相机、相册与麦克风用途" },
-  { icon: "♡", title: "关于喵懂", subtitle: "读懂它的小世界" },
+  { icon: "♡", title: "关于喵一下", subtitle: "读懂它的小世界" },
 ];
 
 export function SettingsScreen() {
@@ -44,7 +44,7 @@ export function SettingsScreen() {
         </div>
 
         <div className="mt-6 text-center text-[10.5px] leading-relaxed text-[oklch(0.58_0.05_300)]">
-          喵懂 · 读懂它的小世界<br />版本 1.0
+          喵一下 · 读懂它的小世界<br />版本 1.0
         </div>
       </div>
     </ScreenShell>

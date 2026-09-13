@@ -102,7 +102,7 @@ export function AuthLoginScreen() {
         }
       }
 
-      toast.success(restored ? "登录成功，已恢复云端猫咪档案" : "登录成功，欢迎回到喵懂");
+      toast.success(restored ? "登录成功，已恢复云端猫咪档案" : "登录成功，欢迎回到喵一下");
       await navigate({ to: restored || hadLocalPersona ? "/app" : "/", replace: true });
     } catch (error) {
       toast.error(authErrorMessage(error));
@@ -163,7 +163,7 @@ export function AuthLoginScreen() {
           </Link>
 
           <div className="mt-8">
-            <div className="text-[10px] tracking-[0.45em] text-[oklch(0.58_0.08_320)]">喵懂账号</div>
+            <div className="text-[10px] tracking-[0.45em] text-[oklch(0.58_0.08_320)]">喵一下账号</div>
             <h1 className="mt-3 text-[28px] font-light leading-tight text-foreground">邮箱验证码登录</h1>
             <p className="mt-2 text-[12.5px] leading-relaxed text-[oklch(0.55_0.06_300)]">
               输入邮箱，我们会给你发送 6 位验证码。
@@ -311,7 +311,7 @@ export function AccountScreen() {
           <div className="flex items-center gap-4">
             <CatAvatar size={68} usePhoto />
             <div className="min-w-0 flex-1">
-              <div className="truncate text-[17px] font-medium text-foreground">{summary?.profile.displayName || "喵懂用户"}</div>
+              <div className="truncate text-[17px] font-medium text-foreground">{summary?.profile.displayName || "喵一下用户"}</div>
               <div className="mt-1 truncate text-[11px] text-[oklch(0.55_0.06_300)]">{auth.user.email}</div>
             </div>
           </div>
@@ -326,7 +326,7 @@ export function AccountScreen() {
           <input
             value={displayName}
             onChange={(event) => setDisplayName(event.target.value.slice(0, 40))}
-            placeholder="喵懂用户"
+            placeholder="喵一下用户"
             className="mt-2 block w-full rounded-2xl bg-[oklch(0.98_0.012_320)] px-4 py-3 text-[13px] text-foreground outline-none focus:ring-2 focus:ring-[oklch(0.85_0.08_320_/_0.5)]"
           />
           <button

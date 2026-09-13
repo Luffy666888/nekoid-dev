@@ -171,7 +171,7 @@ export function Screen6Result({
           }
           center={
             <span className="text-[10px] font-medium tracking-[0.5em] text-[oklch(0.55_0.06_320)]">
-              喵懂
+              喵一下
             </span>
           }
           right={
