@@ -226,6 +226,14 @@ export async function handleIOSAPIRequest(request: Request, env: unknown) {
       error instanceof IOSAuthError ||
       error instanceof IOSCloudError
     ) {
+      if (error instanceof IOSCloudError) {
+        console.error("NEKO iOS cloud API failed", {
+          pathname: url.pathname,
+          status: error.status,
+          code: error.code,
+          message: error.message,
+        });
+      }
       return errorResponse(error.status, error.code, publicErrorMessage(error.code, error.message));
     }
 
