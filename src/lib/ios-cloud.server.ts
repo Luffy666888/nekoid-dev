@@ -123,10 +123,17 @@ function cleanString(value: unknown, fallback = "") {
   return typeof value === "string" ? value.trim() : fallback;
 }
 
-function mediaProxyUrl(requestOrigin: string, objectKey: string | null | undefined) {
+function mediaProxyUrl(
+  requestOrigin: string,
+  objectKey: string | null | undefined,
+  version?: string | null,
+) {
   if (!objectKey) return undefined;
   const url = new URL("/api/ios/cloud/media", requestOrigin);
   url.searchParams.set("objectKey", objectKey);
+  if (version) {
+    url.searchParams.set("v", version);
+  }
   return url.toString();
 }
 
@@ -279,7 +286,7 @@ async function mapCatRow(row: CatRow, requestOrigin: string) {
     gender: row.gender,
     ageStage: row.age_stage,
     avatarObjectKey: row.avatar_object_key ?? undefined,
-    avatarURL: mediaProxyUrl(requestOrigin, row.avatar_object_key),
+    avatarURL: mediaProxyUrl(requestOrigin, row.avatar_object_key, row.updated_at),
     updatedAt: row.updated_at ?? undefined,
   };
 }
@@ -330,7 +337,7 @@ async function mapVoiceRow(row: VoiceRow, requestOrigin: string) {
             tags: row.share_tags ?? row.tags ?? [],
           }
         : undefined,
-    mediaURL: mediaProxyUrl(requestOrigin, row.media_object_key),
+    mediaURL: mediaProxyUrl(requestOrigin, row.media_object_key, row.created_at),
   };
 }
 
