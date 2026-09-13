@@ -1,7 +1,16 @@
 import { useEffect, useState } from "react";
 import { getCatAvatar, persistCatAvatar, setCatAvatar } from "./catAvatarStore";
 import { getCatName, persistCatName, setCatName } from "./catNameStore";
-import { getPersistJSON, getSessionJSON, NEKO_PERSIST_KEYS, NEKO_SESSION_KEYS, removePersistValue, removeSessionValue, setPersistJSON, setSessionJSON } from "./transientSession";
+import {
+  getPersistJSON,
+  getSessionJSON,
+  NEKO_PERSIST_KEYS,
+  NEKO_SESSION_KEYS,
+  removePersistValue,
+  removeSessionValue,
+  setPersistJSON,
+  setSessionJSON,
+} from "./transientSession";
 
 const EVT = "neko:profile-change";
 
@@ -25,10 +34,13 @@ export type CatPersona = {
   matchScore: number;
   monologue: string;
   analysis: string;
+  misunderstanding?: string;
+  loveLanguage?: string;
   ownerRole: string;
   tags: string[];
   traits: Array<{ label: string; value: number }>;
   observations: Array<{ label: string; value: string }>;
+  evidence?: Array<{ fact: string; interpretation: string }>;
   dailyMood: string;
   savedAt: number;
 };
@@ -48,7 +60,11 @@ export function getCatProfile(): CatProfile {
 }
 
 export function setCatProfile(profile: CatProfile) {
-  const normalized = { ...profile, name: profile.name.trim() || getCatName(), updatedAt: Date.now() };
+  const normalized = {
+    ...profile,
+    name: profile.name.trim() || getCatName(),
+    updatedAt: Date.now(),
+  };
   setSessionJSON(NEKO_SESSION_KEYS.profile, normalized);
   setCatName(normalized.name);
   if (normalized.avatar) setCatAvatar(normalized.avatar);
@@ -66,7 +82,10 @@ export function updateCatProfile(patch: Partial<CatProfile>) {
 }
 
 export function getCatPersona(): CatPersona | null {
-  return getSessionJSON<CatPersona>(NEKO_SESSION_KEYS.persona) || getPersistJSON<CatPersona>(NEKO_PERSIST_KEYS.persona);
+  return (
+    getSessionJSON<CatPersona>(NEKO_SESSION_KEYS.persona) ||
+    getPersistJSON<CatPersona>(NEKO_PERSIST_KEYS.persona)
+  );
 }
 
 export function setCatPersona(persona: CatPersona) {
@@ -82,7 +101,10 @@ export function clearCatPersona() {
 
 export function persistCatResult() {
   const latestAvatar = getCatAvatar();
-  const profile = { ...getCatProfile(), avatar: getCatProfile().avatar ?? latestAvatar ?? undefined };
+  const profile = {
+    ...getCatProfile(),
+    avatar: getCatProfile().avatar ?? latestAvatar ?? undefined,
+  };
   const persona = getCatPersona();
   setPersistJSON(NEKO_PERSIST_KEYS.profile, profile);
   if (persona) setPersistJSON(NEKO_PERSIST_KEYS.persona, persona);

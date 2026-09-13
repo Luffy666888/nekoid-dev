@@ -10,7 +10,11 @@ import {
   type CatProfile,
 } from "@/components/neko/catProfileStore";
 import { voicesStore, type Voice } from "@/components/neko/app/voicesStore";
-import { getSupabaseBrowserClient, getSupabasePublicConfig, NEKO_MEDIA_BUCKET } from "@/lib/supabase/client";
+import {
+  getSupabaseBrowserClient,
+  getSupabasePublicConfig,
+  NEKO_MEDIA_BUCKET,
+} from "@/lib/supabase/client";
 import { isNekoUploadSizeAllowed, NEKO_MAX_UPLOAD_LABEL } from "@/lib/neko-upload-limits";
 
 type CloudAuthState =
@@ -38,10 +42,13 @@ type PersonaRow = {
   match_score: number;
   monologue: string;
   analysis: string;
+  misunderstanding: string | null;
+  love_language: string | null;
   owner_role: string;
   tags: string[] | null;
   traits: CatPersona["traits"] | null;
   observations: CatPersona["observations"] | null;
+  evidence: CatPersona["evidence"] | null;
   daily_mood: string;
   updated_at: string;
 };
@@ -87,7 +94,8 @@ type SaveOptions = {
 };
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
-const PROFILE_COLUMNS = "id,email,display_name,avatar_object_key,onboarding_completed_at,created_at,updated_at";
+const PROFILE_COLUMNS =
+  "id,email,display_name,avatar_object_key,onboarding_completed_at,created_at,updated_at";
 
 function requireSupabaseClient(): SupabaseClient {
   const client = getSupabaseBrowserClient();
@@ -105,15 +113,22 @@ async function requireSupabaseUser(client: SupabaseClient): Promise<User> {
 }
 
 function randomId() {
-  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return (
+    globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`
+  );
 }
 
 function isUuid(value: string | undefined) {
-  return Boolean(value?.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i));
+  return Boolean(
+    value?.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i),
+  );
 }
 
 function cleanStringList(value: string[] | undefined) {
-  return (value ?? []).map((item) => item.trim()).filter(Boolean).slice(0, 12);
+  return (value ?? [])
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 12);
 }
 
 function extFromMime(mime: string) {
@@ -156,7 +171,9 @@ async function uploadDataUrl(
 
 async function signedMediaUrl(client: SupabaseClient, objectKey: string | null | undefined) {
   if (!objectKey) return undefined;
-  const { data, error } = await client.storage.from(NEKO_MEDIA_BUCKET).createSignedUrl(objectKey, SIGNED_URL_TTL_SECONDS);
+  const { data, error } = await client.storage
+    .from(NEKO_MEDIA_BUCKET)
+    .createSignedUrl(objectKey, SIGNED_URL_TTL_SECONDS);
   if (error) return undefined;
   return data.signedUrl;
 }
@@ -191,7 +208,8 @@ function mapProfileRow(row: Record<string, unknown>): NekoUserProfile {
     email: typeof row.email === "string" ? row.email : null,
     displayName: typeof row.display_name === "string" ? row.display_name : null,
     avatarObjectKey: typeof row.avatar_object_key === "string" ? row.avatar_object_key : null,
-    onboardingCompletedAt: typeof row.onboarding_completed_at === "string" ? row.onboarding_completed_at : null,
+    onboardingCompletedAt:
+      typeof row.onboarding_completed_at === "string" ? row.onboarding_completed_at : null,
     createdAt: typeof row.created_at === "string" ? row.created_at : new Date().toISOString(),
     updatedAt: typeof row.updated_at === "string" ? row.updated_at : new Date().toISOString(),
   };
@@ -235,13 +253,24 @@ async function loadOrCreateNekoUserProfile(client: SupabaseClient, user: User) {
   return mapProfileRow(data as Record<string, unknown>);
 }
 
-async function countOwnedRows(client: SupabaseClient, table: "cats" | "cat_voices", userId: string) {
-  const { count, error } = await client.from(table).select("id", { count: "exact", head: true }).eq("user_id", userId);
+async function countOwnedRows(
+  client: SupabaseClient,
+  table: "cats" | "cat_voices",
+  userId: string,
+) {
+  const { count, error } = await client
+    .from(table)
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId);
 
   if (!error) return count ?? 0;
 
   console.warn(`NEKO account ${table} count failed`, error);
-  const { data, error: fallbackError } = await client.from(table).select("id").eq("user_id", userId).limit(1000);
+  const { data, error: fallbackError } = await client
+    .from(table)
+    .select("id")
+    .eq("user_id", userId)
+    .limit(1000);
 
   if (fallbackError) {
     console.warn(`NEKO account ${table} fallback count failed`, fallbackError);
@@ -270,11 +299,19 @@ export function useNekoCloudAuth(): CloudAuthState {
     client.auth.getSession().then(({ data }) => {
       if (!live) return;
       const session = data.session;
-      setState(session ? { status: "signed-in", session, user: session.user } : { status: "signed-out", session: null, user: null });
+      setState(
+        session
+          ? { status: "signed-in", session, user: session.user }
+          : { status: "signed-out", session: null, user: null },
+      );
     });
 
     const { data } = client.auth.onAuthStateChange((_event, session) => {
-      setState(session ? { status: "signed-in", session, user: session.user } : { status: "signed-out", session: null, user: null });
+      setState(
+        session
+          ? { status: "signed-in", session, user: session.user }
+          : { status: "signed-out", session: null, user: null },
+      );
     });
 
     return () => {
@@ -450,7 +487,12 @@ async function saveProfileAndCat(client: SupabaseClient, user: User, profile: Ca
   return hydratedProfile;
 }
 
-async function savePersona(client: SupabaseClient, user: User, catId: string, persona: CatPersona | null) {
+async function savePersona(
+  client: SupabaseClient,
+  user: User,
+  catId: string,
+  persona: CatPersona | null,
+) {
   if (!persona) return null;
 
   const { data, error } = await client
@@ -464,15 +506,20 @@ async function savePersona(client: SupabaseClient, user: User, catId: string, pe
         match_score: persona.matchScore,
         monologue: persona.monologue,
         analysis: persona.analysis,
+        misunderstanding: persona.misunderstanding ?? null,
+        love_language: persona.loveLanguage ?? null,
         owner_role: persona.ownerRole,
         tags: cleanStringList(persona.tags),
         traits: persona.traits ?? [],
         observations: persona.observations ?? [],
+        evidence: persona.evidence ?? [],
         daily_mood: persona.dailyMood,
       },
       { onConflict: "cat_id" },
     )
-    .select("id,cat_id,type,mbti,match_score,monologue,analysis,owner_role,tags,traits,observations,daily_mood,updated_at")
+    .select(
+      "id,cat_id,type,mbti,match_score,monologue,analysis,misunderstanding,love_language,owner_role,tags,traits,observations,evidence,daily_mood,updated_at",
+    )
     .single();
 
   if (error) throw error;
@@ -503,9 +550,12 @@ async function saveVoice(client: SupabaseClient, user: User, catId: string, voic
       cat_id: catId,
       user_id: user.id,
       text: voice.text,
-      analysis: typeof voice.analysis === "string"
-        ? voice.analysis
-        : [structuredAnalysis?.observation, structuredAnalysis?.personalityInterpretation].filter(Boolean).join("\n\n") || null,
+      analysis:
+        typeof voice.analysis === "string"
+          ? voice.analysis
+          : [structuredAnalysis?.observation, structuredAnalysis?.personalityInterpretation]
+              .filter(Boolean)
+              .join("\n\n") || null,
       analysis_summary: structuredAnalysis?.observation ?? null,
       personality_interpretation: structuredAnalysis?.personalityInterpretation ?? null,
       share_headline: voice.share?.headline ?? null,
@@ -576,18 +626,23 @@ export async function loadNekoFromCloud() {
 
   const cat = catData as CatRow;
 
-  const [{ data: personaData, error: personaError }, { data: voiceData, error: voiceError }] = await Promise.all([
-    client
-      .from("cat_personas")
-      .select("id,cat_id,type,mbti,match_score,monologue,analysis,owner_role,tags,traits,observations,daily_mood,updated_at")
-      .eq("cat_id", cat.id)
-      .maybeSingle(),
-    client
-      .from("cat_voices")
-      .select("id,text,analysis,analysis_summary,personality_interpretation,share_headline,share_insight,share_tags,location,tags,media_object_key,media_type,aspect,video_duration,grad,local_time_label,created_at")
-      .eq("cat_id", cat.id)
-      .order("created_at", { ascending: false }),
-  ]);
+  const [{ data: personaData, error: personaError }, { data: voiceData, error: voiceError }] =
+    await Promise.all([
+      client
+        .from("cat_personas")
+        .select(
+          "id,cat_id,type,mbti,match_score,monologue,analysis,misunderstanding,love_language,owner_role,tags,traits,observations,evidence,daily_mood,updated_at",
+        )
+        .eq("cat_id", cat.id)
+        .maybeSingle(),
+      client
+        .from("cat_voices")
+        .select(
+          "id,text,analysis,analysis_summary,personality_interpretation,share_headline,share_insight,share_tags,location,tags,media_object_key,media_type,aspect,video_duration,grad,local_time_label,created_at",
+        )
+        .eq("cat_id", cat.id)
+        .order("created_at", { ascending: false }),
+    ]);
 
   if (personaError) throw personaError;
   if (voiceError) throw voiceError;
@@ -615,10 +670,13 @@ export async function loadNekoFromCloud() {
         matchScore: personaRow.match_score,
         monologue: personaRow.monologue,
         analysis: personaRow.analysis,
+        misunderstanding: personaRow.misunderstanding ?? personaRow.analysis,
+        loveLanguage: personaRow.love_language ?? undefined,
         ownerRole: personaRow.owner_role,
         tags: personaRow.tags ?? [],
         traits: personaRow.traits ?? [],
         observations: personaRow.observations ?? [],
+        evidence: personaRow.evidence ?? [],
         dailyMood: personaRow.daily_mood,
         savedAt: isoToMs(personaRow.updated_at),
       }
@@ -639,19 +697,21 @@ export async function loadNekoFromCloud() {
       mediaType: row.media_type ?? undefined,
       aspect: row.aspect ?? undefined,
       videoDuration: row.video_duration ?? undefined,
-      analysis: row.analysis_summary || row.personality_interpretation
-        ? {
-            observation: row.analysis_summary ?? row.analysis ?? "",
-            personalityInterpretation: row.personality_interpretation ?? "",
-          }
-        : row.analysis ?? undefined,
-      share: row.share_headline || row.share_insight || row.share_tags?.length
-        ? {
-            headline: row.share_headline ?? row.text,
-            insight: row.share_insight ?? row.personality_interpretation ?? row.analysis ?? "",
-            tags: row.share_tags ?? row.tags ?? [],
-          }
-        : undefined,
+      analysis:
+        row.analysis_summary || row.personality_interpretation
+          ? {
+              observation: row.analysis_summary ?? row.analysis ?? "",
+              personalityInterpretation: row.personality_interpretation ?? "",
+            }
+          : (row.analysis ?? undefined),
+      share:
+        row.share_headline || row.share_insight || row.share_tags?.length
+          ? {
+              headline: row.share_headline ?? row.text,
+              insight: row.share_insight ?? row.personality_interpretation ?? row.analysis ?? "",
+              tags: row.share_tags ?? row.tags ?? [],
+            }
+          : undefined,
     })),
   );
 

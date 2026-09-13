@@ -14,6 +14,14 @@ export type VoiceInput = {
   scene?: string;
 };
 
+type PersonaInsightValue = string | { title?: unknown; text?: unknown };
+type PersonaAIResponse = Omit<CatPersona, "misunderstanding" | "loveLanguage" | "ownerRole"> & {
+  misunderstanding?: PersonaInsightValue;
+  loveLanguage?: PersonaInsightValue;
+  ownerRole?: PersonaInsightValue;
+  evidence?: Array<{ fact?: unknown; interpretation?: unknown }>;
+};
+
 type AIProvider = "openai" | "qwen" | "deepseek" | "bytecat";
 
 let workerEnv: Record<string, string | undefined> | null = null;
@@ -114,6 +122,11 @@ function asText(value: unknown, fallback = "") {
   return fallback;
 }
 
+function personaInsightText(value: PersonaInsightValue | undefined, fallback = "") {
+  if (typeof value === "string") return value.trim() || fallback;
+  return asText(value?.text, fallback);
+}
+
 function normalizeCatFacts(value: unknown, profile: CatProfile, fallback = "") {
   const text = asText(value, fallback);
   if (!text) return "";
@@ -167,6 +180,8 @@ function normalizePersonaForProfile(persona: CatPersona, profile: CatProfile): C
     mbti: normalizeCatFacts(persona.mbti, profile) || persona.mbti,
     monologue: normalizeCatFacts(persona.monologue, profile),
     analysis: normalizeCatFacts(persona.analysis, profile),
+    misunderstanding: normalizeCatFacts(persona.misunderstanding, profile),
+    loveLanguage: normalizeCatFacts(persona.loveLanguage, profile),
     ownerRole: normalizeCatFacts(persona.ownerRole, profile),
     dailyMood: normalizeCatFacts(persona.dailyMood, profile),
     tags: parsedTags.map((tag) => normalizeCatFacts(tag, profile)).filter(Boolean),
@@ -196,6 +211,13 @@ function normalizePersonaForProfile(persona: CatPersona, profile: CatProfile): C
       })
       .filter((observation) => observation.value)
       .slice(0, 3),
+    evidence: (Array.isArray(persona.evidence) ? persona.evidence : [])
+      .map((item) => ({
+        fact: normalizeCatFacts(item?.fact, profile),
+        interpretation: normalizeCatFacts(item?.interpretation, profile),
+      }))
+      .filter((item) => item.fact && item.interpretation)
+      .slice(0, 4),
   };
 }
 
@@ -277,7 +299,9 @@ function buildStablePersona(profile: CatProfile): CatPersona {
       matchScore: 88,
       monologue: `今天也想悄悄靠近你，陪你待一会。`,
       analysis: `${profile.name}是${profile.ageStage}里的${profile.gender}，性格里带着独立和温柔。它会先观察环境，再用停留、靠近和注视表达亲近。`,
-      ownerRole: `在${profile.name}眼里，你是能给它安全感的人。它信任你，也会用自己的节奏靠近你、陪伴你。`,
+      misunderstanding: `它不是对周围没兴趣，只是更习惯先把情况看明白。平时坐着不动时，也可能早已把注意力放在眼前，只是在等自己认可的时机。`,
+      loveLanguage: `如果它平时也常待在你附近却不紧贴，它可能更习惯用关注你的动向、共享同一片空间来表达亲近。`,
+      ownerRole: `你可能不是它时时刻刻都要黏着的人，但很可能是它默认会在的人。对它来说，不需要反复确认你的存在，本身就是一种稳定的信任。`,
       tags: tone.tags,
       traits: tone.traits,
       observations: [
@@ -286,6 +310,7 @@ function buildStablePersona(profile: CatProfile): CatPersona {
         { label: "亲密关系", value: "需要安全感，也保留自己的小主见" },
         { label: "年龄阶段", value: `${profile.ageStage}特征更明显` },
       ],
+      evidence: [],
       dailyMood: tone.mood,
       savedAt: Date.now(),
     },
@@ -918,20 +943,20 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
   const data = validatePersonaInput(input);
   const profileFacts = `猫咪名称：${data.profile.name}；性别：${data.profile.gender}；年龄阶段：${data.profile.ageStage}`;
   const wrongGender = data.profile.gender === "小公猫" ? "小母猫、她、她的" : "小公猫、他、他的";
-  const prompt = `你是「喵懂」的猫咪性格观察者。你的任务不是给猫套通用人格模板，也不是只描述照片，而是结合基础资料、照片中真实可见的行为、姿态、表情、视线、身体状态和环境互动，推测这只猫最有辨识度的人格特点。
+  const prompt = `你是「喵懂」的猫咪性格观察者。你不是在做图像描述，也不是在做宠物性格测试报告。你要从猫咪真实行为、照片细节和问卷答案中，找到 2–3 个主人平时可能感受到、但未必总结出来的行为模式。
 
 猫咪基础资料：${JSON.stringify(data.profile)}
 硬性资料事实：${profileFacts}
 照片状态：${data.imageDataUrl ? "已提供；必须优先依据照片中的可见事实" : "未提供；不得虚构任何视觉细节"}
 
-最终结果要让真正养它的主人觉得“对，就是它”，而不是换一只猫也成立。
+最终结果必须让主人产生“对，它就是这样”“原来这个行为是这个意思”“这句话很像我和它的关系”，而不是觉得 AI 只把照片复述了一遍。
 
 请先在内部按以下顺序推理，但不要输出推理过程：
 照片事实 → 提炼 1–2 个真实行为模式 → 提炼 1 个最明显、有证据的性格反差 → 根据这些证据命名 type → 它可能如何看待主人。
 禁止先决定 MBTI 再寻找证据。
 禁止先造 type 再为它反向寻找理由；type 必须能被 observations 和 analysis 中的行为证据直接解释。
 
-观察时优先抓住 2–4 个真正有辨识度的细节，例如视线、眼睛和耳朵状态、坐趴姿势、松弛或警觉程度、与物体/环境/主人的位置和互动。不要罗列所有物体，不要只写“安静观察、温柔细腻、有自己的节奏”等空泛判断。每个人格结论都应能回答“为什么”。
+照片观察只作为内部推理证据。最终用户内容不要罗列坐姿、视线、爪子、装扮、家具等肉眼可见信息，除非该细节对解释洞察不可或缺。重点回答主人可能误会了什么、它如何表达喜欢、主人处在什么位置。
 
 如果证据支持，优先提炼“A，但是 B”的真实反差，例如想靠近却保留距离；但绝不能为了反差虚构画面、动作、经历、主人行为或长期习惯。
 
@@ -940,11 +965,13 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
 - mbti：完成人格判断后再选择最接近的趣味标签，格式必须为 XXXX-A 或 XXXX-T；不要把它当科学测量或用刻板印象改写事实。
 - matchScore：60–99 的整数，反映现有证据与结论的匹配程度。
 - monologue：最重要的分享文案。第一人称，优先 20–35 个中文字，结合具体场景，像这只猫此刻会说的话；允许一点小脾气、小傲娇和幽默，不写 AI 散文、鸡汤或泛宠物文学。
-- analysis：50–80 个中文字，必须包含至少一个具体可见细节，再说明它可能意味着什么，并形成一个有辨识度的人格判断；不要堆抽象形容词。
-- ownerRole：60–90 个中文字，帮助主人重新理解熟悉的小行为。只有存在主人互动证据时才能作较明确判断；证据不足必须使用“如果平时也经常这样”“它可能”等有限推测，禁止套用“专属管家、安全港湾、背景音”等万能关系文案。
-- tags：恰好 6 个短标签，混合 2 个性格、2 个行为模式、1 个反差、1 个有趣人格标签；不要全是正面形容词，不要使用“可爱、萌宠、治愈、快乐”等泛标签。
+- misunderstanding.text：50–80 个中文字，找出主人最容易误解的行为模式，形成清晰的认知反转；不写照片说明，要能联想到日常相处。
+- loveLanguage.text：50–80 个中文字，具体解释它如何表达亲近；证据不足时用“如果平时也经常这样”“它可能更习惯”等克制表达，不能把所有猫都写成默默陪伴型。
+- ownerRole.text：60–90 个中文字，解释主人在关系中的位置。只有存在互动证据时才能明确判断；证据不足必须降低确定性，禁止套用“专属管家、安全港湾、背景音”等万能文案。
+- analysis：保留给旧版本兼容，内容与 misunderstanding.text 一致即可。
+- tags：恰好 4 个短标签，体现具体行为、反差和关系特点；不要全是正面形容词，不要使用“可爱、萌宠、治愈、快乐”等泛标签。
 - traits：恰好 4 项，每项 value 为 0–100 整数。根据本次证据从粘人度、独立性、好奇心、警觉度、社交主动性、观察欲、撒娇度、边界感、探索欲、情绪外露度、主人关注度、行动派程度等维度中动态选择最有区分度的 4 项，禁止固定套用同一组维度或分数。
-- observations：2–3 项，每项必须采用“真实可观察事实 → 简短解释”，禁止把推测包装成事实。
+- evidence：2–4 项，每项采用“真实可观察事实 → 内部判断依据”。它只用于 debug、质量检查与结果验证，绝不作为用户可见内容。
 
 输出严格 JSON，不要 Markdown，不要附加说明。字段：
 {
@@ -953,18 +980,20 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
   "mbti": "四字母加-A或-T的趣味人格类型",
   "matchScore": "60-99的整数，表示现有证据与人格描述的匹配度",
   "monologue": "猫咪第一人称心声",
-  "analysis": "基于照片具体细节的人格解析",
-  "ownerRole": "它与主人关系的个性化解读",
-  "tags": ["标签1", "标签2", "标签3", "标签4", "标签5", "标签6"],
+  "analysis": "与misunderstanding.text一致的旧版兼容文本",
+  "misunderstanding": {"title":"你可能一直误会它的一件事","text":"50-80字认知反转洞察"},
+  "loveLanguage": {"title":"它表达喜欢的方式","text":"50-80字具体亲近方式"},
+  "ownerRole": {"title":"在${data.profile.name}眼里，你的位置","text":"60-90字关系洞察"},
+  "tags": ["标签1", "标签2", "标签3", "标签4"],
   "traits": [
     {"label":"观察欲","value":88},
     {"label":"边界感","value":72},
     {"label":"主人关注度","value":81},
     {"label":"行动派程度","value":46}
   ],
-  "observations": [
-    {"label":"具体可见行为1","value":"这个行为可能意味着什么"},
-    {"label":"具体可见行为2","value":"这个行为可能意味着什么"}
+  "evidence": [
+    {"fact":"内部可见事实1","interpretation":"内部判断依据"},
+    {"fact":"内部可见事实2","interpretation":"内部判断依据"}
   ]
 }
 
@@ -975,7 +1004,7 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
 1. 性别和年龄阶段必须完全遵守用户填写的资料：${profileFacts}。
 2. 全文不要出现与资料冲突的表达，例如：${wrongGender}；描述猫咪时优先使用“它”。
 3. 不要把${data.profile.gender}写成另一种性别，不要把${data.profile.ageStage}写成其他年龄阶段。
-4. type、tags、analysis 和 ownerRole 必须彼此一致，但不能互相重复改写。
+4. type、tags、misunderstanding、loveLanguage 和 ownerRole 必须彼此一致，但不能互相重复改写。
 
 【喵懂文风】
 具体、自然、有观察力，有一点幽默和温柔，像真正养猫的人会说的话。让主人感觉“AI 好像真的观察了一会儿我的猫”，而不是收到心理测试报告、宠物公众号或营销文案。
@@ -988,13 +1017,14 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
 
 输出前请在内部自检：
 1. 换成另一只猫是否仍成立；若是，请重写得更具体。
-2. analysis 是否引用至少一个真实可见细节；若没有，请重写。
+2. 是否大量复述肉眼可见内容；若是，请转成主人可验证的行为洞察。
 3. monologue 是否像猫真的会说的话；若不是，请重写。
-4. ownerRole 是否在证据不足时假装确定；若是，请降低确定性。
+4. misunderstanding 是否真的形成认知反转，loveLanguage 是否说清具体表达方式；若没有，请重写。
+5. ownerRole 是否在证据不足时假装确定；若是，请降低确定性。
 5. 是否大量使用“温柔、敏感、细腻、陪伴、治愈”等通用词；若是，请换成具体行为。
 6. 是否提炼出一个有证据支持的独特特点或反差；若没有，请重新判断。`;
   try {
-    const result = await callFirstAvailableJson<CatPersona>(
+    const result = await callFirstAvailableJson<PersonaAIResponse>(
       (provider) => [
         {
           role: "system",
@@ -1011,13 +1041,15 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
           Boolean(
             isSpecificPersonaType(parsed.type) &&
             parsed.monologue?.trim() &&
-            parsed.analysis?.trim() &&
+            personaInsightText(parsed.misunderstanding).length >= 20 &&
+            personaInsightText(parsed.loveLanguage).length >= 20 &&
+            personaInsightText(parsed.ownerRole).length >= 20 &&
             Array.isArray(parsed.tags) &&
-            parsed.tags.length >= 6 &&
+            parsed.tags.length >= 4 &&
             Array.isArray(parsed.traits) &&
             parsed.traits.length >= 4 &&
-            Array.isArray(parsed.observations) &&
-            parsed.observations.length >= 2,
+            Array.isArray(parsed.evidence) &&
+            parsed.evidence.length >= 2,
           ),
       },
     );
@@ -1031,21 +1063,29 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
         mbti: parsed.mbti || "INFP-A",
         matchScore: Math.max(60, Math.min(99, Number(parsed.matchScore) || 88)),
         monologue: parsed.monologue || "今天也想悄悄靠近你，陪你待一会。",
-        analysis:
-          parsed.analysis || `${data.profile.name}会先观察环境，再用停留、靠近和注视表达亲近。`,
-        ownerRole: parsed.ownerRole || `你是${data.profile.name}确认世界安全的小坐标。`,
-        tags: (Array.isArray(parsed.tags) ? parsed.tags : []).slice(0, 6),
+        analysis: personaInsightText(parsed.misunderstanding, parsed.analysis),
+        misunderstanding: personaInsightText(parsed.misunderstanding, parsed.analysis),
+        loveLanguage: personaInsightText(parsed.loveLanguage),
+        ownerRole: personaInsightText(parsed.ownerRole),
+        tags: (Array.isArray(parsed.tags) ? parsed.tags : []).slice(0, 4),
         traits: (Array.isArray(parsed.traits) ? parsed.traits : []).slice(0, 4),
-        observations: (Array.isArray(parsed.observations) ? parsed.observations : []).slice(0, 3),
+        observations: [],
+        evidence: (Array.isArray(parsed.evidence) ? parsed.evidence : [])
+          .map((item) => ({ fact: asText(item.fact), interpretation: asText(item.interpretation) }))
+          .filter((item) => item.fact && item.interpretation)
+          .slice(0, 4),
         dailyMood: "",
         savedAt: Date.now(),
       },
       data.profile,
     );
     if (
-      normalized.tags.length !== 6 ||
+      normalized.tags.length !== 4 ||
       normalized.traits.length !== 4 ||
-      normalized.observations.length < 2
+      !normalized.misunderstanding ||
+      !normalized.loveLanguage ||
+      !normalized.ownerRole ||
+      (normalized.evidence?.length ?? 0) < 2
     ) {
       if (await shouldRequireRealAI()) throw new Error("AI persona JSON missing required fields");
       return buildStablePersona(data.profile);

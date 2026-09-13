@@ -19,24 +19,6 @@ import {
 
 const KEYWORDS = ["温柔观察者", "慢热", "安静陪伴"];
 
-const INSIGHTS = [
-  { emoji: "👀", title: "先观察，再靠近", desc: "不会马上亲近，但会偷偷观察你。" },
-  { emoji: "🏠", title: "很需要自己的安全区", desc: "熟悉的位置和气味会让它安心。" },
-  { emoji: "❤️", title: "喜欢你，但不一定黏着你", desc: "待在附近，就是它表达亲近的方式。" },
-];
-
-function compactSentence(value: string | undefined, fallback: string, maxLength = 24) {
-  const normalized = (value || fallback).replace(/[“”"]/g, "").replace(/\s+/g, "").trim();
-  const firstSentence = normalized.split(/[。！？]/)[0] || fallback;
-  return firstSentence.length > maxLength ? `${firstSentence.slice(0, maxLength)}…` : firstSentence;
-}
-
-function compactOwnerRole(value: string | undefined) {
-  const normalized = (value || "").replace(/[“”"]/g, "").trim();
-  const matched = normalized.match(/你是(?:它)?([^，。！？]{2,8})/);
-  return matched?.[1] || (normalized.length <= 8 ? normalized : "生活主理人") || "生活主理人";
-}
-
 export function Screen6Result({
   onRestart,
   onBack,
@@ -64,13 +46,6 @@ export function Screen6Result({
   const personaType = persona?.type ?? "奶油小绅士";
   const personaMbti = persona?.mbti ?? "ISFJ-A";
   const personaKeywords = persona?.tags?.length ? persona.tags.slice(0, 3) : KEYWORDS;
-  const personaInsights = persona?.observations?.length
-    ? persona.observations.slice(0, 3).map((item, index) => ({
-        emoji: ["👀", "🏠", "❤️"][index] ?? "✦",
-        title: item.label,
-        desc: item.value,
-      }))
-    : INSIGHTS;
   const generatedPrompts = generateLittleWorldPrompts({
     catName,
     mbti: personaMbti,
@@ -86,12 +61,30 @@ export function Screen6Result({
     prompt: generatedImages?.[index]?.prompt || scene.prompt,
   }));
   const [activeScene, setActiveScene] = useState(0);
-  const ownerBadge = compactOwnerRole(persona?.ownerRole);
-  const ownerDescription = compactSentence(
-    persona?.ownerRole || persona?.analysis,
-    "你让它放心做自己，也给它稳稳的安全感",
-  );
-  const ownerMonologue = compactSentence(persona?.monologue, "只要你在，我就知道这里是家", 28);
+  const resultInsights = [
+    {
+      index: "01",
+      title: "你可能一直误会它的一件事",
+      text:
+        persona?.misunderstanding ||
+        persona?.analysis ||
+        "它不是不感兴趣，只是更习惯先把情况看明白。坐着不动时，也可能早已把注意力放在眼前。",
+    },
+    {
+      index: "02",
+      title: "它表达喜欢的方式",
+      text:
+        persona?.loveLanguage ||
+        "如果它平时也常待在你附近却不紧贴，它可能更习惯用关注你的动向、共享同一片空间来表达亲近。",
+    },
+    {
+      index: "03",
+      title: `在${catName}眼里，你的位置`,
+      text:
+        persona?.ownerRole ||
+        "你可能不是它时时刻刻都要黏着的人，但很可能是它默认会在的人。不需要反复确认你的存在，本身就是一种稳定的信任。",
+    },
+  ];
 
   const closeShare = () => setShareOpen(false);
 
@@ -306,89 +299,42 @@ export function Screen6Result({
         </div>
       </section>
 
-      {/* 洞察 */}
+      {/* 人格洞察：照片证据只用于内部推理，不在结果页重复展示 */}
       <section className="relative z-10 mx-5 mt-7 shrink-0">
         <h2 className="flex items-baseline gap-2 text-[16px] font-semibold text-[oklch(0.32_0.05_300)]">
-          原来它是这样的猫
+          原来{catName}是这样的猫
           <span className="text-[10px] font-normal tracking-[0.22em] text-[oklch(0.72_0.035_300)]">
             CAT · INSIGHT
           </span>
         </h2>
         <div className="mt-3.5 flex flex-col gap-2.5">
-          {personaInsights.map((it) => (
+          {resultInsights.map((it, insightIndex) => (
             <div
               key={it.title}
-              className="flex items-start gap-3 rounded-[20px] p-4"
+              className="rounded-[20px] px-5 py-4"
               style={{
                 background:
-                  "linear-gradient(180deg, oklch(1 0 0 / 0.85), oklch(0.99 0.015 320 / 0.65))",
+                  insightIndex === 2
+                    ? "linear-gradient(145deg, oklch(0.98 0.025 330 / 0.94), oklch(0.96 0.04 295 / 0.90))"
+                    : "linear-gradient(180deg, oklch(1 0 0 / 0.74), oklch(0.99 0.015 320 / 0.54))",
                 border: "1px solid oklch(1 0 0 / 0.8)",
                 backdropFilter: "blur(20px)",
                 boxShadow: "0 14px 30px -24px oklch(0.6 0.12 305 / 0.5)",
               }}
             >
-              <span className="shrink-0 text-[18px] leading-none pt-[3px]">{it.emoji}</span>
-              <div className="min-w-0">
-                <div className="text-[14px] font-medium text-[oklch(0.33_0.045_300)]">
+              <div className="flex items-baseline gap-3">
+                <span className="text-[11px] font-medium tracking-[0.18em] text-[oklch(0.68_0.08_305)]">
+                  {it.index}
+                </span>
+                <h3 className="text-[15px] font-semibold text-[oklch(0.33_0.045_300)]">
                   {it.title}
-                </div>
-                <div className="mt-1 text-[13px] leading-[1.6] text-[oklch(0.57_0.04_300)]">
-                  {it.desc}
-                </div>
+                </h3>
               </div>
+              <p className="mt-2.5 text-[14px] leading-[1.75] text-[oklch(0.48_0.04_300)]">
+                {it.text}
+              </p>
             </div>
           ))}
-        </div>
-      </section>
-
-      {/* 情绪高潮：你在它心里 */}
-      <section
-        className="relative z-10 mx-5 mt-7 shrink-0 overflow-hidden rounded-[26px]"
-        style={{
-          background:
-            "linear-gradient(160deg, oklch(0.97 0.035 330 / 0.95), oklch(0.955 0.045 295 / 0.95))",
-          border: "1px solid oklch(1 0 0 / 0.8)",
-          boxShadow: "0 20px 44px -26px oklch(0.6 0.14 305 / 0.6)",
-        }}
-      >
-        <div className="grid min-h-[168px] grid-cols-[3fr_2fr] items-stretch">
-          {/* 左侧：文字 */}
-          <div className="min-w-0 px-5 py-5">
-            <div className="flex items-start gap-2">
-              <span className="shrink-0 text-[15px] leading-[1.5] pt-[3px]">❤️</span>
-              <h2 className="min-w-0 flex-1 break-words text-[16px] font-semibold leading-[1.5] text-[oklch(0.32_0.05_300)]">
-                在{catName}眼里，你是什么？
-              </h2>
-            </div>
-            <div
-              className="mt-3 inline-flex rounded-full px-3.5 py-1.5 text-[13px] font-medium text-white"
-              style={{ background: "linear-gradient(90deg, #B69AEF, #E6B8CF)" }}
-            >
-              {ownerBadge}
-            </div>
-            <p className="mt-3 text-[14px] font-medium leading-[1.55] text-[oklch(0.4_0.045_300)]">
-              {ownerDescription}
-            </p>
-            <p className="mt-2 border-l-2 border-[oklch(0.72_0.1_305)] pl-3 text-[12.5px] italic leading-[1.6] text-[oklch(0.52_0.055_300)]">
-              “{ownerMonologue}”
-            </p>
-          </div>
-
-          {/* 右侧：图片 */}
-          <div className="relative min-w-0 overflow-hidden">
-            <img
-              src={avatarSrc}
-              alt={`${catName}的头像`}
-              loading="lazy"
-              className="absolute inset-0 h-full w-full object-cover object-center"
-            />
-            <div
-              className="absolute inset-y-0 left-0 w-[28px]"
-              style={{
-                background: "linear-gradient(90deg, oklch(0.97 0.035 330 / 0.95), transparent)",
-              }}
-            />
-          </div>
         </div>
       </section>
 

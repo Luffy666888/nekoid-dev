@@ -30,10 +30,13 @@ type PersonaRow = {
   match_score: number;
   monologue: string;
   analysis: string;
+  misunderstanding?: string | null;
+  love_language?: string | null;
   owner_role: string;
   tags: string[] | null;
   traits: Array<{ label: string; value: number }> | null;
   observations: Array<{ label: string; value: string }> | null;
+  evidence?: Array<{ fact: string; interpretation: string }> | null;
   daily_mood: string;
   provider?: string | null;
   model?: string | null;
@@ -62,7 +65,7 @@ type VoiceRow = {
 
 const CAT_COLUMNS = "id,name,gender,age_stage,avatar_object_key,quiz,updated_at";
 const PERSONA_COLUMNS =
-  "id,cat_id,type,mbti,match_score,monologue,analysis,owner_role,tags,traits,observations,daily_mood,provider,model,updated_at";
+  "id,cat_id,type,mbti,match_score,monologue,analysis,misunderstanding,love_language,owner_role,tags,traits,observations,evidence,daily_mood,provider,model,updated_at";
 const VOICE_COLUMNS =
   "id,text,analysis,analysis_summary,personality_interpretation,share_headline,share_insight,share_tags,location,tags,media_object_key,media_type,aspect,video_duration,grad,local_time_label,created_at";
 const PROFILE_COLUMNS =
@@ -299,10 +302,13 @@ function mapPersonaRow(row: PersonaRow | null | undefined) {
     matchScore: row.match_score,
     monologue: row.monologue,
     analysis: row.analysis,
+    misunderstanding: row.misunderstanding ?? row.analysis,
+    loveLanguage: row.love_language ?? undefined,
     ownerRole: row.owner_role,
     tags: row.tags ?? [],
     traits: row.traits ?? [],
     observations: row.observations ?? [],
+    evidence: row.evidence ?? [],
     dailyMood: row.daily_mood,
     provider: row.provider ?? "server",
     model: row.model ?? "neko-id-server-persona",
@@ -484,10 +490,14 @@ async function upsertPersona(
           value.analysis,
           "它正在用自己的节奏理解世界，也在确认你是可靠的陪伴。",
         ),
+        misunderstanding:
+          cleanString(value.misunderstanding) || cleanString(value.analysis) || null,
+        love_language: cleanString(value.loveLanguage) || null,
         owner_role: cleanString(value.ownerRole, "你是它安心回来的据点。"),
         tags: cleanStringList(value.tags),
         traits: Array.isArray(value.traits) ? value.traits : [],
         observations: Array.isArray(value.observations) ? value.observations : [],
+        evidence: Array.isArray(value.evidence) ? value.evidence : [],
         daily_mood: cleanString(value.dailyMood, "今天好像有点想你"),
         provider: cleanString(value.provider, "ios-native"),
         model: cleanString(value.model, "native-onboarding-v1"),

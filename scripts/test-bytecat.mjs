@@ -223,15 +223,26 @@ test("merged persona preserves four traits and the updated generation settings",
                 matchScore: 88,
                 monologue: "让我先看看，再决定要不要靠近。",
                 analysis: "它坐着看向镜头，前爪并拢，像是在确认眼前的变化。",
-                ownerRole: "如果平时也经常这样，它可能习惯先观察你的反应。",
-                tags: ["观察优先", "保留距离", "前爪并拢", "关注镜头", "心动不动", "小小探长"],
+                misunderstanding: {
+                  title: "你可能一直误会它的一件事",
+                  text: "它不是不想参与，只是习惯先把局面看明白；坐着不动时，注意力可能早已放在眼前。",
+                },
+                loveLanguage: {
+                  title: "它表达喜欢的方式",
+                  text: "如果它平时也经常这样，它可能更习惯把你放在视线里，用关注而不是紧贴表达亲近。",
+                },
+                ownerRole: {
+                  title: "在团子眼里，你的位置",
+                  text: "你可能不是它时时刻刻都要黏着的人，但很可能是它默认会在、可以放心观察周围的人。",
+                },
+                tags: ["观察优先", "保留距离", "心动不动", "小小探长"],
                 traits: ["观察欲", "边界感", "主人关注度", "行动派程度"].map((label) => ({
                   label,
                   value: 72,
                 })),
-                observations: [
-                  { label: "前爪并拢", value: "可能正在等待" },
-                  { label: "看向镜头", value: "注意当前互动" },
+                evidence: [
+                  { fact: "前爪并拢", interpretation: "可能正在等待" },
+                  { fact: "看向镜头", interpretation: "注意当前互动" },
                 ],
               }),
             },
@@ -242,9 +253,9 @@ test("merged persona preserves four traits and the updated generation settings",
   });
   const result = await api.generateCatPersonaServer({ profile: mergedProfile });
   assert.equal(calls, 1);
-  assert.equal(result.tags.length, 6);
+  assert.equal(result.tags.length, 4);
   assert.equal(result.traits.length, 4);
-  assert.equal(result.observations.length, 2);
+  assert.equal(result.evidence.length, 2);
 });
 
 for (const structured of [false, true]) {
@@ -316,11 +327,23 @@ const fallbackPersona = {
   type: "先看再行动",
   monologue: "让我先坐好看看，再决定要不要靠近。",
   analysis: "前爪并拢，视线停在镜头上，可能还在观察眼前的互动。",
-  tags: ["观察优先", "保留距离", "前爪并拢", "关注镜头", "心动不动", "小小探长"],
+  misunderstanding: {
+    title: "你可能一直误会它的一件事",
+    text: "它不是不想参与，只是习惯先把情况看明白；坐着不动时，注意力可能早已放在眼前。",
+  },
+  loveLanguage: {
+    title: "它表达喜欢的方式",
+    text: "如果平时也经常这样，它可能更习惯把你放在视线里，用关注而不是紧贴表达亲近。",
+  },
+  ownerRole: {
+    title: "在团子眼里，你的位置",
+    text: "你可能不是它时时刻刻都要黏着的人，但很可能是它默认会在、可以放心观察周围的人。",
+  },
+  tags: ["观察优先", "保留距离", "心动不动", "小小探长"],
   traits: ["观察欲", "边界感", "好奇心", "行动力"].map((label) => ({ label, value: 72 })),
-  observations: [
-    { label: "前爪并拢", value: "可能正在等待" },
-    { label: "看向镜头", value: "注意当前互动" },
+  evidence: [
+    { fact: "前爪并拢", interpretation: "可能正在等待" },
+    { fact: "看向镜头", interpretation: "注意当前互动" },
   ],
 };
 
@@ -348,7 +371,7 @@ test("updated persona falls through Terra timeout and incomplete Gemini 3.7 resu
   const result = await api.generateCatPersonaServer({ profile: mergedProfile, imageDataUrl });
   assert.deepEqual(calls, ["gpt-5.6-terra", "gemini-3.7-flash", "gemini-3-flash-preview"]);
   assert.equal(result.traits.length, 4);
-  assert.equal(result.tags.length, 6);
+  assert.equal(result.tags.length, 4);
 });
 
 test("updated voice uses Preview after upstream failure and a thought-only Gemini 3.7 reply", async () => {
