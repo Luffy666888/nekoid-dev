@@ -127,8 +127,10 @@ function getUserFacingCatFaceFailure(error: unknown) {
 }
 
 const BYTECAT_DEFAULT_VISION_MODELS = [
+  "gemini-3.7-flash",
+  "gemini-3-flash-preview",
+  "gpt-5.6-sol",
   "gpt-5.5",
-  "gpt-5.6-terra",
 ] as const;
 
 function parseModelList(value?: string | null) {
@@ -218,13 +220,15 @@ async function getProviderModels(provider: AIProvider) {
       await getServerEnv("BYTECAT_CATFACE_MODEL"),
       ...parseModelList(await getServerEnv("BYTECAT_CATFACE_FALLBACK_MODELS")),
     ]);
-    if (catFaceModels.length) return catFaceModels;
+    if (catFaceModels.length)
+      return uniqueModels([...catFaceModels, ...BYTECAT_DEFAULT_VISION_MODELS]);
 
     const configuredModels = uniqueModels([
-      await getServerEnv("BYTECAT_VISION_MODEL"),
+      await getProviderModel(provider),
       ...parseModelList(await getServerEnv("BYTECAT_VISION_FALLBACK_MODELS")),
+      ...BYTECAT_DEFAULT_VISION_MODELS,
     ]);
-    return configuredModels.length ? configuredModels : [...BYTECAT_DEFAULT_VISION_MODELS];
+    return configuredModels;
   }
   return [await getProviderModel(provider)];
 }

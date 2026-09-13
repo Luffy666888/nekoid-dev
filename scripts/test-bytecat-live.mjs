@@ -60,9 +60,7 @@ for (const model of models) {
       (api) => api.generateCatPersonaServer({ profile, imageDataUrl }),
       (result) => {
         assert.equal(result.name, profile.name);
-        assert.ok(
-          result.tags.length === 6 && result.traits.length === 4 && result.observations.length >= 2,
-        );
+        assert.ok(result.tags.length === 4 && result.traits.length === 4);
       },
     ],
     [

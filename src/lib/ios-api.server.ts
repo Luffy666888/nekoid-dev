@@ -6,6 +6,7 @@ import {
   IOSCloudError,
 } from "./ios-cloud.server";
 import {
+  analyzeCatVideoClipServer,
   generateCatPersonaServer,
   generateCatVoiceServer,
   setNekoAIWorkerEnv,
@@ -189,6 +190,13 @@ export async function handleIOSAPIRequest(request: Request, env: unknown) {
     if (url.pathname === "/api/ios/onboarding/persona") {
       const result = await generateCatPersonaServer(
         body as Parameters<typeof generateCatPersonaServer>[0],
+      );
+      return jsonResponse({ ok: true, data: result });
+    }
+
+    if (url.pathname === "/api/ios/onboarding/video-analysis") {
+      const result = await analyzeCatVideoClipServer(
+        body as Parameters<typeof analyzeCatVideoClipServer>[0],
       );
       return jsonResponse({ ok: true, data: result });
     }

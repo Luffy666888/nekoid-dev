@@ -1,4 +1,5 @@
 import { getSessionJSON, NEKO_SESSION_KEYS, setSessionJSON } from "../transientSession";
+import type { CatVideoObservation } from "@/lib/neko-ai.functions";
 
 export type PhotoDraft = {
   name: string;
@@ -14,6 +15,10 @@ export type VideoDraftClip = {
   gradient: string;
   duration: string;
   label: string;
+  analysisStatus?: "analyzing" | "ready" | "failed";
+  analysisError?: string;
+  frameCount?: number;
+  observation?: CatVideoObservation;
 };
 
 const DEFAULT_PHOTO_DRAFT: PhotoDraft = {

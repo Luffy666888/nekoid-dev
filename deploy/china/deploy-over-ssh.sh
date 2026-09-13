@@ -82,6 +82,7 @@ COPYFILE_DISABLE=1 tar \
   --exclude='.vinxi' \
   --exclude='.tanstack' \
   --exclude='.wrangler' \
+  --exclude='artifacts' \
   --exclude='.env' \
   --exclude='.env.*' \
   --exclude='deploy/china/nekoid.env' \
