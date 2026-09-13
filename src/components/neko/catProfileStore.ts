@@ -21,7 +21,7 @@ export type CatProfile = {
   ageStage: "幼猫" | "青年猫" | "成熟猫" | "资深猫";
   avatar?: string;
   avatarObjectKey?: string;
-  quiz?: Record<number, "a" | "b" | null>;
+  quiz?: Record<number, "a" | "b" | "c" | null>;
   updatedAt: number;
 };
 
@@ -34,9 +34,12 @@ export type CatPersona = {
   matchScore: number;
   monologue: string;
   analysis: string;
+  corePersonality?: string;
   misunderstanding?: string;
   loveLanguage?: string;
+  loveLanguageInsight?: string;
   ownerRole: string;
+  ownerRelationship?: string;
   tags: string[];
   traits: Array<{ label: string; value: number }>;
   observations: Array<{ label: string; value: string }>;

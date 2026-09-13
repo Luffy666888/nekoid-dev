@@ -42,6 +42,7 @@ type PersonaRow = {
   match_score: number;
   monologue: string;
   analysis: string;
+  core_personality: string | null;
   misunderstanding: string | null;
   love_language: string | null;
   owner_role: string;
@@ -56,6 +57,7 @@ type PersonaRow = {
 type VoiceRow = {
   id: string;
   text: string;
+  subtext: string | null;
   analysis: string | null;
   analysis_summary: string | null;
   personality_interpretation: string | null;
@@ -506,9 +508,10 @@ async function savePersona(
         match_score: persona.matchScore,
         monologue: persona.monologue,
         analysis: persona.analysis,
+        core_personality: persona.corePersonality ?? null,
         misunderstanding: persona.misunderstanding ?? null,
-        love_language: persona.loveLanguage ?? null,
-        owner_role: persona.ownerRole,
+        love_language: persona.loveLanguageInsight ?? persona.loveLanguage ?? null,
+        owner_role: persona.ownerRelationship ?? persona.ownerRole,
         tags: cleanStringList(persona.tags),
         traits: persona.traits ?? [],
         observations: persona.observations ?? [],
@@ -518,7 +521,7 @@ async function savePersona(
       { onConflict: "cat_id" },
     )
     .select(
-      "id,cat_id,type,mbti,match_score,monologue,analysis,misunderstanding,love_language,owner_role,tags,traits,observations,evidence,daily_mood,updated_at",
+      "id,cat_id,type,mbti,match_score,monologue,analysis,core_personality,misunderstanding,love_language,owner_role,tags,traits,observations,evidence,daily_mood,updated_at",
     )
     .single();
 
@@ -550,6 +553,7 @@ async function saveVoice(client: SupabaseClient, user: User, catId: string, voic
       cat_id: catId,
       user_id: user.id,
       text: voice.text,
+      subtext: voice.subtext ?? null,
       analysis:
         typeof voice.analysis === "string"
           ? voice.analysis
@@ -631,14 +635,14 @@ export async function loadNekoFromCloud() {
       client
         .from("cat_personas")
         .select(
-          "id,cat_id,type,mbti,match_score,monologue,analysis,misunderstanding,love_language,owner_role,tags,traits,observations,evidence,daily_mood,updated_at",
+          "id,cat_id,type,mbti,match_score,monologue,analysis,core_personality,misunderstanding,love_language,owner_role,tags,traits,observations,evidence,daily_mood,updated_at",
         )
         .eq("cat_id", cat.id)
         .maybeSingle(),
       client
         .from("cat_voices")
         .select(
-          "id,text,analysis,analysis_summary,personality_interpretation,share_headline,share_insight,share_tags,location,tags,media_object_key,media_type,aspect,video_duration,grad,local_time_label,created_at",
+          "id,text,subtext,analysis,analysis_summary,personality_interpretation,share_headline,share_insight,share_tags,location,tags,media_object_key,media_type,aspect,video_duration,grad,local_time_label,created_at",
         )
         .eq("cat_id", cat.id)
         .order("created_at", { ascending: false }),
@@ -670,9 +674,12 @@ export async function loadNekoFromCloud() {
         matchScore: personaRow.match_score,
         monologue: personaRow.monologue,
         analysis: personaRow.analysis,
+        corePersonality: personaRow.core_personality ?? personaRow.type,
         misunderstanding: personaRow.misunderstanding ?? personaRow.analysis,
         loveLanguage: personaRow.love_language ?? undefined,
+        loveLanguageInsight: personaRow.love_language ?? undefined,
         ownerRole: personaRow.owner_role,
+        ownerRelationship: personaRow.owner_role,
         tags: personaRow.tags ?? [],
         traits: personaRow.traits ?? [],
         observations: personaRow.observations ?? [],
@@ -689,6 +696,7 @@ export async function loadNekoFromCloud() {
       time: row.local_time_label || formatTimeLabel(row.created_at),
       grad: row.grad || "linear-gradient(135deg, oklch(0.9 0.06 280), oklch(0.92 0.05 320))",
       text: row.text,
+      subtext: row.subtext ?? undefined,
       location: row.location ?? undefined,
       tags: row.tags ?? undefined,
       createdAt: isoToMs(row.created_at),

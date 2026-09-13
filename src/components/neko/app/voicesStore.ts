@@ -6,6 +6,7 @@ export type Voice = {
   time: string;
   grad: string;
   text: string;
+  subtext?: string;
   location?: string;
   tags?: string[];
   createdAt?: number;
@@ -32,7 +33,9 @@ export type Voice = {
 export function voiceAnalysisText(voice?: Voice | null): string | undefined {
   if (!voice?.analysis) return undefined;
   if (typeof voice.analysis === "string") return voice.analysis;
-  return [voice.analysis.observation, voice.analysis.personalityInterpretation].filter(Boolean).join("\n\n");
+  return [voice.analysis.observation, voice.analysis.personalityInterpretation]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 const CAT_GRADIENTS = [

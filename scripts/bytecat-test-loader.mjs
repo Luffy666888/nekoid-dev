@@ -18,6 +18,16 @@ export function loadAIServer(
   } = {},
 ) {
   const filename = new URL(`../src/lib/${name}.functions.ts`, import.meta.url);
+  const behaviorFilename = new URL("../src/lib/neko-behavior-profile.ts", import.meta.url);
+  const behaviorModule = {};
+  const behaviorOutput = ts.transpileModule(readFileSync(behaviorFilename, "utf8"), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  vm.runInNewContext(
+    behaviorOutput,
+    { exports: behaviorModule },
+    { filename: behaviorFilename.pathname },
+  );
   const source = readFileSync(filename, "utf8") + `\nexport { ${internals.join(", ")} };\n`;
   const { outputText } = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
@@ -30,7 +40,9 @@ export function loadAIServer(
       require: (id) =>
         id === "@tanstack/react-start"
           ? { createServerFn: () => ({ inputValidator: () => ({ handler: (fn) => fn }) }) }
-          : require(id),
+          : id === "@/lib/neko-behavior-profile"
+            ? behaviorModule
+            : require(id),
       process: { env, cwd: () => "/__neko_test_no_env_file__" },
       fetch: request,
       console: logger,

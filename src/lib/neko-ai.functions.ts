@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { CatPersona, CatProfile } from "@/components/neko/catProfileStore";
 import type { Voice } from "@/components/neko/app/voicesStore";
+import { buildBehaviorProfile, buildCombinationInsights } from "@/lib/neko-behavior-profile";
 
 export type PersonaInput = {
   profile: CatProfile;
@@ -180,9 +181,12 @@ function normalizePersonaForProfile(persona: CatPersona, profile: CatProfile): C
     mbti: normalizeCatFacts(persona.mbti, profile) || persona.mbti,
     monologue: normalizeCatFacts(persona.monologue, profile),
     analysis: normalizeCatFacts(persona.analysis, profile),
+    corePersonality: normalizeCatFacts(persona.corePersonality, profile),
     misunderstanding: normalizeCatFacts(persona.misunderstanding, profile),
     loveLanguage: normalizeCatFacts(persona.loveLanguage, profile),
+    loveLanguageInsight: normalizeCatFacts(persona.loveLanguageInsight, profile),
     ownerRole: normalizeCatFacts(persona.ownerRole, profile),
+    ownerRelationship: normalizeCatFacts(persona.ownerRelationship, profile),
     dailyMood: normalizeCatFacts(persona.dailyMood, profile),
     tags: parsedTags.map((tag) => normalizeCatFacts(tag, profile)).filter(Boolean),
     traits: parsedTraits
@@ -299,9 +303,15 @@ function buildStablePersona(profile: CatProfile): CatPersona {
       matchScore: 88,
       monologue: `今天也想悄悄靠近你，陪你待一会。`,
       analysis: `${profile.name}是${profile.ageStage}里的${profile.gender}，性格里带着独立和温柔。它会先观察环境，再用停留、靠近和注视表达亲近。`,
+      corePersonality:
+        profile.quiz && Object.values(profile.quiz).some(Boolean)
+          ? tone.type
+          : "资料还不够多，它的长期性格需要更多日常线索。",
       misunderstanding: `它不是对周围没兴趣，只是更习惯先把情况看明白。平时坐着不动时，也可能早已把注意力放在眼前，只是在等自己认可的时机。`,
       loveLanguage: `如果它平时也常待在你附近却不紧贴，它可能更习惯用关注你的动向、共享同一片空间来表达亲近。`,
+      loveLanguageInsight: `如果它平时也常待在你附近却不紧贴，它可能更习惯用关注你的动向、共享同一片空间来表达亲近。`,
       ownerRole: `你可能不是它时时刻刻都要黏着的人，但很可能是它默认会在的人。对它来说，不需要反复确认你的存在，本身就是一种稳定的信任。`,
+      ownerRelationship: `你可能不是它时时刻刻都要黏着的人，但很可能是它默认会在的人。对它来说，不需要反复确认你的存在，本身就是一种稳定的信任。`,
       tags: tone.tags,
       traits: tone.traits,
       observations: [
@@ -332,7 +342,10 @@ function normalizeVoiceForProfile(
   imageDataUrl?: string | null,
 ): Voice {
   const tags = Array.isArray(input.tags)
-    ? input.tags.map((tag) => normalizeCatFacts(tag, profile)).filter(Boolean)
+    ? input.tags
+        .map((tag) => normalizeShareTag(tag, profile))
+        .filter((tag) => Array.from(tag).length >= 4)
+        .slice(0, 3)
     : [];
   const mood = normalizeCatFacts(input.mood, profile, "想被关注");
   const rawAnalysis =
@@ -347,20 +360,20 @@ function normalizeVoiceForProfile(
       `${profile.name}保持停留并注视周围，姿态放松，同时持续关注当前互动。`,
     ),
     `${profile.name}保持停留并注视周围，姿态放松，同时持续关注当前互动。`,
-    45,
-    70,
+    20,
+    30,
   );
   const subtext = boundedCopy(
     normalizeCatFacts(input.subtext, profile, "它没有急着行动，像是在等一个符合自己节奏的时机。"),
     "它没有急着行动，像是在等一个符合自己节奏的时机。",
     15,
-    35,
+    30,
   );
   const personalityInterpretation = boundedCopy(
     normalizeCatFacts(rawAnalysis.personalityInterpretation ?? input.subtext, profile, subtext),
     subtext,
-    15,
-    60,
+    20,
+    30,
   );
   const rawShare =
     input.share && typeof input.share === "object" ? (input.share as Record<string, unknown>) : {};
@@ -383,6 +396,7 @@ function normalizeVoiceForProfile(
       12,
       30,
     ),
+    subtext,
     media: imageDataUrl ?? undefined,
     mediaType: "photo",
     analysis: {
@@ -941,11 +955,16 @@ function validateVoiceInput(input: unknown): VoiceInput {
 
 export async function generateCatPersonaServer(input: PersonaInput): Promise<CatPersona> {
   const data = validatePersonaInput(input);
+  const behaviorProfile = buildBehaviorProfile(data.profile.quiz);
+  const combinationInsights = buildCombinationInsights(behaviorProfile);
   const profileFacts = `猫咪名称：${data.profile.name}；性别：${data.profile.gender}；年龄阶段：${data.profile.ageStage}`;
   const wrongGender = data.profile.gender === "小公猫" ? "小母猫、她、她的" : "小公猫、他、他的";
   const prompt = `你是「喵懂」的猫咪性格观察者。你不是在做图像描述，也不是在做宠物性格测试报告。你要从猫咪真实行为、照片细节和问卷答案中，找到 2–3 个主人平时可能感受到、但未必总结出来的行为模式。
 
 猫咪基础资料：${JSON.stringify(data.profile)}
+结构化行为画像：${JSON.stringify(behaviorProfile)}
+组合行为洞察：${JSON.stringify(combinationInsights)}
+原始问卷答案：${JSON.stringify(data.profile.quiz ?? {})}
 硬性资料事实：${profileFacts}
 照片状态：${data.imageDataUrl ? "已提供；必须优先依据照片中的可见事实" : "未提供；不得虚构任何视觉细节"}
 
@@ -956,7 +975,9 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
 禁止先决定 MBTI 再寻找证据。
 禁止先造 type 再为它反向寻找理由；type 必须能被 observations 和 analysis 中的行为证据直接解释。
 
-照片观察只作为内部推理证据。最终用户内容不要罗列坐姿、视线、爪子、装扮、家具等肉眼可见信息，除非该细节对解释洞察不可或缺。重点回答主人可能误会了什么、它如何表达喜欢、主人处在什么位置。
+长期人格优先依据结构化行为画像和组合洞察；照片只补充外观、当下姿态和可见特征，绝不能用单张照片覆盖长期行为答案。MBTI 必须最后映射，仅作为趣味包装。照片观察只作为内部推理证据。最终用户内容不要罗列坐姿、视线、爪子、装扮、家具等肉眼可见信息，除非该细节对解释洞察不可或缺。
+
+若 answeredCount 为 8，可较高置信度使用行为画像；部分完成时，只使用 confidence 足够的维度并降低措辞确定性；完全跳过时，不得输出精确 Trait 判断或武断推测它与主人的长期关系。
 
 如果证据支持，优先提炼“A，但是 B”的真实反差，例如想靠近却保留距离；但绝不能为了反差虚构画面、动作、经历、主人行为或长期习惯。
 
@@ -965,9 +986,10 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
 - mbti：完成人格判断后再选择最接近的趣味标签，格式必须为 XXXX-A 或 XXXX-T；不要把它当科学测量或用刻板印象改写事实。
 - matchScore：60–99 的整数，反映现有证据与结论的匹配程度。
 - monologue：最重要的分享文案。第一人称，优先 20–35 个中文字，结合具体场景，像这只猫此刻会说的话；允许一点小脾气、小傲娇和幽默，不写 AI 散文、鸡汤或泛宠物文学。
-- misunderstanding.text：50–80 个中文字，找出主人最容易误解的行为模式，形成清晰的认知反转；不写照片说明，要能联想到日常相处。
-- loveLanguage.text：50–80 个中文字，具体解释它如何表达亲近；证据不足时用“如果平时也经常这样”“它可能更习惯”等克制表达，不能把所有猫都写成默默陪伴型。
-- ownerRole.text：60–90 个中文字，解释主人在关系中的位置。只有存在互动证据时才能明确判断；证据不足必须降低确定性，禁止套用“专属管家、安全港湾、背景音”等万能文案。
+- corePersonality：一句话概括最核心的行为特点，必须来自 Trait 组合，而不是 MBTI 或泛形容词。
+- misunderstanding：50–80 个中文字，找出主人最容易误解的行为模式，形成清晰的认知反转；不写照片说明，要能联想到日常相处。
+- loveLanguageInsight：50–80 个中文字，结合 loveLanguage 与 attachment/expressiveness/boundary，具体解释它如何表达亲近。
+- ownerRelationship：60–90 个中文字，结合 attachment/boundary/expressiveness 解释主人在关系中的位置；证据不足必须降低确定性。
 - analysis：保留给旧版本兼容，内容与 misunderstanding.text 一致即可。
 - tags：恰好 4 个短标签，体现具体行为、反差和关系特点；不要全是正面形容词，不要使用“可爱、萌宠、治愈、快乐”等泛标签。
 - traits：恰好 4 项，每项 value 为 0–100 整数。根据本次证据从粘人度、独立性、好奇心、警觉度、社交主动性、观察欲、撒娇度、边界感、探索欲、情绪外露度、主人关注度、行动派程度等维度中动态选择最有区分度的 4 项，禁止固定套用同一组维度或分数。
@@ -981,9 +1003,10 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
   "matchScore": "60-99的整数，表示现有证据与人格描述的匹配度",
   "monologue": "猫咪第一人称心声",
   "analysis": "与misunderstanding.text一致的旧版兼容文本",
-  "misunderstanding": {"title":"你可能一直误会它的一件事","text":"50-80字认知反转洞察"},
-  "loveLanguage": {"title":"它表达喜欢的方式","text":"50-80字具体亲近方式"},
-  "ownerRole": {"title":"在${data.profile.name}眼里，你的位置","text":"60-90字关系洞察"},
+  "corePersonality": "一句话核心人格洞察",
+  "misunderstanding": "50-80字认知反转洞察",
+  "loveLanguageInsight": "50-80字具体亲近方式",
+  "ownerRelationship": "60-90字关系洞察",
   "tags": ["标签1", "标签2", "标签3", "标签4"],
   "traits": [
     {"label":"观察欲","value":88},
@@ -1042,8 +1065,8 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
             isSpecificPersonaType(parsed.type) &&
             parsed.monologue?.trim() &&
             personaInsightText(parsed.misunderstanding).length >= 20 &&
-            personaInsightText(parsed.loveLanguage).length >= 20 &&
-            personaInsightText(parsed.ownerRole).length >= 20 &&
+            (parsed.loveLanguageInsight?.trim().length ?? 0) >= 20 &&
+            (parsed.ownerRelationship?.trim().length ?? 0) >= 20 &&
             Array.isArray(parsed.tags) &&
             parsed.tags.length >= 4 &&
             Array.isArray(parsed.traits) &&
@@ -1064,9 +1087,13 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
         matchScore: Math.max(60, Math.min(99, Number(parsed.matchScore) || 88)),
         monologue: parsed.monologue || "今天也想悄悄靠近你，陪你待一会。",
         analysis: personaInsightText(parsed.misunderstanding, parsed.analysis),
+        corePersonality: parsed.corePersonality?.trim() || parsed.type,
         misunderstanding: personaInsightText(parsed.misunderstanding, parsed.analysis),
-        loveLanguage: personaInsightText(parsed.loveLanguage),
-        ownerRole: personaInsightText(parsed.ownerRole),
+        loveLanguage: parsed.loveLanguageInsight?.trim() || personaInsightText(parsed.loveLanguage),
+        loveLanguageInsight:
+          parsed.loveLanguageInsight?.trim() || personaInsightText(parsed.loveLanguage),
+        ownerRole: parsed.ownerRelationship?.trim() || personaInsightText(parsed.ownerRole),
+        ownerRelationship: parsed.ownerRelationship?.trim() || personaInsightText(parsed.ownerRole),
         tags: (Array.isArray(parsed.tags) ? parsed.tags : []).slice(0, 4),
         traits: (Array.isArray(parsed.traits) ? parsed.traits : []).slice(0, 4),
         observations: [],
@@ -1128,10 +1155,12 @@ ${data.scene || "无补充场景"}
 
 字段要求：
 - text：最重要字段。第一人称猫咪口吻，优先 12–30 个中文字，最多 2 句；必须针对照片中的一个具体对象或行为，口语化，有一点猫的脾气、幽默或反差。写它对眼前事情的态度，不写“我喜欢你、我要陪你、我很开心”等泛泛情感。
-- subtext：15–35 个中文字，第三人称或旁白，比 text 克制；揭示表面行为之下的小反差，让主人觉得“它确实经常这样”，不能换句话重复 text。
-- analysis：45–70 个中文字。结构必须是“一个具体可见细节 + 这个细节可能意味着什么 + 结合人格的克制推测”。不要复述整张照片，不罗列与行为无关的花、家具或装饰。
+- subtext：15–30 个中文字，第三人称或旁白，比 text 克制；揭示表面行为之下的小反差，让主人觉得“它确实经常这样”，不能换句话重复 text。
+- analysis：拆成 observation 和 personalityInterpretation，两段合计优先 40–60 个中文字。observation 只保留一个具体可见行为及其可能含义；personalityInterpretation 用一句话联系既有人格。不要重复罗列前爪、仰头、注视、没有扑等同一组事实，不罗列与行为无关的花、家具或装饰。
 - mood：2–6 个中文字，描述当前行为状态，例如观察中、跃跃欲试、假装淡定、正在评估、想玩但端着、警觉围观；禁止只写开心、温柔、治愈、平静等抽象情绪。
-- tags：2–3 个短标签，体现“当前行为 × 猫咪人格”，至少一个必须指向这一刻的具体行为；不要使用可爱猫咪、萌宠、治愈等泛标签。
+- tags：严格生成 3 个、每个 4–8 个中文字，依次表达“当前行为、行为模式、反差或趣味”。必须一眼能懂，不造抽象新词，不只写人格形容词，不带 #；不要使用可爱猫咪、萌宠、治愈等泛标签。
+
+不要频繁使用“赏脸、本喵、勉强、人类、铲屎官、高贵、本小姐”等通用傲娇猫套话。趣味必须来自当前可见行为，而不是把所有猫写成同一种傲娇角色。
 
 优先寻找有事实支撑的“A，但其实 B”，但不能为了搞笑虚构画面中不存在的动作、人物、情绪事件或长期习惯。照片只能证明可见行为，不能据此确定它喜欢或讨厌谁、嫉妒、想念主人、长期粘人或有心理问题。证据不足时，宁可写一个具体的小心思，也不要上升到深刻情感或医疗判断。
 
@@ -1144,7 +1173,10 @@ ${data.scene || "无补充场景"}
 {
   "text": "猫咪第一人称心声",
   "subtext": "它没说出口的小心思",
-  "analysis": "基于具体画面细节的AI解读",
+  "analysis": {
+    "observation": "一个具体行为及其可能含义",
+    "personalityInterpretation": "该行为与既有人格的克制关联"
+  },
   "mood": "当前行为状态",
   "tags": ["标签1", "标签2", "标签3"]
 }

@@ -30,6 +30,7 @@ type PersonaRow = {
   match_score: number;
   monologue: string;
   analysis: string;
+  core_personality?: string | null;
   misunderstanding?: string | null;
   love_language?: string | null;
   owner_role: string;
@@ -46,6 +47,7 @@ type PersonaRow = {
 type VoiceRow = {
   id: string;
   text: string;
+  subtext: string | null;
   analysis: string | null;
   analysis_summary: string | null;
   personality_interpretation: string | null;
@@ -65,9 +67,9 @@ type VoiceRow = {
 
 const CAT_COLUMNS = "id,name,gender,age_stage,avatar_object_key,quiz,updated_at";
 const PERSONA_COLUMNS =
-  "id,cat_id,type,mbti,match_score,monologue,analysis,misunderstanding,love_language,owner_role,tags,traits,observations,evidence,daily_mood,provider,model,updated_at";
+  "id,cat_id,type,mbti,match_score,monologue,analysis,core_personality,misunderstanding,love_language,owner_role,tags,traits,observations,evidence,daily_mood,provider,model,updated_at";
 const VOICE_COLUMNS =
-  "id,text,analysis,analysis_summary,personality_interpretation,share_headline,share_insight,share_tags,location,tags,media_object_key,media_type,aspect,video_duration,grad,local_time_label,created_at";
+  "id,text,subtext,analysis,analysis_summary,personality_interpretation,share_headline,share_insight,share_tags,location,tags,media_object_key,media_type,aspect,video_duration,grad,local_time_label,created_at";
 const PROFILE_COLUMNS =
   "id,email,display_name,avatar_object_key,onboarding_completed_at,created_at,updated_at";
 
@@ -186,7 +188,7 @@ function cleanQuiz(value: unknown) {
   return Object.fromEntries(
     Object.entries(value as Record<string, unknown>)
       .map(([key, answer]) => [key, String(answer)])
-      .filter(([key, answer]) => key && (answer === "a" || answer === "b")),
+      .filter(([key, answer]) => key && (answer === "a" || answer === "b" || answer === "c")),
   );
 }
 
@@ -302,9 +304,12 @@ function mapPersonaRow(row: PersonaRow | null | undefined) {
     matchScore: row.match_score,
     monologue: row.monologue,
     analysis: row.analysis,
+    corePersonality: row.core_personality ?? row.type,
     misunderstanding: row.misunderstanding ?? row.analysis,
     loveLanguage: row.love_language ?? undefined,
+    loveLanguageInsight: row.love_language ?? undefined,
     ownerRole: row.owner_role,
+    ownerRelationship: row.owner_role,
     tags: row.tags ?? [],
     traits: row.traits ?? [],
     observations: row.observations ?? [],
@@ -321,6 +326,7 @@ async function mapVoiceRow(row: VoiceRow, requestOrigin: string) {
     time: row.local_time_label || formatTimeLabel(row.created_at),
     grad: row.grad || "linear-gradient(135deg, oklch(0.9 0.06 280), oklch(0.92 0.05 320))",
     text: row.text,
+    subtext: row.subtext ?? undefined,
     location: row.location ?? undefined,
     tags: row.tags ?? [],
     createdAt: isoToMs(row.created_at),
@@ -490,10 +496,14 @@ async function upsertPersona(
           value.analysis,
           "它正在用自己的节奏理解世界，也在确认你是可靠的陪伴。",
         ),
+        core_personality: cleanString(value.corePersonality) || null,
         misunderstanding:
           cleanString(value.misunderstanding) || cleanString(value.analysis) || null,
-        love_language: cleanString(value.loveLanguage) || null,
-        owner_role: cleanString(value.ownerRole, "你是它安心回来的据点。"),
+        love_language:
+          cleanString(value.loveLanguageInsight) || cleanString(value.loveLanguage) || null,
+        owner_role:
+          cleanString(value.ownerRelationship) ||
+          cleanString(value.ownerRole, "你是它安心回来的据点。"),
         tags: cleanStringList(value.tags),
         traits: Array.isArray(value.traits) ? value.traits : [],
         observations: Array.isArray(value.observations) ? value.observations : [],
@@ -687,6 +697,7 @@ async function saveVoice(
         cat_id: catId,
         user_id: user.id,
         text: cleanString(voice.text),
+        subtext: cleanString(voice.subtext) || null,
         analysis:
           legacyAnalysis ||
           [analysisSummary, personalityInterpretation].filter(Boolean).join("\n\n") ||
