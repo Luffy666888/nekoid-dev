@@ -6,7 +6,7 @@ function ProfilePage() {
   return (
     <Screen6Result
       onBack={() => window.history.length > 1 ? window.history.back() : navigate({ to: "/app" })}
-      onRestart={() => navigate({ to: "/app" })}
+      onRestart={() => navigate({ to: "/", search: { restart: true } })}
     />
   );
 }
