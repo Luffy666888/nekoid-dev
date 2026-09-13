@@ -19,7 +19,9 @@ const JSON_HEADERS = {
 function getEnvValue(env: unknown, name: string) {
   const workerValue = (env as EnvLike | undefined)?.[name];
   if (workerValue) return workerValue;
-  const globalWorkerValue = (globalThis as typeof globalThis & { __env__?: EnvLike }).__env__?.[name];
+  const globalWorkerValue = (globalThis as typeof globalThis & { __env__?: EnvLike }).__env__?.[
+    name
+  ];
   if (globalWorkerValue) return globalWorkerValue;
   return typeof process !== "undefined" ? process.env[name] : undefined;
 }
@@ -54,16 +56,22 @@ function verifySupabaseHook(payload: string, request: Request, env: unknown): Se
 
 function normalizeMainlandPhone(phone: string) {
   const compact = phone.replace(/[\s-]/g, "");
-  const mainland = compact.match(/^\+86(1\d{10})$/)?.[1] ?? compact.match(/^86(1\d{10})$/)?.[1] ?? compact;
+  const mainland =
+    compact.match(/^\+86(1\d{10})$/)?.[1] ?? compact.match(/^86(1\d{10})$/)?.[1] ?? compact;
   if (!/^1\d{10}$/.test(mainland)) {
-    throw new SendSmsHookError(400, "unsupported_phone", "Only mainland China phone numbers are supported");
+    throw new SendSmsHookError(
+      400,
+      "unsupported_phone",
+      "Only mainland China phone numbers are supported",
+    );
   }
   return mainland;
 }
 
 function percentEncode(value: string) {
-  return encodeURIComponent(value).replace(/[!'()*]/g, (char) =>
-    `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+  return encodeURIComponent(value).replace(
+    /[!'()*]/g,
+    (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
   );
 }
 
@@ -92,11 +100,7 @@ async function hmacSha1Base64(secret: string, value: string) {
   return toBase64(signature);
 }
 
-async function buildAliyunSignedBody(
-  env: unknown,
-  phoneNumber: string,
-  otp: string,
-) {
+async function buildAliyunSignedBody(env: unknown, phoneNumber: string, otp: string) {
   const accessKeyId = requireEnv(env, "ALIYUN_SMS_ACCESS_KEY_ID");
   const accessKeySecret = requireEnv(env, "ALIYUN_SMS_ACCESS_KEY_SECRET");
   const signName = requireEnv(env, "ALIYUN_SMS_SIGN_NAME");
@@ -153,7 +157,11 @@ async function sendAliyunSms(env: unknown, phoneNumber: string, otp: string) {
   try {
     result = text ? (JSON.parse(text) as typeof result) : {};
   } catch {
-    throw new SendSmsHookError(502, "aliyun_invalid_response", "SMS provider returned an invalid response");
+    throw new SendSmsHookError(
+      502,
+      "aliyun_invalid_response",
+      "SMS provider returned an invalid response",
+    );
   }
 
   if (!response.ok || (result.Code !== "OK" && result.Success !== true)) {
@@ -163,7 +171,11 @@ async function sendAliyunSms(env: unknown, phoneNumber: string, otp: string) {
       requestId: result.RequestId,
       message: result.Message,
     });
-    throw new SendSmsHookError(502, "aliyun_send_failed", "SMS provider failed to send the verification code");
+    throw new SendSmsHookError(
+      502,
+      "aliyun_send_failed",
+      "SMS provider failed to send the verification code",
+    );
   }
 }
 
@@ -213,6 +225,11 @@ export async function handleSendSmsHookRequest(request: Request, env: unknown) {
     }
 
     if (error instanceof SendSmsHookError) {
+      console.error("NEKO Send SMS hook failed", {
+        status: error.status,
+        code: error.code,
+        message: error.message,
+      });
       return jsonResponse(
         { error: { http_code: error.status, message: error.message } },
         { status: error.status },

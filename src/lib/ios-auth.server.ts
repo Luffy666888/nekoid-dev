@@ -27,7 +27,8 @@ function getEnvValue(env: unknown, name: string) {
 function requireSupabaseConfig(env: unknown) {
   const url = getEnvValue(env, "SUPABASE_URL") || getEnvValue(env, "VITE_SUPABASE_URL");
   const publishableKey =
-    getEnvValue(env, "SUPABASE_PUBLISHABLE_KEY") || getEnvValue(env, "VITE_SUPABASE_PUBLISHABLE_KEY");
+    getEnvValue(env, "SUPABASE_PUBLISHABLE_KEY") ||
+    getEnvValue(env, "VITE_SUPABASE_PUBLISHABLE_KEY");
 
   if (!url || !publishableKey) {
     throw new IOSAuthError(500, "supabase_not_configured", "云端登录服务暂时不可用，请稍后再试。");
@@ -87,15 +88,40 @@ function mapSupabaseAuthError(error: { message?: string; code?: string; status?:
   const message = error.message || "Supabase Auth request failed";
   const lower = message.toLowerCase();
   if (lower.includes("rate")) {
-    return new IOSAuthError(429, error.code || "otp_rate_limited", "验证码发送太频繁了，稍等一会儿再试。");
+    return new IOSAuthError(
+      429,
+      error.code || "otp_rate_limited",
+      "验证码发送太频繁了，稍等一会儿再试。",
+    );
   }
   if (lower.includes("expired") || lower.includes("invalid")) {
     return new IOSAuthError(400, error.code || "invalid_otp", "验证码不正确或已过期，请重新获取。");
   }
   if (lower.includes("phone") && lower.includes("disabled")) {
-    return new IOSAuthError(400, error.code || "phone_provider_disabled", "手机号登录暂时不可用，请稍后再试。");
+    return new IOSAuthError(
+      400,
+      error.code || "phone_provider_disabled",
+      "手机号登录暂时不可用，请稍后再试。",
+    );
   }
-  return new IOSAuthError(error.status || 400, error.code || "auth_failed", "登录暂时失败，请稍后再试。");
+  return new IOSAuthError(
+    error.status || 400,
+    error.code || "auth_failed",
+    "登录暂时失败，请稍后再试。",
+  );
+}
+
+function logSupabaseAuthError(
+  operation: "phone-otp" | "phone-verify" | "refresh",
+  error: { message?: string; code?: string; status?: number } | null,
+) {
+  if (!error) return;
+  console.error("NEKO Supabase auth failed", {
+    operation,
+    status: error.status ?? null,
+    code: error.code ?? null,
+    message: error.message ?? null,
+  });
 }
 
 function mapSession(data: {
@@ -146,6 +172,7 @@ export async function handleIOSAuthRequest(pathname: string, body: unknown, env:
         shouldCreateUser: true,
       },
     });
+    logSupabaseAuthError("phone-otp", error);
     const mappedError = mapSupabaseAuthError(error);
     if (mappedError) throw mappedError;
     return { sent: true };
@@ -159,6 +186,7 @@ export async function handleIOSAuthRequest(pathname: string, body: unknown, env:
       token,
       type: "sms",
     });
+    logSupabaseAuthError("phone-verify", error);
     const mappedError = mapSupabaseAuthError(error);
     if (mappedError) throw mappedError;
     return mapSession(data);
@@ -169,6 +197,7 @@ export async function handleIOSAuthRequest(pathname: string, body: unknown, env:
     const { data, error } = await client.auth.refreshSession({
       refresh_token: refreshToken,
     });
+    logSupabaseAuthError("refresh", error);
     const mappedError = mapSupabaseAuthError(error);
     if (mappedError) throw mappedError;
     return mapSession(data);
