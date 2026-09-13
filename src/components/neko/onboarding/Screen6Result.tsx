@@ -1,6 +1,6 @@
 import hero from "@/assets/neko-hero.jpg";
 import { useNavigate } from "@tanstack/react-router";
-import { ChevronLeft, Share2 } from "lucide-react";
+import { Bug, ChevronLeft, Share2, X } from "lucide-react";
 import { SafeAreaTopBar } from "../screens/_shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
@@ -28,6 +28,7 @@ export function Screen6Result({
   const navigate = useNavigate();
   const cardRef = useRef<HTMLDivElement | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
+  const [debugOpen, setDebugOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const profile = useCatProfile();
   const uploaded = useCatAvatar();
@@ -47,7 +48,10 @@ export function Screen6Result({
   const heroImagePosition = useHeroImagePosition(avatarSrc);
   const goBack = onBack ?? onPrev;
   const heroDescription = shortenCopy(
-    persona?.corePersonality || persona?.monologue || persona?.analysis || "它用自己的节奏观察世界，也珍惜熟悉的陪伴。",
+    persona?.corePersonality ||
+      persona?.monologue ||
+      persona?.analysis ||
+      "它用自己的节奏观察世界，也珍惜熟悉的陪伴。",
     48,
   );
   const resultInsights = [
@@ -82,6 +86,7 @@ export function Screen6Result({
       ),
     },
   ];
+  const canShowPersonaDebug = import.meta.env.DEV && Boolean(persona?.generation);
 
   const closeShare = () => setShareOpen(false);
 
@@ -220,9 +225,7 @@ export function Screen6Result({
           </div>
 
           <div className="absolute bottom-6 left-6 z-20 w-[min(74%,340px)]">
-            <div className="text-[20px] font-medium leading-none text-[#2E2741]">
-              {catName}
-            </div>
+            <div className="text-[20px] font-medium leading-none text-[#2E2741]">{catName}</div>
             <div className="mt-2 text-[17px] font-semibold leading-none tracking-[0.03em] text-[#2E2741]">
               {personaMbti}
             </div>
@@ -282,9 +285,7 @@ export function Screen6Result({
                 <h3 className="text-[19px] font-semibold leading-[25px] text-[#2F2942]">
                   {it.title}
                 </h3>
-                <p className="mt-2.5 text-[16px] leading-[26px] text-[#6C647C]">
-                  {it.text}
-                </p>
+                <p className="mt-2.5 text-[16px] leading-[26px] text-[#6C647C]">{it.text}</p>
               </div>
             </article>
           ))}
@@ -301,6 +302,16 @@ export function Screen6Result({
           backdropFilter: "blur(18px)",
         }}
       >
+        {canShowPersonaDebug && (
+          <button
+            type="button"
+            onClick={() => setDebugOpen(true)}
+            className="mb-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-full bg-[#211832]/88 px-4 text-[13px] font-semibold text-white shadow-[0_14px_30px_-18px_rgba(33,24,50,0.7)] active:scale-[0.98]"
+          >
+            <Bug className="h-4 w-4" strokeWidth={2.2} />
+            Debug Persona
+          </button>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
@@ -328,6 +339,9 @@ export function Screen6Result({
       </div>
 
       {shareOpen && <ShareSheet onClose={closeShare} onSaveImage={saveImage} busy={busy} />}
+      {debugOpen && persona?.generation && (
+        <PersonaDebugPanel generation={persona.generation} onClose={() => setDebugOpen(false)} />
+      )}
     </div>
   );
 }
@@ -377,9 +391,7 @@ function splitPersonaTitle(title: string) {
 }
 
 function buildPersonaKeywords(tags: string[] | undefined) {
-  const merged = [...(tags ?? []), ...KEYWORDS]
-    .map((tag) => tag.trim())
-    .filter(Boolean);
+  const merged = [...(tags ?? []), ...KEYWORDS].map((tag) => tag.trim()).filter(Boolean);
   return Array.from(new Set(merged)).slice(0, 3);
 }
 
@@ -413,6 +425,75 @@ function shortenLabel(value: string, maxLength: number) {
   const chars = Array.from(value.trim());
   if (chars.length <= maxLength) return value;
   return chars.slice(0, maxLength).join("");
+}
+
+function PersonaDebugPanel({
+  generation,
+  onClose,
+}: {
+  generation: NonNullable<ReturnType<typeof useCatPersona>>["generation"];
+  onClose: () => void;
+}) {
+  if (!generation) return null;
+  const sections = [
+    ["Raw Inputs", generation.rawInputs],
+    ["Questionnaire Answers", generation.questionnaireAnswers],
+    ["Behavior Profile", generation.behaviorProfile],
+    ["Grounded Traits", generation.groundedTraits],
+    ["Unsupported Claims", generation.unsupportedClaims],
+    ["Stage 2 Insights", generation.insights],
+    ["Final Copy", generation.finalCopy],
+    ["Eval Scores", generation.evalResult],
+    ["Prompt Version", generation.promptVersion],
+    [
+      "Model / Latency / Token Usage",
+      {
+        model: generation.model,
+        retryCount: generation.retryCount,
+        stageLogs: generation.stageLogs,
+      },
+    ],
+  ] as const;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-[#120D1D]/48 p-4 backdrop-blur-md">
+      <div className="mx-auto flex h-full max-w-[460px] flex-col overflow-hidden rounded-[22px] bg-[#fbf8ff] shadow-[0_24px_70px_-34px_rgba(25,18,37,0.8)]">
+        <div className="flex min-h-[58px] items-center justify-between border-b border-[#E7DDF4] px-4">
+          <div>
+            <div className="text-[12px] font-semibold tracking-[0.18em] text-[#7B63B5]">
+              PERSONA DEBUG
+            </div>
+            <div className="mt-0.5 text-[11px] text-[#7A7188]">
+              {generation.generationId} · {generation.inputHash}
+            </div>
+          </div>
+          <button
+            type="button"
+            aria-label="关闭 Debug"
+            onClick={onClose}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#372B4F] shadow-[0_10px_22px_-18px_rgba(55,43,79,0.7)] active:scale-95"
+          >
+            <X className="h-4 w-4" strokeWidth={2.2} />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 py-4">
+          <div className="space-y-3">
+            {sections.map(([title, value]) => (
+              <section
+                key={title}
+                className="rounded-[14px] border border-[#E9DFF5] bg-white/78 p-3"
+              >
+                <h3 className="text-[12px] font-semibold text-[#342C48]">{title}</h3>
+                <pre className="mt-2 max-h-[260px] overflow-auto whitespace-pre-wrap break-words rounded-[10px] bg-[#201832] p-3 text-[11px] leading-[1.55] text-[#F6EFFA]">
+                  {JSON.stringify(value ?? null, null, 2)}
+                </pre>
+              </section>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function ShareSheet({

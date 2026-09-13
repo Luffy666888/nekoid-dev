@@ -25,6 +25,9 @@ export type CatProfile = {
   updatedAt: number;
 };
 
+export type JsonValue =
+  string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+
 export type CatPersona = {
   cloudId?: string;
   catCloudId?: string;
@@ -46,6 +49,25 @@ export type CatPersona = {
   evidence?: Array<{ fact: string; interpretation: string }>;
   dailyMood: string;
   savedAt: number;
+  provider?: string;
+  model?: string;
+  generation?: {
+    generationId: string;
+    inputHash: string;
+    timestamp: string;
+    promptVersion: Record<string, string>;
+    model: string;
+    rawInputs?: JsonValue;
+    questionnaireAnswers?: JsonValue;
+    behaviorProfile?: JsonValue;
+    groundedTraits?: JsonValue;
+    unsupportedClaims?: JsonValue;
+    insights?: JsonValue;
+    finalCopy?: JsonValue;
+    evalResult?: JsonValue;
+    stageLogs?: JsonValue;
+    retryCount?: number;
+  };
 };
 
 export function getCatProfile(): CatProfile {

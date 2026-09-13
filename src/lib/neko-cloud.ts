@@ -8,6 +8,7 @@ import {
   hydratePersistedCatResult,
   type CatPersona,
   type CatProfile,
+  type JsonValue,
 } from "@/components/neko/catProfileStore";
 import { voicesStore, type Voice } from "@/components/neko/app/voicesStore";
 import {
@@ -51,6 +52,21 @@ type PersonaRow = {
   observations: CatPersona["observations"] | null;
   evidence: CatPersona["evidence"] | null;
   daily_mood: string;
+  generation_id?: string | null;
+  input_hash?: string | null;
+  prompt_version?: Record<string, string> | null;
+  generation_input?: unknown;
+  stage_outputs?: {
+    behaviorProfile?: unknown;
+    groundedTraits?: unknown;
+    unsupportedClaims?: unknown;
+    insights?: unknown;
+    finalCopy?: unknown;
+  } | null;
+  eval_result?: unknown;
+  stage_logs?: unknown;
+  generation_model?: string | null;
+  generation_retry_count?: number | null;
   updated_at: string;
 };
 
@@ -98,8 +114,18 @@ type SaveOptions = {
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 const PROFILE_COLUMNS =
   "id,email,display_name,avatar_object_key,onboarding_completed_at,created_at,updated_at";
+const PERSONA_BASE_COLUMNS =
+  "id,cat_id,type,mbti,match_score,monologue,analysis,core_personality,misunderstanding,love_language,owner_role,tags,traits,observations,evidence,daily_mood,updated_at";
+const PERSONA_DEBUG_COLUMNS =
+  "generation_id,input_hash,prompt_version,generation_input,stage_outputs,eval_result,stage_logs,generation_model,generation_retry_count";
 const LEGACY_DEFAULT_DISPLAY_NAME = "喵一下用户";
 const EMPTY_ACCOUNT_DISPLAY_NAME = "猫咪主人";
+
+function personaSelectColumns() {
+  return import.meta.env.DEV
+    ? `${PERSONA_BASE_COLUMNS},${PERSONA_DEBUG_COLUMNS}`
+    : PERSONA_BASE_COLUMNS;
+}
 
 function requireSupabaseClient(): SupabaseClient {
   const client = getSupabaseBrowserClient();
@@ -133,6 +159,53 @@ function cleanStringList(value: string[] | undefined) {
     .map((item) => item.trim())
     .filter(Boolean)
     .slice(0, 12);
+}
+
+function toJsonValue(value: unknown): JsonValue | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (Array.isArray(value)) {
+    const output: JsonValue[] = [];
+    for (const item of value) output.push(toJsonValue(item) ?? null);
+    return output;
+  }
+  if (typeof value === "object") {
+    const output: Record<string, JsonValue> = {};
+    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+      if (item === undefined || typeof item === "function" || typeof item === "symbol") continue;
+      const converted = toJsonValue(item);
+      output[key] = converted === undefined ? null : converted;
+    }
+    return output;
+  }
+  return null;
+}
+
+function personaGenerationFromRow(row: PersonaRow): CatPersona["generation"] | undefined {
+  if (!row.generation_id) return undefined;
+  return {
+    generationId: row.generation_id,
+    inputHash: row.input_hash ?? "",
+    timestamp: row.updated_at,
+    promptVersion: row.prompt_version ?? {},
+    model: row.generation_model ?? "",
+    rawInputs: toJsonValue(row.generation_input),
+    questionnaireAnswers:
+      row.generation_input && typeof row.generation_input === "object"
+        ? toJsonValue(
+            (row.generation_input as { questionnaireAnswers?: unknown }).questionnaireAnswers,
+          )
+        : undefined,
+    behaviorProfile: toJsonValue(row.stage_outputs?.behaviorProfile),
+    groundedTraits: toJsonValue(row.stage_outputs?.groundedTraits),
+    unsupportedClaims: toJsonValue(row.stage_outputs?.unsupportedClaims),
+    insights: toJsonValue(row.stage_outputs?.insights),
+    finalCopy: toJsonValue(row.stage_outputs?.finalCopy),
+    evalResult: toJsonValue(row.eval_result),
+    stageLogs: toJsonValue(row.stage_logs),
+    retryCount: row.generation_retry_count ?? 0,
+  };
 }
 
 function extFromMime(mime: string) {
@@ -582,20 +655,38 @@ async function savePersona(
         observations: persona.observations ?? [],
         evidence: persona.evidence ?? [],
         daily_mood: persona.dailyMood,
+        ...(persona.generation
+          ? {
+              generation_id: persona.generation.generationId,
+              input_hash: persona.generation.inputHash,
+              prompt_version: persona.generation.promptVersion,
+              generation_input: persona.generation.rawInputs ?? null,
+              stage_outputs: {
+                behaviorProfile: persona.generation.behaviorProfile,
+                groundedTraits: persona.generation.groundedTraits,
+                unsupportedClaims: persona.generation.unsupportedClaims,
+                insights: persona.generation.insights,
+                finalCopy: persona.generation.finalCopy,
+              },
+              eval_result: persona.generation.evalResult ?? null,
+              stage_logs: persona.generation.stageLogs ?? null,
+              generation_model: persona.generation.model ?? persona.model ?? null,
+              generation_retry_count: persona.generation.retryCount ?? 0,
+            }
+          : {}),
       },
       { onConflict: "cat_id" },
     )
-    .select(
-      "id,cat_id,type,mbti,match_score,monologue,analysis,core_personality,misunderstanding,love_language,owner_role,tags,traits,observations,evidence,daily_mood,updated_at",
-    )
+    .select(personaSelectColumns())
     .single();
 
   if (error) throw error;
-  const row = data as PersonaRow;
+  const row = data as unknown as PersonaRow;
   return {
     ...persona,
     cloudId: row.id,
     catCloudId: row.cat_id,
+    generation: persona.generation ?? personaGenerationFromRow(row),
     savedAt: isoToMs(row.updated_at),
   };
 }
@@ -697,13 +788,7 @@ export async function loadNekoFromCloud() {
 
   const [{ data: personaData, error: personaError }, { data: voiceData, error: voiceError }] =
     await Promise.all([
-      client
-        .from("cat_personas")
-        .select(
-          "id,cat_id,type,mbti,match_score,monologue,analysis,core_personality,misunderstanding,love_language,owner_role,tags,traits,observations,evidence,daily_mood,updated_at",
-        )
-        .eq("cat_id", cat.id)
-        .maybeSingle(),
+      client.from("cat_personas").select(personaSelectColumns()).eq("cat_id", cat.id).maybeSingle(),
       client
         .from("cat_voices")
         .select(
@@ -728,7 +813,7 @@ export async function loadNekoFromCloud() {
     updatedAt: isoToMs(cat.updated_at),
   };
 
-  const personaRow = personaData as PersonaRow | null;
+  const personaRow = personaData as unknown as PersonaRow | null;
   const persona: CatPersona | null = personaRow
     ? {
         cloudId: personaRow.id,
@@ -750,6 +835,7 @@ export async function loadNekoFromCloud() {
         observations: personaRow.observations ?? [],
         evidence: personaRow.evidence ?? [],
         dailyMood: personaRow.daily_mood,
+        generation: personaGenerationFromRow(personaRow),
         savedAt: isoToMs(personaRow.updated_at),
       }
     : null;

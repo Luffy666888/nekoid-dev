@@ -628,6 +628,25 @@ async function upsertPersona(
         daily_mood: cleanString(value.dailyMood, "今天好像有点想你"),
         provider: cleanString(value.provider, "ios-native"),
         model: cleanString(value.model, "native-onboarding-v1"),
+        ...(value.generation && typeof value.generation === "object"
+          ? {
+              generation_id: cleanString((value.generation as JsonRecord).generationId) || null,
+              input_hash: cleanString((value.generation as JsonRecord).inputHash) || null,
+              prompt_version: (value.generation as JsonRecord).promptVersion ?? null,
+              generation_input: (value.generation as JsonRecord).rawInputs ?? null,
+              stage_outputs: {
+                behaviorProfile: (value.generation as JsonRecord).behaviorProfile,
+                groundedTraits: (value.generation as JsonRecord).groundedTraits,
+                unsupportedClaims: (value.generation as JsonRecord).unsupportedClaims,
+                insights: (value.generation as JsonRecord).insights,
+                finalCopy: (value.generation as JsonRecord).finalCopy,
+              },
+              eval_result: (value.generation as JsonRecord).evalResult ?? null,
+              stage_logs: (value.generation as JsonRecord).stageLogs ?? null,
+              generation_model: cleanString((value.generation as JsonRecord).model) || null,
+              generation_retry_count: Number((value.generation as JsonRecord).retryCount ?? 0),
+            }
+          : {}),
       },
       { onConflict: "cat_id" },
     )

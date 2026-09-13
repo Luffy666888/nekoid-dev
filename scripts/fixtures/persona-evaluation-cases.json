@@ -1,0 +1,148 @@
+[
+  {
+    "id": "liuliu_high_social_boundary",
+    "name": "六六 case",
+    "profile": {
+      "name": "六六",
+      "gender": "小母猫",
+      "ageStage": "青年猫",
+      "quiz": { "0": "a", "1": "b", "2": "a", "3": "b", "4": "a", "5": "a", "6": "b", "7": "c" },
+      "updatedAt": 0
+    },
+    "expectedTraits": ["亲近但有边界", "好奇但谨慎", "先观察再行动"],
+    "forbiddenClaims": ["固定时间巡视", "固定路线巡查", "每天按点出现"]
+  },
+  {
+    "id": "high_social_high_attachment",
+    "profile": { "name": "奶盖", "gender": "小公猫", "ageStage": "幼猫", "quiz": { "0": "a", "1": "a", "2": "a", "3": "a", "4": "c", "5": "c", "6": "a", "7": "a" }, "updatedAt": 0 },
+    "expectedTraits": ["主动亲近"],
+    "forbiddenClaims": ["主人不在时一定", "每天"]
+  },
+  {
+    "id": "high_social_high_boundary",
+    "profile": { "name": "糯米", "gender": "小母猫", "ageStage": "成熟猫", "quiz": { "0": "a", "1": "b", "2": "a", "3": "b", "4": "b", "5": "a", "6": "b", "7": "c" }, "updatedAt": 0 },
+    "expectedTraits": ["亲近但有边界"],
+    "forbiddenClaims": ["控场", "固定位置"]
+  },
+  {
+    "id": "slow_warm_high_attachment",
+    "profile": { "name": "芝麻", "gender": "小公猫", "ageStage": "青年猫", "quiz": { "0": "c", "1": "b", "2": "c", "3": "b", "4": "a", "5": "b", "6": "b", "7": "c" }, "updatedAt": 0 },
+    "expectedTraits": ["安静表达亲近", "先观察再行动"],
+    "forbiddenClaims": ["陌生人都讨厌", "每天"]
+  },
+  {
+    "id": "high_independent_low_interaction",
+    "profile": { "name": "煤球", "gender": "小母猫", "ageStage": "成熟猫", "quiz": { "0": "c", "1": "c", "2": "b", "3": "b", "4": "b", "5": "a", "6": "c", "7": "c" }, "updatedAt": 0 },
+    "expectedTraits": ["亲近但有边界"],
+    "forbiddenClaims": ["不爱主人", "主人不在时一定"]
+  },
+  {
+    "id": "high_curiosity_high_caution",
+    "profile": { "name": "阿福", "gender": "小公猫", "ageStage": "青年猫", "quiz": { "0": "b", "1": "b", "2": "b", "3": "c", "4": "a", "5": "a", "6": "b", "7": "b" }, "updatedAt": 0 },
+    "expectedTraits": ["好奇但谨慎", "先观察再行动"],
+    "forbiddenClaims": ["固定路线", "巡查"]
+  },
+  {
+    "id": "low_curiosity_low_caution",
+    "profile": { "name": "豆包", "gender": "小母猫", "ageStage": "资深猫", "quiz": { "0": "b", "1": "c", "2": "b", "3": "b", "4": "c", "5": "b", "6": "c", "7": "c" }, "updatedAt": 0 },
+    "expectedTraits": ["亲近但有边界"],
+    "forbiddenClaims": ["生活秩序严格", "每天按点"]
+  },
+  {
+    "id": "direct_need_expression",
+    "profile": { "name": "小满", "gender": "小公猫", "ageStage": "幼猫", "quiz": { "0": "a", "1": "a", "2": "a", "3": "a", "4": "b", "5": "b", "6": "a", "7": "a" }, "updatedAt": 0 },
+    "expectedTraits": ["主动亲近"],
+    "forbiddenClaims": ["营业", "发令"]
+  },
+  {
+    "id": "subtle_need_expression",
+    "profile": { "name": "布丁", "gender": "小母猫", "ageStage": "成熟猫", "quiz": { "0": "b", "1": "b", "2": "c", "3": "b", "4": "a", "5": "a", "6": "b", "7": "c" }, "updatedAt": 0 },
+    "expectedTraits": ["安静表达亲近", "亲近但有边界"],
+    "forbiddenClaims": ["克制讨关注", "稳态"]
+  },
+  {
+    "id": "likes_touch_closeness",
+    "profile": { "name": "汤圆", "gender": "小公猫", "ageStage": "青年猫", "quiz": { "0": "a", "1": "a", "2": "a", "3": "a", "4": "c", "5": "c", "6": "a", "7": "a" }, "updatedAt": 0 },
+    "expectedTraits": ["主动亲近"],
+    "forbiddenClaims": ["永远", "每天"]
+  },
+  {
+    "id": "same_room_not_touch",
+    "profile": { "name": "可可", "gender": "小母猫", "ageStage": "成熟猫", "quiz": { "0": "b", "1": "b", "2": "b", "3": "b", "4": "a", "5": "a", "6": "b", "7": "c" }, "updatedAt": 0 },
+    "expectedTraits": ["亲近但有边界", "安静表达亲近"],
+    "forbiddenClaims": ["端庄定点", "固定位置"]
+  },
+  {
+    "id": "rejects_body_contact",
+    "profile": { "name": "花卷", "gender": "小母猫", "ageStage": "青年猫", "quiz": { "0": "b", "1": "b", "2": "b", "3": "c", "4": "a", "5": "a", "6": "c", "7": "c" }, "updatedAt": 0 },
+    "expectedTraits": ["亲近但有边界"],
+    "forbiddenClaims": ["不喜欢主人", "一定"]
+  },
+  {
+    "id": "high_tolerance",
+    "profile": { "name": "橘子", "gender": "小公猫", "ageStage": "成熟猫", "quiz": { "0": "a", "1": "a", "2": "a", "3": "a", "4": "c", "5": "c", "6": "a", "7": "b" }, "updatedAt": 0 },
+    "expectedTraits": ["主动亲近"],
+    "forbiddenClaims": ["永远允许", "没有边界"]
+  },
+  {
+    "id": "stranger_fear",
+    "profile": { "name": "乌梅", "gender": "小母猫", "ageStage": "青年猫", "quiz": { "0": "c", "1": "b", "2": "c", "3": "b", "4": "a", "5": "a", "6": "b", "7": "c" }, "updatedAt": 0 },
+    "expectedTraits": ["先观察再行动", "亲近但有边界"],
+    "forbiddenClaims": ["讨厌陌生人", "一定躲"]
+  },
+  {
+    "id": "stranger_curiosity",
+    "profile": { "name": "栗子", "gender": "小公猫", "ageStage": "幼猫", "quiz": { "0": "a", "1": "b", "2": "b", "3": "c", "4": "b", "5": "b", "6": "a", "7": "b" }, "updatedAt": 0 },
+    "expectedTraits": ["好奇但谨慎"],
+    "forbiddenClaims": ["社交牛", "营业"]
+  },
+  {
+    "id": "mixed_playful_boundary",
+    "profile": { "name": "年糕", "gender": "小母猫", "ageStage": "青年猫", "quiz": { "0": "a", "1": "a", "2": "b", "3": "c", "4": "b", "5": "a", "6": "b", "7": "b" }, "updatedAt": 0 },
+    "expectedTraits": ["亲近但有边界", "好奇但谨慎"],
+    "forbiddenClaims": ["控场", "策略性"]
+  },
+  {
+    "id": "mixed_quiet_attached",
+    "profile": { "name": "松子", "gender": "小公猫", "ageStage": "资深猫", "quiz": { "0": "c", "1": "c", "2": "c", "3": "b", "4": "a", "5": "b", "6": "b", "7": "c" }, "updatedAt": 0 },
+    "expectedTraits": ["安静表达亲近"],
+    "forbiddenClaims": ["慢慢巡视派", "固定路线"]
+  },
+  {
+    "id": "mixed_alert_affectionate",
+    "profile": { "name": "泡芙", "gender": "小母猫", "ageStage": "成熟猫", "quiz": { "0": "b", "1": "b", "2": "a", "3": "b", "4": "a", "5": "a", "6": "b", "7": "c" }, "updatedAt": 0 },
+    "expectedTraits": ["亲近但有边界", "先观察再行动"],
+    "forbiddenClaims": ["固定时间", "每天"]
+  },
+  {
+    "id": "mixed_expressive_play",
+    "profile": { "name": "麻薯", "gender": "小公猫", "ageStage": "青年猫", "quiz": { "0": "a", "1": "a", "2": "a", "3": "c", "4": "b", "5": "b", "6": "a", "7": "b" }, "updatedAt": 0 },
+    "expectedTraits": ["主动亲近", "好奇但谨慎"],
+    "forbiddenClaims": ["精准互动", "高质"]
+  },
+  {
+    "id": "mixed_low_evidence",
+    "profile": { "name": "小雪", "gender": "小母猫", "ageStage": "青年猫", "quiz": { "0": "b", "1": "b", "2": null, "3": null, "4": "b", "5": null, "6": null, "7": null }, "updatedAt": 0 },
+    "expectedTraits": [],
+    "forbiddenClaims": ["确定", "一定", "每天"]
+  },
+  {
+    "id": "mixed_video_observation",
+    "profile": { "name": "皮蛋", "gender": "小公猫", "ageStage": "青年猫", "quiz": { "0": "b", "1": "b", "2": "b", "3": "c", "4": "a", "5": "a", "6": "b", "7": "b" }, "updatedAt": 0 },
+    "videoObservations": [
+      {
+        "clipId": "clip-1",
+        "label": "玩耍",
+        "duration": "00:08",
+        "containsCat": true,
+        "summary": "它先盯着玩具看了一会，后面身体有准备靠近的趋势。",
+        "movement": "从停住观察到身体微微前移。",
+        "behaviorSignals": ["盯着玩具", "先看再动"],
+        "personalityEvidence": [{ "fact": "注意力持续放在玩具上。", "interpretation": "适合辅助判断先观察再行动。" }],
+        "confidence": "high"
+      }
+    ],
+    "expectedTraits": ["好奇但谨慎", "视频里也会先观察"],
+    "forbiddenClaims": ["长期监控", "每天"]
+  }
+]

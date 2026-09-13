@@ -14,7 +14,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test:ai": "node --test scripts/test-bytecat.mjs",
-    "test:ai:live": "node scripts/test-bytecat-live.mjs"
+    "test:ai:live": "node scripts/test-bytecat-live.mjs",
+    "test:persona": "node scripts/evaluate-persona-cases.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
