@@ -98,6 +98,8 @@ type SaveOptions = {
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 const PROFILE_COLUMNS =
   "id,email,display_name,avatar_object_key,onboarding_completed_at,created_at,updated_at";
+const LEGACY_DEFAULT_DISPLAY_NAME = "喵一下用户";
+const EMPTY_ACCOUNT_DISPLAY_NAME = "猫咪主人";
 
 function requireSupabaseClient(): SupabaseClient {
   const client = getSupabaseBrowserClient();
@@ -199,16 +201,47 @@ export function isNekoCloudConfigured() {
   return Boolean(getSupabasePublicConfig());
 }
 
-function fallbackDisplayName(user: User) {
+function fallbackDisplayName(user: User, preferredDisplayName?: unknown) {
+  const preferred = typeof preferredDisplayName === "string" ? preferredDisplayName.trim() : "";
+  if (preferred) return preferred.slice(0, 40);
+
   const metadataName = typeof user.user_metadata?.name === "string" ? user.user_metadata.name : "";
-  return metadataName.trim() || user.email?.split("@")[0] || "喵一下用户";
+  return metadataName.trim() || user.email?.split("@")[0] || EMPTY_ACCOUNT_DISPLAY_NAME;
 }
 
-function mapProfileRow(row: Record<string, unknown>): NekoUserProfile {
+function isReplaceableDefaultDisplayName(value: unknown) {
+  const displayName = typeof value === "string" ? value.trim() : "";
+  return (
+    !displayName ||
+    displayName === LEGACY_DEFAULT_DISPLAY_NAME ||
+    displayName === EMPTY_ACCOUNT_DISPLAY_NAME
+  );
+}
+
+function displayNameForProfile(
+  row: Record<string, unknown>,
+  user: User,
+  preferredDisplayName?: unknown,
+) {
+  const storedDisplayName = typeof row.display_name === "string" ? row.display_name.trim() : "";
+  return isReplaceableDefaultDisplayName(storedDisplayName)
+    ? fallbackDisplayName(user, preferredDisplayName)
+    : storedDisplayName;
+}
+
+function localCatDisplayName() {
+  return getCatProfile()?.name?.trim() || null;
+}
+
+function mapProfileRow(
+  row: Record<string, unknown>,
+  user: User,
+  preferredDisplayName?: unknown,
+): NekoUserProfile {
   return {
     id: String(row.id),
     email: typeof row.email === "string" ? row.email : null,
-    displayName: typeof row.display_name === "string" ? row.display_name : null,
+    displayName: displayNameForProfile(row, user, preferredDisplayName),
     avatarObjectKey: typeof row.avatar_object_key === "string" ? row.avatar_object_key : null,
     onboardingCompletedAt:
       typeof row.onboarding_completed_at === "string" ? row.onboarding_completed_at : null,
@@ -218,6 +251,7 @@ function mapProfileRow(row: Record<string, unknown>): NekoUserProfile {
 }
 
 async function loadOrCreateNekoUserProfile(client: SupabaseClient, user: User) {
+  const preferredDisplayName = localCatDisplayName();
   const { data: existingProfile, error: selectError } = await client
     .from("profiles")
     .select(PROFILE_COLUMNS)
@@ -225,14 +259,29 @@ async function loadOrCreateNekoUserProfile(client: SupabaseClient, user: User) {
     .maybeSingle();
 
   if (selectError) throw selectError;
-  if (existingProfile) return mapProfileRow(existingProfile as Record<string, unknown>);
+  if (existingProfile) {
+    const profile = existingProfile as Record<string, unknown>;
+    if (preferredDisplayName && isReplaceableDefaultDisplayName(profile.display_name)) {
+      const { data: updatedProfile, error: updateError } = await client
+        .from("profiles")
+        .update({ display_name: preferredDisplayName })
+        .eq("id", user.id)
+        .select(PROFILE_COLUMNS)
+        .single();
+
+      if (updateError) throw updateError;
+      return mapProfileRow(updatedProfile as Record<string, unknown>, user, preferredDisplayName);
+    }
+
+    return mapProfileRow(profile, user, preferredDisplayName);
+  }
 
   const { data, error } = await client
     .from("profiles")
     .insert({
       id: user.id,
       email: user.email ?? null,
-      display_name: fallbackDisplayName(user),
+      display_name: fallbackDisplayName(user, preferredDisplayName),
     })
     .select(PROFILE_COLUMNS)
     .single();
@@ -246,13 +295,13 @@ async function loadOrCreateNekoUserProfile(client: SupabaseClient, user: User) {
         .single();
 
       if (racedSelectError) throw racedSelectError;
-      return mapProfileRow(racedProfile as Record<string, unknown>);
+      return mapProfileRow(racedProfile as Record<string, unknown>, user, preferredDisplayName);
     }
 
     throw error;
   }
 
-  return mapProfileRow(data as Record<string, unknown>);
+  return mapProfileRow(data as Record<string, unknown>, user, preferredDisplayName);
 }
 
 async function countOwnedRows(
@@ -377,7 +426,8 @@ export async function loadNekoUserProfile() {
 export async function updateNekoUserProfile(displayName: string) {
   const client = requireSupabaseClient();
   const user = await requireSupabaseUser(client);
-  const nextDisplayName = displayName.trim().slice(0, 40) || fallbackDisplayName(user);
+  const nextDisplayName =
+    displayName.trim().slice(0, 40) || fallbackDisplayName(user, localCatDisplayName());
 
   const { error: authError } = await client.auth.updateUser({
     data: { name: nextDisplayName },
@@ -398,7 +448,7 @@ export async function updateNekoUserProfile(displayName: string) {
     .single();
 
   if (error) throw error;
-  return mapProfileRow(data as Record<string, unknown>);
+  return mapProfileRow(data as Record<string, unknown>, user, localCatDisplayName());
 }
 
 export async function loadNekoAccountSummary(): Promise<NekoAccountSummary> {
@@ -446,11 +496,26 @@ async function saveProfileAndCat(client: SupabaseClient, user: User, profile: Ca
     currentAvatarObjectKey,
   );
 
+  const { data: existingProfile, error: existingProfileError } = await client
+    .from("profiles")
+    .select("display_name")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (existingProfileError) throw existingProfileError;
+
+  const existingDisplayName =
+    existingProfile && typeof existingProfile.display_name === "string"
+      ? existingProfile.display_name
+      : "";
+  const displayName = isReplaceableDefaultDisplayName(existingDisplayName)
+    ? fallbackDisplayName(user, profile.name)
+    : existingDisplayName.trim();
+
   const { error: profileError } = await client.from("profiles").upsert(
     {
       id: user.id,
       email: user.email ?? null,
-      display_name: user.user_metadata?.name ?? user.email ?? null,
+      display_name: displayName,
       avatar_object_key: avatarObjectKey ?? null,
       onboarding_completed_at: new Date().toISOString(),
     },

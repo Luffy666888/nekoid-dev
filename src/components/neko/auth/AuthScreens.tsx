@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, type PropsWithChildren } from "react";
 import { toast } from "sonner";
 
 import { CatAvatar, ScreenShell, StatusBar } from "@/components/neko/app/AppShowcase";
-import { getCatPersona } from "@/components/neko/catProfileStore";
+import { getCatPersona, getCatProfile } from "@/components/neko/catProfileStore";
 import {
   loadNekoAccountSummary,
   loadNekoFromCloud,
@@ -16,10 +16,14 @@ import {
 } from "@/lib/neko-cloud";
 
 function authErrorMessage(error: unknown) {
-  const code = typeof error === "object" && error && "code" in error ? String((error as { code?: unknown }).code) : "";
+  const code =
+    typeof error === "object" && error && "code" in error
+      ? String((error as { code?: unknown }).code)
+      : "";
   const message = error instanceof Error ? error.message : "";
 
-  if (code === "over_email_send_rate_limit" || message.includes("rate")) return "验证码发送太频繁了，稍等一会儿再试";
+  if (code === "over_email_send_rate_limit" || message.includes("rate"))
+    return "验证码发送太频繁了，稍等一会儿再试";
   if (code === "otp_expired" || message.includes("expired")) return "验证码已过期，请重新获取";
   if (message.includes("OTP_CODE_INVALID")) return "请输入 6 位邮箱验证码";
   if (message.includes("EMAIL_REQUIRED")) return "请输入邮箱";
@@ -30,21 +34,33 @@ function safeEmail(value: string) {
   return value.trim().toLowerCase();
 }
 
-const AUTH_LOGIN_BG = "linear-gradient(180deg, oklch(0.985 0.014 60) 0%, oklch(0.965 0.032 320) 55%, oklch(0.95 0.04 285) 100%)";
+const AUTH_LOGIN_BG =
+  "linear-gradient(180deg, oklch(0.985 0.014 60) 0%, oklch(0.965 0.032 320) 55%, oklch(0.95 0.04 285) 100%)";
 
-function AuthLoginFrame({ children, bg = "var(--gradient-cream)" }: PropsWithChildren<{ bg?: string }>) {
+function AuthLoginFrame({
+  children,
+  bg = "var(--gradient-cream)",
+}: PropsWithChildren<{ bg?: string }>) {
   return (
     <div className="relative h-[100dvh] overflow-hidden" style={{ background: bg }}>
-      <div aria-hidden className="pointer-events-none fixed inset-0 opacity-80" style={{ background: "var(--gradient-aura)" }} />
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 opacity-80"
+        style={{ background: "var(--gradient-aura)" }}
+      />
       <div
         aria-hidden
         className="pointer-events-none fixed inset-0 opacity-[0.06]"
         style={{
-          backgroundImage: "radial-gradient(circle at 1px 1px, oklch(0.78 0.11 305 / .35) 1px, transparent 0)",
+          backgroundImage:
+            "radial-gradient(circle at 1px 1px, oklch(0.78 0.11 305 / .35) 1px, transparent 0)",
           backgroundSize: "32px 32px",
         }}
       />
-      <div className="relative z-10 mx-auto h-[100dvh] w-full max-w-[480px] overflow-hidden" style={{ transform: "translateZ(0)" }}>
+      <div
+        className="relative z-10 mx-auto h-[100dvh] w-full max-w-[480px] overflow-hidden"
+        style={{ transform: "translateZ(0)" }}
+      >
         {children}
       </div>
     </div>
@@ -117,12 +133,19 @@ export function AuthLoginScreen() {
         <ScreenShell>
           <StatusBar />
           <div className="absolute inset-0 flex items-center justify-center px-7">
-            <div className="w-full rounded-[28px] bg-white/85 p-5 text-center backdrop-blur" style={{ boxShadow: "var(--shadow-soft)" }}>
+            <div
+              className="w-full rounded-[28px] bg-white/85 p-5 text-center backdrop-blur"
+              style={{ boxShadow: "var(--shadow-soft)" }}
+            >
               <div className="text-[18px] font-medium text-foreground">云端登录暂不可用</div>
               <p className="mt-2 text-[12px] leading-relaxed text-[oklch(0.55_0.06_300)]">
                 登录服务正在配置中，请稍后再试。
               </p>
-              <Link to="/app/me" className="mt-5 inline-flex rounded-full px-5 py-2.5 text-[12px] font-medium text-white" style={{ background: "var(--gradient-cta)" }}>
+              <Link
+                to="/app/me"
+                className="mt-5 inline-flex rounded-full px-5 py-2.5 text-[12px] font-medium text-white"
+                style={{ background: "var(--gradient-cta)" }}
+              >
                 返回我的
               </Link>
             </div>
@@ -138,13 +161,31 @@ export function AuthLoginScreen() {
         <ScreenShell>
           <StatusBar />
           <div className="absolute inset-0 flex items-center justify-center px-7">
-            <div className="w-full rounded-[28px] bg-white/85 p-5 text-center backdrop-blur" style={{ boxShadow: "var(--shadow-soft)" }}>
-              <div className="mx-auto mb-4 w-fit"><CatAvatar size={68} usePhoto /></div>
+            <div
+              className="w-full rounded-[28px] bg-white/85 p-5 text-center backdrop-blur"
+              style={{ boxShadow: "var(--shadow-soft)" }}
+            >
+              <div className="mx-auto mb-4 w-fit">
+                <CatAvatar size={68} usePhoto />
+              </div>
               <div className="text-[18px] font-medium text-foreground">已经登录啦</div>
-              <p className="mt-2 truncate text-[12px] text-[oklch(0.55_0.06_300)]">{auth.user.email}</p>
+              <p className="mt-2 truncate text-[12px] text-[oklch(0.55_0.06_300)]">
+                {auth.user.email}
+              </p>
               <div className="mt-5 grid grid-cols-2 gap-2">
-                <Link to="/app/account" className="rounded-full bg-white px-4 py-2.5 text-[12px] text-foreground">账号与数据</Link>
-                <Link to="/app/me" className="rounded-full px-4 py-2.5 text-[12px] font-medium text-white" style={{ background: "var(--gradient-cta)" }}>返回我的</Link>
+                <Link
+                  to="/app/account"
+                  className="rounded-full bg-white px-4 py-2.5 text-[12px] text-foreground"
+                >
+                  账号与数据
+                </Link>
+                <Link
+                  to="/app/me"
+                  className="rounded-full px-4 py-2.5 text-[12px] font-medium text-white"
+                  style={{ background: "var(--gradient-cta)" }}
+                >
+                  返回我的
+                </Link>
               </div>
             </div>
           </div>
@@ -158,20 +199,33 @@ export function AuthLoginScreen() {
       <ScreenShell bg={AUTH_LOGIN_BG}>
         <StatusBar />
         <div className="absolute inset-0 overflow-y-auto scrollbar-none px-6 pt-[72px] pb-12">
-          <Link to="/app/me" className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/80 text-[oklch(0.5_0.1_320)] backdrop-blur" style={{ boxShadow: "var(--shadow-soft)" }}>
+          <Link
+            to="/app/me"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/80 text-[oklch(0.5_0.1_320)] backdrop-blur"
+            style={{ boxShadow: "var(--shadow-soft)" }}
+          >
             ‹
           </Link>
 
           <div className="mt-8">
-            <div className="text-[10px] tracking-[0.45em] text-[oklch(0.58_0.08_320)]">喵一下账号</div>
-            <h1 className="mt-3 text-[28px] font-light leading-tight text-foreground">邮箱验证码登录</h1>
+            <div className="text-[10px] tracking-[0.45em] text-[oklch(0.58_0.08_320)]">
+              喵一下账号
+            </div>
+            <h1 className="mt-3 text-[28px] font-light leading-tight text-foreground">
+              邮箱验证码登录
+            </h1>
             <p className="mt-2 text-[12.5px] leading-relaxed text-[oklch(0.55_0.06_300)]">
               输入邮箱，我们会给你发送 6 位验证码。
             </p>
           </div>
 
-          <div className="mt-8 rounded-[28px] bg-white/85 p-4 backdrop-blur" style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.72)" }}>
-            <label className="text-[10px] tracking-[0.32em] text-[oklch(0.55_0.06_300)]">邮箱</label>
+          <div
+            className="mt-8 rounded-[28px] bg-white/85 p-4 backdrop-blur"
+            style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.72)" }}
+          >
+            <label className="text-[10px] tracking-[0.32em] text-[oklch(0.55_0.06_300)]">
+              邮箱
+            </label>
             <input
               value={email}
               onChange={(event) => setEmail(event.target.value)}
@@ -187,12 +241,20 @@ export function AuthLoginScreen() {
               className="mt-3 w-full rounded-full px-5 py-3 text-[13px] font-medium text-white disabled:opacity-60"
               style={{ background: "var(--gradient-cta)" }}
             >
-              {busy === "send" ? "发送中…" : cooldown > 0 ? `${cooldown}s 后可重发` : sentEmail ? "重新发送验证码" : "发送验证码"}
+              {busy === "send"
+                ? "发送中…"
+                : cooldown > 0
+                  ? `${cooldown}s 后可重发`
+                  : sentEmail
+                    ? "重新发送验证码"
+                    : "发送验证码"}
             </button>
 
             {sentEmail && (
               <div className="mt-5">
-                <label className="text-[10px] tracking-[0.32em] text-[oklch(0.55_0.06_300)]">6 位验证码</label>
+                <label className="text-[10px] tracking-[0.32em] text-[oklch(0.55_0.06_300)]">
+                  6 位验证码
+                </label>
                 <input
                   value={code}
                   onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
@@ -209,7 +271,9 @@ export function AuthLoginScreen() {
                   disabled={busy !== null || code.length !== 6}
                   onClick={verifyCode}
                   className="mt-3 w-full rounded-full px-5 py-3 text-[13px] font-medium text-white disabled:opacity-60"
-                  style={{ background: "linear-gradient(135deg, oklch(0.70 0.14 305), oklch(0.76 0.11 0))" }}
+                  style={{
+                    background: "linear-gradient(135deg, oklch(0.70 0.14 305), oklch(0.76 0.11 0))",
+                  }}
                 >
                   {busy === "verify" ? "验证中…" : "完成登录"}
                 </button>
@@ -235,6 +299,9 @@ export function AccountScreen() {
   const [summary, setSummary] = useState<NekoAccountSummary | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [busy, setBusy] = useState<"load" | "saveName" | "signout" | null>("load");
+  const catName = getCatProfile()?.name?.trim() || "";
+  const accountDisplayName = summary?.profile.displayName || catName || "猫咪主人";
+  const accountDisplayPlaceholder = catName || "猫咪昵称";
 
   const reload = async () => {
     setBusy("load");
@@ -253,7 +320,6 @@ export function AccountScreen() {
   useEffect(() => {
     if (auth.status === "signed-in") void reload();
     if (auth.status === "signed-out" || auth.status === "unconfigured") setBusy(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.status]);
 
   const run = async (kind: Exclude<typeof busy, "load" | null>, task: () => Promise<void>) => {
@@ -273,7 +339,9 @@ export function AccountScreen() {
     return (
       <ScreenShell>
         <StatusBar />
-        <div className="absolute inset-0 flex items-center justify-center text-[13px] text-[oklch(0.55_0.06_300)]">正在读取账号信息…</div>
+        <div className="absolute inset-0 flex items-center justify-center text-[13px] text-[oklch(0.55_0.06_300)]">
+          正在读取账号信息…
+        </div>
       </ScreenShell>
     );
   }
@@ -283,10 +351,19 @@ export function AccountScreen() {
       <ScreenShell>
         <StatusBar />
         <div className="absolute inset-0 flex items-center justify-center px-7">
-          <div className="w-full rounded-[28px] bg-white/85 p-5 text-center backdrop-blur" style={{ boxShadow: "var(--shadow-soft)" }}>
+          <div
+            className="w-full rounded-[28px] bg-white/85 p-5 text-center backdrop-blur"
+            style={{ boxShadow: "var(--shadow-soft)" }}
+          >
             <div className="text-[18px] font-medium text-foreground">需要先登录</div>
-            <p className="mt-2 text-[12px] leading-relaxed text-[oklch(0.55_0.06_300)]">登录后才能管理账号数据。</p>
-            <Link to="/auth/login" className="mt-5 inline-flex rounded-full px-5 py-2.5 text-[12px] font-medium text-white" style={{ background: "var(--gradient-cta)" }}>
+            <p className="mt-2 text-[12px] leading-relaxed text-[oklch(0.55_0.06_300)]">
+              登录后才能管理账号数据。
+            </p>
+            <Link
+              to="/auth/login"
+              className="mt-5 inline-flex rounded-full px-5 py-2.5 text-[12px] font-medium text-white"
+              style={{ background: "var(--gradient-cta)" }}
+            >
               去邮箱登录
             </Link>
           </div>
@@ -300,19 +377,34 @@ export function AccountScreen() {
       <StatusBar />
       <div className="absolute inset-0 overflow-y-auto scrollbar-none px-5 pt-[52px] pb-10">
         <div className="flex items-center justify-between">
-          <button onClick={() => navigate({ to: "/app/me" })} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/80 text-[oklch(0.5_0.1_320)] backdrop-blur" style={{ boxShadow: "var(--shadow-soft)" }}>
+          <button
+            onClick={() => navigate({ to: "/app/me" })}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/80 text-[oklch(0.5_0.1_320)] backdrop-blur"
+            style={{ boxShadow: "var(--shadow-soft)" }}
+          >
             ‹
           </button>
           <div className="text-[13px] font-medium text-foreground">账号与数据</div>
           <div className="h-9 w-9" />
         </div>
 
-        <div className="mt-5 overflow-hidden rounded-[26px] p-5" style={{ background: "linear-gradient(135deg, oklch(0.96 0.035 320), oklch(0.95 0.04 280))", boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}>
+        <div
+          className="mt-5 overflow-hidden rounded-[26px] p-5"
+          style={{
+            background: "linear-gradient(135deg, oklch(0.96 0.035 320), oklch(0.95 0.04 280))",
+            boxShadow: "var(--shadow-soft)",
+            border: "1px solid oklch(1 0 0 / 0.7)",
+          }}
+        >
           <div className="flex items-center gap-4">
             <CatAvatar size={68} usePhoto />
             <div className="min-w-0 flex-1">
-              <div className="truncate text-[17px] font-medium text-foreground">{summary?.profile.displayName || "喵一下用户"}</div>
-              <div className="mt-1 truncate text-[11px] text-[oklch(0.55_0.06_300)]">{auth.user.email}</div>
+              <div className="truncate text-[17px] font-medium text-foreground">
+                {accountDisplayName}
+              </div>
+              <div className="mt-1 truncate text-[11px] text-[oklch(0.55_0.06_300)]">
+                {auth.user.email}
+              </div>
             </div>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-2">
@@ -321,22 +413,27 @@ export function AccountScreen() {
           </div>
         </div>
 
-        <div className="mt-4 rounded-[22px] bg-white/80 p-4 backdrop-blur" style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}>
+        <div
+          className="mt-4 rounded-[22px] bg-white/80 p-4 backdrop-blur"
+          style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}
+        >
           <label className="text-[10px] tracking-[0.32em] text-[oklch(0.55_0.06_300)]">昵称</label>
           <input
             value={displayName}
             onChange={(event) => setDisplayName(event.target.value.slice(0, 40))}
-            placeholder="喵一下用户"
+            placeholder={accountDisplayPlaceholder}
             className="mt-2 block w-full rounded-2xl bg-[oklch(0.98_0.012_320)] px-4 py-3 text-[13px] text-foreground outline-none focus:ring-2 focus:ring-[oklch(0.85_0.08_320_/_0.5)]"
           />
           <button
             disabled={busy === "saveName"}
-            onClick={() => void run("saveName", async () => {
-              const profile = await updateNekoUserProfile(displayName);
-              setSummary((current) => current ? { ...current, profile } : current);
-              setDisplayName(profile.displayName ?? "");
-              toast.success("昵称已更新");
-            })}
+            onClick={() =>
+              void run("saveName", async () => {
+                const profile = await updateNekoUserProfile(displayName);
+                setSummary((current) => (current ? { ...current, profile } : current));
+                setDisplayName(profile.displayName ?? "");
+                toast.success("昵称已更新");
+              })
+            }
             className="mt-3 w-full rounded-full px-5 py-3 text-[12.5px] font-medium text-white disabled:opacity-60"
             style={{ background: "var(--gradient-cta)" }}
           >
@@ -344,18 +441,25 @@ export function AccountScreen() {
           </button>
         </div>
 
-        <div className="mt-4 rounded-[22px] bg-white/80 p-4 backdrop-blur" style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}>
+        <div
+          className="mt-4 rounded-[22px] bg-white/80 p-4 backdrop-blur"
+          style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}
+        >
           <div className="text-[10px] tracking-[0.32em] text-[oklch(0.55_0.06_300)]">自动同步</div>
-          <p className="mt-2 text-[11.5px] leading-relaxed text-foreground/75">登录后，猫咪档案、人格和心声会自动绑定到当前账号。换设备登录时，会优先读取账号里的历史档案。</p>
+          <p className="mt-2 text-[11.5px] leading-relaxed text-foreground/75">
+            登录后，猫咪档案、人格和心声会自动绑定到当前账号。换设备登录时，会优先读取账号里的历史档案。
+          </p>
         </div>
 
         <button
           disabled={busy === "signout"}
-          onClick={() => void run("signout", async () => {
-            await signOutNekoCloud();
-            toast.success("已退出登录");
-            await navigate({ to: "/app/me", replace: true });
-          })}
+          onClick={() =>
+            void run("signout", async () => {
+              await signOutNekoCloud();
+              toast.success("已退出登录");
+              await navigate({ to: "/app/me", replace: true });
+            })
+          }
           className="mt-5 w-full rounded-full bg-white/85 px-5 py-3.5 text-[13px] text-[oklch(0.55_0.06_300)] disabled:opacity-60"
           style={{ boxShadow: "var(--shadow-soft)" }}
         >

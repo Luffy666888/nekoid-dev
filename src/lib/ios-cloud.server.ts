@@ -80,6 +80,8 @@ const VOICE_COLUMNS =
   "id,text,subtext,analysis,analysis_summary,personality_interpretation,share_headline,share_insight,share_tags,location,tags,media_object_key,media_type,aspect,video_duration,grad,local_time_label,created_at";
 const PROFILE_COLUMNS =
   "id,email,display_name,avatar_object_key,onboarding_completed_at,created_at,updated_at";
+const LEGACY_DEFAULT_DISPLAY_NAME = "喵一下用户";
+const EMPTY_ACCOUNT_DISPLAY_NAME = "猫咪主人";
 
 export class IOSCloudError extends Error {
   constructor(
@@ -214,8 +216,28 @@ function cleanQuiz(value: unknown) {
   );
 }
 
-function fallbackDisplayName(user: IOSUser) {
-  return user.email?.split("@")[0] || "喵一下用户";
+function fallbackDisplayName(user: IOSUser, preferredDisplayName?: unknown) {
+  const preferred = cleanString(preferredDisplayName).slice(0, 40);
+  if (preferred) return preferred;
+
+  const emailName = user.email?.split("@")[0]?.trim();
+  return emailName || EMPTY_ACCOUNT_DISPLAY_NAME;
+}
+
+function isReplaceableDefaultDisplayName(value: unknown) {
+  const displayName = cleanString(value);
+  return (
+    !displayName ||
+    displayName === LEGACY_DEFAULT_DISPLAY_NAME ||
+    displayName === EMPTY_ACCOUNT_DISPLAY_NAME
+  );
+}
+
+function displayNameForProfile(row: JsonRecord, user: IOSUser, preferredDisplayName?: unknown) {
+  const storedDisplayName = cleanString(row.display_name);
+  return isReplaceableDefaultDisplayName(storedDisplayName)
+    ? fallbackDisplayName(user, preferredDisplayName)
+    : storedDisplayName;
 }
 
 function isoToMs(value: string | null | undefined) {
@@ -335,12 +357,11 @@ async function translateMediaStorageError<T>(operation: () => Promise<T>) {
   }
 }
 
-function mapProfileRow(row: JsonRecord, user: IOSUser) {
+function mapProfileRow(row: JsonRecord, user: IOSUser, preferredDisplayName?: unknown) {
   return {
     id: String(row.id ?? user.id),
     email: typeof row.email === "string" ? row.email : (user.email ?? null),
-    displayName:
-      typeof row.display_name === "string" ? row.display_name : fallbackDisplayName(user),
+    displayName: displayNameForProfile(row, user, preferredDisplayName),
   };
 }
 
@@ -413,7 +434,11 @@ async function mapVoiceRow(row: VoiceRow, env: unknown, requestOrigin: string) {
   };
 }
 
-async function loadOrCreateProfile(client: SupabaseClient, user: IOSUser) {
+async function loadOrCreateProfile(
+  client: SupabaseClient,
+  user: IOSUser,
+  preferredDisplayName?: unknown,
+) {
   const { data: existing, error: selectError } = await client
     .from("profiles")
     .select(PROFILE_COLUMNS)
@@ -421,20 +446,39 @@ async function loadOrCreateProfile(client: SupabaseClient, user: IOSUser) {
     .maybeSingle();
 
   if (selectError) throw new IOSCloudError(500, "profile_load_failed", selectError.message);
-  if (existing) return mapProfileRow(existing as JsonRecord, user);
+  if (existing) {
+    const existingProfile = existing as JsonRecord;
+    const preferred = cleanString(preferredDisplayName).slice(0, 40);
+    if (preferred && isReplaceableDefaultDisplayName(existingProfile.display_name)) {
+      const { data: updated, error: updateError } = await client
+        .from("profiles")
+        .update({ display_name: preferred })
+        .eq("id", user.id)
+        .select(PROFILE_COLUMNS)
+        .single();
+
+      if (updateError) {
+        throw new IOSCloudError(500, "profile_update_failed", updateError.message);
+      }
+
+      return mapProfileRow(updated as JsonRecord, user, preferred);
+    }
+
+    return mapProfileRow(existingProfile, user, preferredDisplayName);
+  }
 
   const { data, error } = await client
     .from("profiles")
     .insert({
       id: user.id,
       email: user.email ?? null,
-      display_name: fallbackDisplayName(user),
+      display_name: fallbackDisplayName(user, preferredDisplayName),
     })
     .select(PROFILE_COLUMNS)
     .single();
 
   if (error) throw new IOSCloudError(500, "profile_create_failed", error.message);
-  return mapProfileRow(data as JsonRecord, user);
+  return mapProfileRow(data as JsonRecord, user, preferredDisplayName);
 }
 
 async function countOwnedRows(
@@ -458,11 +502,12 @@ async function countOwnedRows(
 }
 
 async function fetchAccountSummary(client: SupabaseClient, user: IOSUser) {
-  const [profile, catCount, voiceCount] = await Promise.all([
-    loadOrCreateProfile(client, user),
+  const [activeCat, catCount, voiceCount] = await Promise.all([
+    fetchActiveCatRow(client, user),
     countOwnedRows(client, "cats", user.id),
     countOwnedRows(client, "cat_voices", user.id),
   ]);
+  const profile = await loadOrCreateProfile(client, user, activeCat?.name);
 
   return { profile, catCount, voiceCount };
 }
@@ -517,8 +562,8 @@ async function fetchCloudState(
   user: IOSUser,
   requestOrigin: string,
 ) {
-  await loadOrCreateProfile(client, user);
   const catRow = await fetchActiveCatRow(client, user);
+  await loadOrCreateProfile(client, user, catRow?.name);
   if (!catRow) {
     return { profile: null, persona: null, voices: [] };
   }
@@ -532,8 +577,12 @@ async function fetchCloudState(
   return { profile, persona, voices };
 }
 
-async function markOnboardingCompleted(client: SupabaseClient, user: IOSUser) {
-  await loadOrCreateProfile(client, user);
+async function markOnboardingCompleted(
+  client: SupabaseClient,
+  user: IOSUser,
+  preferredDisplayName?: unknown,
+) {
+  await loadOrCreateProfile(client, user, preferredDisplayName);
   const { error } = await client
     .from("profiles")
     .update({ onboarding_completed_at: new Date().toISOString() })
@@ -665,7 +714,9 @@ async function saveCatProfile(
 
   if (error) throw new IOSCloudError(500, "cat_save_failed", error.message);
   if (body.completeOnboarding !== false) {
-    await markOnboardingCompleted(client, user);
+    await markOnboardingCompleted(client, user, name);
+  } else {
+    await loadOrCreateProfile(client, user, name);
   }
 
   const persona = await upsertPersona(client, user, catId, body.persona);
@@ -716,9 +767,9 @@ async function updateAvatar(
 }
 
 async function updateUserProfile(client: SupabaseClient, user: IOSUser, body: JsonRecord) {
+  const activeCat = await fetchActiveCatRow(client, user);
   const displayName =
-    cleanString(body.displayName, fallbackDisplayName(user)).slice(0, 40) ||
-    fallbackDisplayName(user);
+    cleanString(body.displayName).slice(0, 40) || fallbackDisplayName(user, activeCat?.name);
   const { data, error } = await client
     .from("profiles")
     .upsert(
@@ -733,7 +784,7 @@ async function updateUserProfile(client: SupabaseClient, user: IOSUser, body: Js
     .single();
 
   if (error) throw new IOSCloudError(500, "profile_update_failed", error.message);
-  return mapProfileRow(data as JsonRecord, user);
+  return mapProfileRow(data as JsonRecord, user, activeCat?.name);
 }
 
 async function saveVoice(
