@@ -313,6 +313,7 @@ test("default generation and detection order tries both Gemini backups before ot
 
 const fallbackPersona = {
   name: "团子",
+  type: "先看再行动",
   monologue: "让我先坐好看看，再决定要不要靠近。",
   analysis: "前爪并拢，视线停在镜头上，可能还在观察眼前的互动。",
   tags: ["观察优先", "保留距离", "前爪并拢", "关注镜头", "心动不动", "小小探长"],

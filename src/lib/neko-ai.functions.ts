@@ -199,13 +199,32 @@ function normalizePersonaForProfile(persona: CatPersona, profile: CatProfile): C
   };
 }
 
+const genericPersonaTypePatterns = [
+  /精致定格派/,
+  /柔光守护者/,
+  /梦境观察家/,
+  /月光陪伴者/,
+  /治愈观察者/,
+  /^(?:温柔|安静|优雅|梦幻|治愈)(?:观察家|守护者|陪伴者|探索家)$/,
+];
+
+function isSpecificPersonaType(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const type = value.trim();
+  return (
+    type.length >= 4 &&
+    type.length <= 8 &&
+    !genericPersonaTypePatterns.some((pattern) => pattern.test(type))
+  );
+}
+
 function buildStablePersona(profile: CatProfile): CatPersona {
   const ageTone: Record<
     CatProfile["ageStage"],
     { type: string; mbti: string; mood: string; tags: string[]; traits: CatPersona["traits"] }
   > = {
     幼猫: {
-      type: "好奇小探险家",
+      type: "先冲再研究",
       mbti: "ENFP-A",
       mood: "今天也想探索新角落",
       tags: ["好奇心旺", "撒娇高手", "活力满满", "需要陪玩", "软萌外表", "小小冒险"],
@@ -216,7 +235,7 @@ function buildStablePersona(profile: CatProfile): CatPersona {
       ],
     },
     青年猫: {
-      type: "优雅观察者",
+      type: "先看再行动",
       mbti: "INFP-A",
       mood: "安静又温暖，适合窝在你身边",
       tags: ["优雅独立", "温柔治愈", "好奇探索", "安静陪伴", "慢热亲近", "小小主见"],
@@ -227,7 +246,7 @@ function buildStablePersona(profile: CatProfile): CatPersona {
       ],
     },
     成熟猫: {
-      type: "从容陪伴者",
+      type: "有主意陪伴派",
       mbti: "ISFJ-A",
       mood: "今天想安稳地陪你一会",
       tags: ["稳定温柔", "懂得陪伴", "慢热可靠", "观察细腻", "亲密有度", "安心感"],
@@ -238,7 +257,7 @@ function buildStablePersona(profile: CatProfile): CatPersona {
       ],
     },
     资深猫: {
-      type: "安静小智者",
+      type: "慢慢巡视派",
       mbti: "INFJ-A",
       mood: "慢慢看着你，就是它的温柔",
       tags: ["沉稳安静", "经验丰富", "温柔守候", "安全感强", "慢节奏", "小智者"],
@@ -291,31 +310,40 @@ function normalizeVoiceForProfile(
     ? input.tags.map((tag) => normalizeCatFacts(tag, profile)).filter(Boolean)
     : [];
   const mood = normalizeCatFacts(input.mood, profile, "想被关注");
-  const rawAnalysis = input.analysis && typeof input.analysis === "object"
-    ? input.analysis as Record<string, unknown>
-    : {};
+  const rawAnalysis =
+    input.analysis && typeof input.analysis === "object"
+      ? (input.analysis as Record<string, unknown>)
+      : {};
   const legacyAnalysis = typeof input.analysis === "string" ? input.analysis : undefined;
-  const analysisSummary = boundedCopy(normalizeCatFacts(
-    rawAnalysis.observation ?? rawAnalysis.summary ?? legacyAnalysis,
-    profile,
+  const analysisSummary = boundedCopy(
+    normalizeCatFacts(
+      rawAnalysis.observation ?? rawAnalysis.summary ?? legacyAnalysis,
+      profile,
+      `${profile.name}保持停留并注视周围，姿态放松，同时持续关注当前互动。`,
+    ),
     `${profile.name}保持停留并注视周围，姿态放松，同时持续关注当前互动。`,
-  ), `${profile.name}保持停留并注视周围，姿态放松，同时持续关注当前互动。`, 45, 70);
+    45,
+    70,
+  );
   const subtext = boundedCopy(
     normalizeCatFacts(input.subtext, profile, "它没有急着行动，像是在等一个符合自己节奏的时机。"),
     "它没有急着行动，像是在等一个符合自己节奏的时机。",
     15,
     35,
   );
-  const personalityInterpretation = boundedCopy(normalizeCatFacts(
-    rawAnalysis.personalityInterpretation ?? input.subtext,
-    profile,
+  const personalityInterpretation = boundedCopy(
+    normalizeCatFacts(rawAnalysis.personalityInterpretation ?? input.subtext, profile, subtext),
     subtext,
-  ), subtext, 15, 60);
-  const rawShare = input.share && typeof input.share === "object"
-    ? input.share as Record<string, unknown>
-    : {};
+    15,
+    60,
+  );
+  const rawShare =
+    input.share && typeof input.share === "object" ? (input.share as Record<string, unknown>) : {};
   const shareTags = Array.isArray(rawShare.tags)
-    ? rawShare.tags.map((tag) => normalizeShareTag(tag, profile)).filter((tag) => Array.from(tag).length >= 4).slice(0, 3)
+    ? rawShare.tags
+        .map((tag) => normalizeShareTag(tag, profile))
+        .filter((tag) => Array.from(tag).length >= 4)
+        .slice(0, 3)
     : [];
   return {
     time: "刚刚",
@@ -349,12 +377,15 @@ function normalizeVoiceForProfile(
         18,
         35,
       ),
-      tags: shareTags.length >= 2
-        ? shareTags
-        : [...tags, `${mood}时刻`, `${profile.ageStage}小观察`]
-            .map((tag) => normalizeShareTag(tag, profile))
-            .filter((tag, index, list) => Array.from(tag).length >= 4 && list.indexOf(tag) === index)
-            .slice(0, 3),
+      tags:
+        shareTags.length >= 2
+          ? shareTags
+          : [...tags, `${mood}时刻`, `${profile.ageStage}小观察`]
+              .map((tag) => normalizeShareTag(tag, profile))
+              .filter(
+                (tag, index, list) => Array.from(tag).length >= 4 && list.indexOf(tag) === index,
+              )
+              .slice(0, 3),
     },
   } as Voice;
 }
@@ -457,15 +488,9 @@ function getUserFacingAIMessage(kind: "persona" | "voice", error: unknown) {
     : "AI 人格档案暂时没有生成成功，请稍后再试。";
 }
 
-const BYTECAT_DEFAULT_TEXT_MODELS = [
-  "gpt-5.5",
-  "gpt-5.6-terra",
-] as const;
+const BYTECAT_DEFAULT_TEXT_MODELS = ["gpt-5.5", "gpt-5.6-terra"] as const;
 
-const BYTECAT_DEFAULT_VISION_MODELS = [
-  "gpt-5.5",
-  "gpt-5.6-terra",
-] as const;
+const BYTECAT_DEFAULT_VISION_MODELS = ["gpt-5.5", "gpt-5.6-terra"] as const;
 
 function parseModelList(value?: string | null) {
   return (value ?? "")
@@ -902,15 +927,16 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
 最终结果要让真正养它的主人觉得“对，就是它”，而不是换一只猫也成立。
 
 请先在内部按以下顺序推理，但不要输出推理过程：
-照片事实 → 行为线索 → 性格倾向 → 最有辨识度的人格特点 → 它可能如何看待主人。
+照片事实 → 提炼 1–2 个真实行为模式 → 提炼 1 个最明显、有证据的性格反差 → 根据这些证据命名 type → 它可能如何看待主人。
 禁止先决定 MBTI 再寻找证据。
+禁止先造 type 再为它反向寻找理由；type 必须能被 observations 和 analysis 中的行为证据直接解释。
 
 观察时优先抓住 2–4 个真正有辨识度的细节，例如视线、眼睛和耳朵状态、坐趴姿势、松弛或警觉程度、与物体/环境/主人的位置和互动。不要罗列所有物体，不要只写“安静观察、温柔细腻、有自己的节奏”等空泛判断。每个人格结论都应能回答“为什么”。
 
 如果证据支持，优先提炼“A，但是 B”的真实反差，例如想靠近却保留距离；但绝不能为了反差虚构画面、动作、经历、主人行为或长期习惯。
 
 字段要求：
-- type：4–6 个中文字符，有行为模式、反差、社交方式或小脾气，有趣但不幼稚；避免“温柔观察家、安静守护者、好奇探索家、治愈陪伴者”等通用模板。
+- type：4–8 个中文字符，让主人一眼看懂它通常“怎么做”或“表面与实际有什么反差”；可有一点趣味和猫的小脾气，但不使用空洞审美词。禁止“精致定格派、柔光守护者、梦境观察家、月光陪伴者、治愈观察者”，也避免“温柔/安静/优雅 + 观察家/守护者/陪伴者”式组合。
 - mbti：完成人格判断后再选择最接近的趣味标签，格式必须为 XXXX-A 或 XXXX-T；不要把它当科学测量或用刻板印象改写事实。
 - matchScore：60–99 的整数，反映现有证据与结论的匹配程度。
 - monologue：最重要的分享文案。第一人称，优先 20–35 个中文字，结合具体场景，像这只猫此刻会说的话；允许一点小脾气、小傲娇和幽默，不写 AI 散文、鸡汤或泛宠物文学。
@@ -923,7 +949,7 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
 输出严格 JSON，不要 Markdown，不要附加说明。字段：
 {
   "name": "猫名",
-  "type": "4-6个中文字、有辨识度的人格称号",
+  "type": "4-8个中文字、能由真实行为模式或性格反差解释的人格称号",
   "mbti": "四字母加-A或-T的趣味人格类型",
   "matchScore": "60-99的整数，表示现有证据与人格描述的匹配度",
   "monologue": "猫咪第一人称心声",
@@ -983,14 +1009,15 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
         modelMode: data.imageDataUrl ? "vision" : "text",
         validate: (parsed) =>
           Boolean(
+            isSpecificPersonaType(parsed.type) &&
             parsed.monologue?.trim() &&
-              parsed.analysis?.trim() &&
-              Array.isArray(parsed.tags) &&
-              parsed.tags.length >= 6 &&
-              Array.isArray(parsed.traits) &&
-              parsed.traits.length >= 4 &&
-              Array.isArray(parsed.observations) &&
-              parsed.observations.length >= 2,
+            parsed.analysis?.trim() &&
+            Array.isArray(parsed.tags) &&
+            parsed.tags.length >= 6 &&
+            Array.isArray(parsed.traits) &&
+            parsed.traits.length >= 4 &&
+            Array.isArray(parsed.observations) &&
+            parsed.observations.length >= 2,
           ),
       },
     );
@@ -998,7 +1025,9 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
     const normalized = normalizePersonaForProfile(
       {
         name: parsed.name || data.profile.name,
-        type: parsed.type || "优雅观察者",
+        type: isSpecificPersonaType(parsed.type)
+          ? parsed.type.trim()
+          : buildStablePersona(data.profile).type,
         mbti: parsed.mbti || "INFP-A",
         matchScore: Math.max(60, Math.min(99, Number(parsed.matchScore) || 88)),
         monologue: parsed.monologue || "今天也想悄悄靠近你，陪你待一会。",
@@ -1114,7 +1143,7 @@ ${data.scene || "无补充场景"}
           const analysis = getObjectRecord(parsed.analysis);
           return Boolean(
             asText(parsed.text) &&
-              (asText(parsed.analysis) || asText(analysis?.observation ?? analysis?.summary)),
+            (asText(parsed.analysis) || asText(analysis?.observation ?? analysis?.summary)),
           );
         },
       },
