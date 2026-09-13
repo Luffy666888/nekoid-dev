@@ -4,7 +4,7 @@ import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { ChevronLeft, Share2, Trash2 } from "lucide-react";
-import { CAT_GRADIENTS, useVoices, voiceAnalysisText, voicesStore } from "./voicesStore";
+import { CAT_GRADIENTS, useVoices, voiceAnalysisText, voicesStore, type Voice } from "./voicesStore";
 import { useCatAvatar } from "../catAvatarStore";
 import { useCatName } from "../catNameStore";
 import { detectCatFace } from "@/lib/catface.functions";
@@ -375,6 +375,94 @@ function ShareTarget({ label, onClick, bg, children }: { label: string; onClick?
       </span>
       <span className="text-[11.5px] text-[oklch(0.4_0.05_300)]">{label}</span>
     </button>
+  );
+}
+
+function cleanVoiceText(value?: string | null) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function voiceCoreSummary(voice: Voice | null | undefined, fallback: string) {
+  return (
+    cleanVoiceText(voice?.subtext) ||
+    cleanVoiceText(voice?.share?.headline) ||
+    cleanVoiceText(voice?.text) ||
+    fallback
+  );
+}
+
+function voiceInsightParagraphs(voice: Voice | null | undefined, fallback: string) {
+  const raw =
+    cleanVoiceText(voiceAnalysisText(voice)) ||
+    cleanVoiceText(voice?.share?.insight) ||
+    fallback;
+  const paragraphs = raw.split(/\n{2,}/).map((part) => part.trim()).filter(Boolean);
+  if (paragraphs.length !== 1 || paragraphs[0].length <= 80) return paragraphs;
+
+  const sentences = paragraphs[0].match(/[^。！？!?]+[。！？!?]?/g)?.map((part) => part.trim()).filter(Boolean);
+  if (!sentences || sentences.length < 3) return paragraphs;
+
+  const midpoint = Math.ceil(sentences.length / 2);
+  return [sentences.slice(0, midpoint).join(""), sentences.slice(midpoint).join("")];
+}
+
+function VoiceResultInfo({
+  voice,
+  catName,
+  className = "",
+  analysisFallback,
+}: {
+  voice: Voice | null | undefined;
+  catName: string;
+  className?: string;
+  analysisFallback?: string;
+}) {
+  const tags = (voice?.tags?.length ? voice.tags : voice?.share?.tags ?? ["先观察再靠近", "想被你发现", "有点小主意"]).slice(0, 3);
+  const summary = voiceCoreSummary(voice, "它正在用自己的节奏靠近你，等你先看懂这个小暗号。");
+  const paragraphs = voiceInsightParagraphs(voice, analysisFallback ?? `暂未获得${catName}的 AI 心声解析。`);
+
+  return (
+    <section className={className}>
+      <div className="flex flex-wrap gap-2.5">
+        {tags.map((tag) => (
+          <span
+            key={tag}
+            className="inline-flex min-h-[34px] items-center rounded-full px-4 py-2.5 text-[13.5px] font-medium leading-[1.1] text-[oklch(0.41_0.07_305)]"
+            style={{ background: "linear-gradient(135deg, oklch(0.965 0.032 320), oklch(0.952 0.038 275))" }}
+          >
+            {tag}
+          </span>
+        ))}
+      </div>
+
+      <div className="mt-5">
+        <h2 className="text-[18px] font-semibold leading-[1.32] text-[oklch(0.33_0.045_295)]">
+          它没说出口的小心思
+        </h2>
+        <p className="mt-3 text-[24px] font-semibold leading-[1.5] text-[oklch(0.22_0.035_292)]">
+          {summary}
+        </p>
+      </div>
+
+      <div
+        className="mt-[22px] rounded-[22px] px-[22px] py-[22px] backdrop-blur"
+        style={{
+          background: "linear-gradient(160deg, oklch(0.995 0.006 80 / 0.94), oklch(0.975 0.018 315 / 0.9))",
+          boxShadow: "0 16px 36px -20px oklch(0.55 0.1 305 / 0.3), 0 2px 8px -3px oklch(0.55 0.1 305 / 0.12)",
+          border: "1px solid oklch(1 0 0 / 0.78)",
+        }}
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-soul text-[14px]">✦</span>
+          <h2 className="text-[18px] font-semibold leading-[1.32] text-[oklch(0.33_0.045_295)]">AI 解读</h2>
+        </div>
+        <div className="mt-3.5 space-y-4 text-[16px] leading-[1.68] text-[oklch(0.31_0.04_295)]">
+          {paragraphs.map((paragraph, index) => (
+            <p key={`${paragraph}-${index}`}>{paragraph}</p>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -782,24 +870,12 @@ export function ScreenVoiceDetail({ id = 0 }: { id?: number }) {
             </div>
           </div>
 
-          {/* AI card — below photo with breathing space */}
-          <div
-            className="mt-5 rounded-[20px] bg-white/95 px-5 py-4 backdrop-blur"
-            style={{ boxShadow: "0 16px 36px -18px oklch(0.3 0.05 300 / 0.28), 0 2px 6px -2px oklch(0.3 0.05 300 / 0.08)", border: "1px solid oklch(1 0 0 / 0.9)" }}
-          >
-            <div className="flex items-center gap-1.5">
-              <span className="text-soul text-[11px]">✨</span>
-              <div className="text-[10px] tracking-[0.3em] text-[#7B7290]">AI 心 声 解 析</div>
-            </div>
-            <p className="mt-2 text-[12.5px] leading-[1.75] text-foreground/85">
-              {voiceAnalysisText(v) ?? "它似乎在表达：这个瞬间里，它正在用自己的方式向你靠近。"}
-            </p>
-            <div className="mt-2.5 flex flex-wrap gap-1.5">
-              {(v.tags ?? ["会用眼神表达", "喜欢待在附近"]).map((t) => (
-                <span key={t} className="rounded-full px-2 py-[3px] text-[10.5px]" style={{ background: "oklch(0.96 0.03 305)", color: "oklch(0.5 0.1 305)" }}>#{t}</span>
-              ))}
-            </div>
-          </div>
+          <VoiceResultInfo
+            voice={v}
+            catName={catName}
+            className="mt-5"
+            analysisFallback="它似乎在表达：这个瞬间里，它正在用自己的方式向你靠近。"
+          />
         </div>
       </div>
 
@@ -1239,8 +1315,7 @@ export function ScreenPublish3() {
         </div>
 
         <div className="mx-5 mt-4 relative overflow-hidden rounded-[26px]" style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)", background: "linear-gradient(180deg, oklch(0.96 0.035 70) 0%, oklch(0.93 0.05 55) 55%, oklch(0.9 0.06 50) 100%)" }}>
-          {/* Unified cat background spanning both the speech and AI analysis modules */}
-          <div className="relative h-[560px]">
+          <div className="relative aspect-[4/5] min-h-[460px]">
             {photoSrc ? (
               <img
                 src={photoSrc}
@@ -1266,17 +1341,17 @@ export function ScreenPublish3() {
                 </svg>
               </div>
             </div>
-            {/* AI analysis card floats over bottom of cat background */}
-            <div className="absolute inset-x-4 bottom-4 z-10 rounded-[22px] bg-white/85 p-4 backdrop-blur-md" style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}>
-              <div className="text-[10px] tracking-[0.4em] text-[oklch(0.55_0.06_300)]">AI 心 声 解 析</div>
-              <p className="mt-2 text-[12px] leading-[1.7] text-foreground/85">
-                {voiceAnalysisText(draftVoice) ?? "暂未获得 AI 心声解析，请点击重新识别。"}
-              </p>
-            </div>
           </div>
         </div>
 
-        <div className="mx-5 mt-5 grid grid-cols-[1fr_1.4fr] gap-2.5">
+        <VoiceResultInfo
+          voice={draftVoice}
+          catName={catName}
+          className="mx-5 mt-5"
+          analysisFallback="暂未获得 AI 心声解析，请点击重新识别。"
+        />
+
+        <div className="mx-5 mt-6 grid grid-cols-[1fr_1.4fr] gap-2.5">
           <button onClick={startReanalyze} className="rounded-full bg-white/85 px-4 py-3.5 text-[12.5px] text-foreground backdrop-blur active:bg-white/95 active:scale-[0.98] transition-all duration-150" style={{ boxShadow: "var(--shadow-soft)" }}>重新识别</button>
           <button type="button" onClick={startPublish} className="flex items-center justify-center rounded-full px-5 py-3.5 text-[13px] font-medium text-white active:scale-[0.97] active:brightness-[0.92] transition-all duration-150"
             style={{ background: "linear-gradient(135deg, oklch(0.70 0.14 305), oklch(0.76 0.11 0))", boxShadow: "0 14px 28px -14px oklch(0.70 0.14 305 / 0.6)" }}>
@@ -1363,33 +1438,13 @@ export function ScreenSuccess() {
               <span className="pointer-events-none absolute right-10 top-16 animate-pulse-soft text-[10px] text-[oklch(0.82_0.1_285)]" style={{ animationDelay: "0.5s" }}>✺</span>
             </div>
 
-            {/* meta below media */}
-            <div className="flex items-center justify-between gap-2 px-4 pb-3.5 pt-3">
-              <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                {(draftVoice?.tags ?? ["会用眼神表达", "喜欢待在附近"]).slice(0, 2).map((tag) => (
-                  <span key={tag} className="shrink-0 rounded-full px-2 py-[3px] text-[10.5px] font-medium text-[oklch(0.45_0.1_305)]"
-                    style={{ background: "linear-gradient(135deg, oklch(0.96 0.04 320), oklch(0.95 0.05 270))" }}>{tag}</span>
-                ))}
-              </div>
-              <div className="shrink-0 text-[10px] tracking-[0.25em] text-[oklch(0.6_0.05_300)]">刚刚发布</div>
-            </div>
           </div>
         </div>
 
-        {/* ── SECTION 3 · AI Insight ──────────────────── */}
-        <div className="mt-4 rounded-[22px] p-4 backdrop-blur"
-          style={{ background: "linear-gradient(135deg, oklch(0.98 0.02 320 / 0.9), oklch(0.96 0.03 285 / 0.85))", border: "1px solid oklch(1 0 0 / 0.7)", boxShadow: "0 14px 30px -18px oklch(0.55 0.1 305 / 0.35)" }}>
-          <div className="flex items-center gap-2">
-            <span className="text-soul text-[12px]">✦</span>
-            <div className="text-[10px] tracking-[0.4em] text-[oklch(0.55_0.06_300)]">AI 发 现</div>
-          </div>
-          <div className="mt-2.5 text-[12.5px] leading-[1.75] text-foreground/85">
-            {voiceAnalysisText(draftVoice) ?? `暂未获得${catName}的 AI 心声解析。`}
-          </div>
-        </div>
+        <VoiceResultInfo voice={draftVoice} catName={catName} className="mt-5" />
 
         {/* ── SECTION 4 · Share Incentive ─────────────── */}
-        <div className="mt-5 px-2 text-center">
+        <div className="mt-7 px-2 text-center">
           <p className="text-[11.5px] leading-[1.7] text-[oklch(0.55_0.06_300)]">
             把这个来自猫咪世界的故事<br />分享给你在乎的人
           </p>
