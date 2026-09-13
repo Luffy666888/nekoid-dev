@@ -201,6 +201,34 @@ test("both text and vision have all four requested backups without duplicates", 
 });
 
 const mergedProfile = { name: "团子", gender: "小母猫", ageStage: "青年猫", updatedAt: 0 };
+const forbiddenNekoCopy = [
+  "仪式感",
+  "施压",
+  "掌控节奏",
+  "节奏掌控",
+  "秩序感",
+  "克制讨关注",
+  "高度敏锐",
+  "策略性靠近",
+  "精准表达",
+  "端庄定点",
+  "稳态陪伴",
+  "低频高质",
+  "眼神催促",
+  "眼神施压",
+];
+
+function assertPlainNekoCopy(values) {
+  for (const value of values.filter(Boolean)) {
+    for (const forbidden of forbiddenNekoCopy) {
+      assert.equal(
+        String(value).includes(forbidden),
+        false,
+        `${value} should not contain ${forbidden}`,
+      );
+    }
+  }
+}
 
 test("merged persona preserves four traits and the updated generation settings", async () => {
   let calls = 0;
@@ -258,9 +286,96 @@ test("merged persona preserves four traits and the updated generation settings",
   });
   const result = await api.generateCatPersonaServer({ profile: mergedProfile });
   assert.equal(calls, 1);
+  assert.equal(result.type, "会先看清楚");
+  assert.deepEqual(Array.from(result.tags), [
+    "先观察再靠近",
+    "不急着靠近",
+    "想靠近又犹豫",
+    "会先看清楚",
+  ]);
   assert.equal(result.tags.length, 4);
   assert.equal(result.traits.length, 4);
   assert.equal(result.evidence.length, 2);
+  assertPlainNekoCopy([result.type, ...result.tags, result.analysis, result.corePersonality]);
+});
+
+test("persona and voice labels rewrite AI-ish phrases into plain cat-owner language", () => {
+  const api = loadAIServer("neko-ai", {
+    internals: ["normalizePersonaForProfile", "normalizeVoiceForProfile"],
+  });
+  const persona = api.normalizePersonaForProfile(
+    {
+      name: "团子",
+      type: "仪式感极强的眼神催促者",
+      mbti: "INTJ-A",
+      matchScore: 88,
+      monologue: "让我先看看，再决定要不要靠近。",
+      analysis: "它会用眼神施压，也有一点克制讨关注。",
+      corePersonality: "高度敏锐，策略性靠近。",
+      loveLanguageInsight: "低频高质互动。",
+      ownerRelationship: "喜欢稳态陪伴。",
+      ownerRole: "喜欢稳态陪伴。",
+      misunderstanding: "它不是在端庄定点，只是安静坐着等你发现。",
+      tags: ["眼神施压", "端庄定点", "克制讨关注", "低频高质互动"],
+      traits: ["观察欲", "边界感", "主人关注度", "行动派程度"].map((label) => ({
+        label,
+        value: 72,
+      })),
+      observations: [],
+      evidence: [],
+      dailyMood: "",
+      savedAt: 0,
+    },
+    mergedProfile,
+  );
+  assert.equal(persona.type, "会用眼神表达");
+  assert.deepEqual(Array.from(persona.tags), [
+    "会用眼神表达",
+    "安静坐着等你",
+    "安静等你发现",
+    "不常主动但会认真回应",
+  ]);
+  assertPlainNekoCopy([
+    persona.type,
+    ...persona.tags,
+    persona.analysis,
+    persona.corePersonality,
+    persona.loveLanguageInsight,
+    persona.ownerRelationship,
+    persona.misunderstanding,
+  ]);
+
+  const voice = api.normalizeVoiceForProfile(
+    {
+      text: "你先别急，我看一下。",
+      subtext: "喜欢挑你视线必经的动线上端正坐好，用直球眼神确认你的注意力。",
+      analysis: {
+        observation: "它没有大声叫，只是眼神施压。",
+        personalityInterpretation: "这是一种稳态陪伴。",
+      },
+      mood: "正在观察",
+      tags: ["眼神施压", "端庄定点", "低频高质互动"],
+      share: {
+        insight: "它通过策略性靠近和精准表达确认你的反应。",
+        tags: ["克制讨关注", "策略性靠近", "精准表达"],
+      },
+    },
+    mergedProfile,
+  );
+  assert.deepEqual(Array.from(voice.tags), [
+    "会用眼神表达",
+    "安静坐着等你",
+    "不常主动但会认真回应",
+  ]);
+  assert.deepEqual(Array.from(voice.share.tags), ["安静等你发现", "先观察再靠近", "表达得很清楚"]);
+  assertPlainNekoCopy([
+    ...voice.tags,
+    ...voice.share.tags,
+    voice.subtext,
+    voice.analysis.observation,
+    voice.analysis.personalityInterpretation,
+    voice.share.insight,
+  ]);
 });
 
 for (const structured of [false, true]) {
@@ -302,6 +417,8 @@ for (const structured of [false, true]) {
       imageDataUrl,
     });
     assert.equal(calls, 1);
+    assert.equal(result.tags.length, 3);
+    assert.deepEqual(Array.from(result.tags), ["先看清楚", "安静坐着", "先不靠近"]);
     assert.ok(result.analysis.observation);
     assert.ok(result.analysis.personalityInterpretation);
     assert.ok(result.share.headline && result.share.insight && result.share.tags.length);

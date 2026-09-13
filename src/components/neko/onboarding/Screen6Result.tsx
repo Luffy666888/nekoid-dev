@@ -1,8 +1,8 @@
 import hero from "@/assets/neko-hero.jpg";
 import { useNavigate } from "@tanstack/react-router";
-import { Share2 } from "lucide-react";
-import { SafeAreaTopBar, Sparkles } from "../screens/_shared";
-import { useRef, useState } from "react";
+import { ChevronLeft, Share2 } from "lucide-react";
+import { SafeAreaTopBar } from "../screens/_shared";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
 import { toast } from "sonner";
 import { getCatAvatar, getCurrentSessionCatAvatar, useCatAvatar } from "../catAvatarStore";
@@ -11,17 +11,14 @@ import { persistCatResult, useCatPersona, useCatProfile } from "../catProfileSto
 import { voicesStore } from "../app/voicesStore";
 import { saveLocalNekoToCloud } from "@/lib/neko-cloud";
 import { getPhotoDraft } from "./onboardingDraftStore";
-import {
-  generateLittleWorldPrompts,
-  type LittleWorldImage,
-  type LittleWorldScene,
-} from "./littleWorldPrompts";
 
 const KEYWORDS = ["温柔观察者", "慢热", "安静陪伴"];
+const EDITORIAL_FONT = '"Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", serif';
 
 export function Screen6Result({
   onRestart,
   onBack,
+  onPrev,
 }: {
   onNext?: () => void;
   onPrev?: () => void;
@@ -43,46 +40,46 @@ export function Screen6Result({
     hero;
   const catName = useCatName();
   const persona = useCatPersona();
-  const personaType = persona?.type ?? "奶油小绅士";
+  const personaType = persona?.type ?? "安静观察型";
   const personaMbti = persona?.mbti ?? "ISFJ-A";
-  const personaKeywords = persona?.tags?.length ? persona.tags.slice(0, 3) : KEYWORDS;
-  const generatedPrompts = generateLittleWorldPrompts({
-    catName,
-    mbti: personaMbti,
-    tags: personaKeywords,
-    description: persona?.analysis ?? persona?.monologue ?? "温柔地观察世界，也珍惜熟悉的陪伴。",
-  });
-  const generatedImages = (
-    persona as (typeof persona & { littleWorldImages?: LittleWorldImage[] }) | null
-  )?.littleWorldImages;
-  const scenes = generatedPrompts.map((scene, index) => ({
-    ...scene,
-    src: generatedImages?.[index]?.url || avatarSrc,
-    prompt: generatedImages?.[index]?.prompt || scene.prompt,
-  }));
-  const [activeScene, setActiveScene] = useState(0);
+  const personaKeywords = buildPersonaKeywords(persona?.tags);
+  const titleLines = useMemo(() => splitPersonaTitle(personaType), [personaType]);
+  const heroImagePosition = useHeroImagePosition(avatarSrc);
+  const goBack = onBack ?? onPrev;
+  const heroDescription = shortenCopy(
+    persona?.corePersonality || persona?.monologue || persona?.analysis || "它用自己的节奏观察世界，也珍惜熟悉的陪伴。",
+    48,
+  );
   const resultInsights = [
     {
       index: "01",
       title: "你可能一直误会它的一件事",
-      text:
+      text: shortenCopy(
         persona?.misunderstanding ||
-        persona?.analysis ||
-        "它不是不感兴趣，只是更习惯先把情况看明白。坐着不动时，也可能早已把注意力放在眼前。",
+          persona?.analysis ||
+          "它不是不感兴趣，只是更习惯先把情况看明白。坐着不动时，也可能早已把注意力放在眼前。",
+        76,
+      ),
     },
     {
       index: "02",
       title: "它表达喜欢的方式",
-      text:
-        persona?.loveLanguage ||
-        "如果它平时也常待在你附近却不紧贴，它可能更习惯用关注你的动向、共享同一片空间来表达亲近。",
+      text: shortenCopy(
+        persona?.loveLanguageInsight ||
+          persona?.loveLanguage ||
+          "如果它平时也常待在你附近却不紧贴，它可能更习惯用关注你的动向、共享同一片空间来表达亲近。",
+        76,
+      ),
     },
     {
       index: "03",
       title: `在${catName}眼里，你的位置`,
-      text:
-        persona?.ownerRole ||
-        "你可能不是它时时刻刻都要黏着的人，但很可能是它默认会在的人。不需要反复确认你的存在，本身就是一种稳定的信任。",
+      text: shortenCopy(
+        persona?.ownerRelationship ||
+          persona?.ownerRole ||
+          "你可能不是它时时刻刻都要黏着的人，但很可能是它默认会在的人。不需要反复确认你的存在，本身就是一种稳定的信任。",
+        76,
+      ),
     },
   ];
 
@@ -136,224 +133,182 @@ export function Screen6Result({
   return (
     <div
       ref={cardRef}
-      className="absolute inset-0 flex flex-col overflow-y-auto scrollbar-none"
+      className="absolute inset-0 overflow-y-auto scrollbar-none"
       style={{
         background:
-          "linear-gradient(180deg, oklch(0.975 0.022 320) 0%, oklch(0.965 0.03 300) 50%, oklch(0.96 0.035 285) 100%)",
+          "linear-gradient(180deg, oklch(0.985 0.012 82) 0%, oklch(0.978 0.022 320) 54%, oklch(0.965 0.026 292) 100%)",
       }}
     >
-      <Sparkles count={14} />
-
-      {/* ================= SCREEN 1 : 这是我的猫 ================= */}
-      <div className="relative z-10 shrink-0">
+      <div className="relative z-10">
         <SafeAreaTopBar
           left={
-            onBack ? (
+            goBack ? (
               <button
                 type="button"
                 aria-label="返回"
-                onClick={onBack}
-                className="flex h-11 w-11 items-center justify-center rounded-full bg-white/80 text-[oklch(0.45_0.12_305)] backdrop-blur-md transition-transform active:scale-95"
+                onClick={goBack}
+                className="flex h-11 w-11 items-center justify-center rounded-full bg-white/38 text-[#201A28] shadow-[0_10px_24px_-18px_rgba(50,38,68,0.5)] backdrop-blur-md transition-transform active:scale-95"
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <path
-                    d="M15 6l-6 6 6 6"
-                    stroke="oklch(0.45 0.12 305)"
-                    strokeWidth="2.2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
+                <ChevronLeft className="h-[21px] w-[21px]" strokeWidth={2.4} />
               </button>
             ) : (
               <span className="block h-11 w-11" />
             )
           }
-          center={
-            <span className="text-[10px] font-medium tracking-[0.5em] text-[oklch(0.55_0.06_320)]">
-              喵一下
-            </span>
-          }
+          center={<span aria-hidden className="block h-1 w-1" />}
           right={
             <button
               type="button"
               aria-label="分享"
               onClick={() => setShareOpen(true)}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-white/80 text-[oklch(0.45_0.12_305)] backdrop-blur-md transition-transform active:scale-95"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-white/50 text-[#201A28] shadow-[0_10px_24px_-18px_rgba(50,38,68,0.5)] backdrop-blur-md transition-transform active:scale-95"
             >
               <Share2 className="h-[16px] w-[16px]" strokeWidth={2} />
             </button>
           }
         />
 
-        {/* HERO */}
-        <div className="relative h-[520px] w-full overflow-hidden">
+        <section className="relative isolate h-[clamp(550px,68dvh,640px)] min-h-[550px] w-full overflow-hidden rounded-b-[22px]">
           <img
             src={avatarSrc}
             alt={catName}
             className="absolute inset-0 h-full w-full object-cover"
+            style={{
+              objectPosition: heroImagePosition,
+              filter: "saturate(0.97) contrast(0.98) brightness(1.03)",
+            }}
           />
           <div
-            className="absolute inset-x-0 bottom-0 h-[300px]"
+            aria-hidden
+            className="absolute inset-0"
             style={{
               background:
-                "linear-gradient(180deg, transparent 0%, oklch(0.97 0.025 320 / 0.6) 50%, oklch(0.965 0.03 300) 100%)",
+                "linear-gradient(90deg, oklch(0.99 0.013 84 / 0.86) 0%, oklch(0.985 0.02 320 / 0.52) 28%, transparent 58%), linear-gradient(180deg, oklch(1 0 0 / 0.42) 0%, transparent 25%, transparent 52%, oklch(0.985 0.024 318 / 0.92) 100%)",
             }}
           />
           <div
             aria-hidden="true"
-            className="absolute bottom-0 left-0 z-[1] h-[245px] w-[88%]"
+            className="absolute -left-24 -top-14 h-[260px] w-[280px] rounded-full bg-[#F8D7E7]/50 blur-3xl"
+          />
+          <div
+            aria-hidden="true"
+            className="absolute -right-20 bottom-16 h-[260px] w-[220px] rounded-full bg-[#E7DBFF]/45 blur-3xl"
+          />
+          <div
+            aria-hidden="true"
+            className="absolute inset-x-0 bottom-0 h-[280px]"
             style={{
               background:
-                "linear-gradient(90deg, rgb(253 249 253 / 0.9) 0%, rgb(248 242 252 / 0.86) 34%, rgb(248 242 252 / 0.56) 68%, transparent 100%)",
-              maskImage: "linear-gradient(180deg, transparent 0%, black 22%, black 100%)",
-              WebkitMaskImage: "linear-gradient(180deg, transparent 0%, black 22%, black 100%)",
+                "linear-gradient(180deg, transparent 0%, oklch(0.98 0.025 318 / 0.42) 30%, oklch(0.985 0.018 84 / 0.96) 100%)",
             }}
           />
 
-          <div className="absolute left-6 right-6 bottom-5 z-10">
-            <div className="text-[15px] font-medium leading-none tracking-[0.02em] text-[#4F485F]">
+          <div className="absolute left-6 top-[calc(env(safe-area-inset-top,0px)+92px)] z-20 text-[#5F5674]/78">
+            <div className="text-[24px] font-medium leading-[1.02] tracking-[0.02em]">
+              CAT
+              <br />
+              PROFILE
+            </div>
+            <div className="mt-4 h-px w-8 bg-[#786C91]/55" />
+            <div className="mt-4 max-w-[94px] text-[13px] font-medium leading-[1.15] tracking-[0.02em]">
+              A Kinder
+              <br />
+              World
+              <br />
+              With Cats
+            </div>
+          </div>
+
+          <div className="absolute bottom-6 left-6 z-20 w-[min(74%,340px)]">
+            <div className="text-[20px] font-medium leading-none text-[#2E2741]">
               {catName}
             </div>
-            <div className="mt-1.5 flex flex-col gap-1.5">
-              <span
-                className="text-[26px] font-semibold leading-tight"
-                style={{
-                  background: "linear-gradient(90deg, #7659C5 0%, #9869BC 48%, #C47D9F 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                }}
-              >
-                {personaType}
-              </span>
-              <span className="flex items-baseline gap-2">
-                <span className="text-[11px] font-medium tracking-[0.24em] text-[#746B80]">
-                  MBTI
-                </span>
-                <span className="text-[15px] font-medium text-[#584A68]">{personaMbti}</span>
-              </span>
+            <div className="mt-2 text-[17px] font-semibold leading-none tracking-[0.03em] text-[#2E2741]">
+              {personaMbti}
             </div>
-            <p className="mt-3 text-[14px] font-medium leading-[1.7] text-[#4F485F]">
-              “{persona?.monologue ?? "不黏人，但永远会待在离你不远的地方。"}”
+            <div className="mt-4 h-px w-8 bg-[#75668E]/60" />
+            <h1
+              className="mt-3 text-[40px] font-bold leading-[1.06] text-[#2E225D] min-[420px]:text-[44px]"
+              style={{
+                fontFamily: EDITORIAL_FONT,
+                textShadow: "0 1px 16px rgb(255 255 255 / 0.72)",
+              }}
+            >
+              {titleLines.map((line) => (
+                <span key={line} className="block">
+                  {line}
+                </span>
+              ))}
+            </h1>
+            <p className="mt-4 max-w-[310px] text-[17px] font-medium leading-[26px] text-[#5A5370]">
+              {heroDescription}
             </p>
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-5 grid max-w-[340px] grid-cols-3 gap-3">
               {personaKeywords.map((k) => (
                 <span
                   key={k}
-                  className="rounded-full bg-white/85 backdrop-blur px-3 py-[6px] text-[12px] font-normal text-[oklch(0.5_0.08_305)]"
-                  style={{ boxShadow: "0 8px 20px -14px oklch(0.6 0.12 305 / 0.6)" }}
+                  className="flex min-h-9 items-center justify-center rounded-full bg-white/72 px-3 text-center text-[14px] font-semibold leading-[18px] text-[#7259B5] shadow-[0_12px_26px_-22px_rgba(93,64,139,0.65)] backdrop-blur-md"
                 >
-                  {k}
+                  {shortenLabel(k, 7)}
                 </span>
               ))}
             </div>
           </div>
-        </div>
+        </section>
       </div>
 
-      {/* ================= SCREEN 2 ================= */}
-
-      {/* 小世界 */}
-      <section className="relative z-10 mt-7 shrink-0">
-        <h2 className="flex items-baseline gap-2 px-6 text-[16px] font-semibold text-[oklch(0.32_0.05_300)]">
-          {catName}的小世界
-          <span className="text-[10px] font-normal tracking-[0.22em] text-[oklch(0.72_0.035_300)]">
-            LITTLE · WORLD
+      <section className="relative z-10 px-5 pt-7">
+        <h2 className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span className="text-[22px] font-semibold leading-tight text-[#2D2540]">
+            原来{catName}是这样的猫
           </span>
-        </h2>
-        <div
-          className="mt-2.5 flex snap-x snap-mandatory gap-3 overflow-x-auto scrollbar-none px-[15%] pb-1"
-          onScroll={(event) => {
-            const element = event.currentTarget;
-            const cards = Array.from(element.children) as HTMLElement[];
-            const center = element.scrollLeft + element.clientWidth / 2;
-            const nearest = cards.reduce(
-              (best, card, index) => {
-                const cardCenter = card.offsetLeft + card.offsetWidth / 2;
-                const distance = Math.abs(cardCenter - center);
-                return distance < best.distance ? { index, distance } : best;
-              },
-              { index: 0, distance: Number.POSITIVE_INFINITY },
-            );
-            setActiveScene(nearest.index);
-          }}
-        >
-          {scenes.map((scene, index) => (
-            <SceneCard key={scene.id} scene={scene} index={index} total={scenes.length} />
-          ))}
-        </div>
-        <div className="mt-1.5 flex justify-center gap-1.5">
-          {scenes.map((scene, index) => (
-            <span
-              key={scene.id}
-              className="h-[5px] rounded-full"
-              style={{
-                width: index === activeScene ? 16 : 5,
-                background:
-                  index === activeScene
-                    ? "linear-gradient(90deg,#B69AEF,#E6B8CF)"
-                    : "oklch(0.86 0.04 310)",
-              }}
-            />
-          ))}
-        </div>
-      </section>
-
-      {/* 人格洞察：照片证据只用于内部推理，不在结果页重复展示 */}
-      <section className="relative z-10 mx-5 mt-7 shrink-0">
-        <h2 className="flex items-baseline gap-2 text-[16px] font-semibold text-[oklch(0.32_0.05_300)]">
-          原来{catName}是这样的猫
-          <span className="text-[10px] font-normal tracking-[0.22em] text-[oklch(0.72_0.035_300)]">
+          <span className="text-[12px] font-medium tracking-[0.28em] text-[#A69AB7]">
             CAT · INSIGHT
           </span>
         </h2>
-        <div className="mt-3.5 flex flex-col gap-2.5">
-          {resultInsights.map((it, insightIndex) => (
-            <div
-              key={it.title}
-              className="rounded-[20px] px-5 py-4"
+        <div className="mt-4 flex flex-col gap-3.5">
+          {resultInsights.map((it) => (
+            <article
+              key={`${it.index}-${it.title}`}
+              className="flex gap-4 rounded-[22px] bg-white/58 px-[22px] py-5 shadow-[0_16px_34px_-30px_rgba(91,65,130,0.45)] backdrop-blur-xl"
               style={{
-                background:
-                  insightIndex === 2
-                    ? "linear-gradient(145deg, oklch(0.98 0.025 330 / 0.94), oklch(0.96 0.04 295 / 0.90))"
-                    : "linear-gradient(180deg, oklch(1 0 0 / 0.74), oklch(0.99 0.015 320 / 0.54))",
-                border: "1px solid oklch(1 0 0 / 0.8)",
-                backdropFilter: "blur(20px)",
-                boxShadow: "0 14px 30px -24px oklch(0.6 0.12 305 / 0.5)",
+                border: "1px solid rgb(255 255 255 / 0.78)",
               }}
             >
-              <div className="flex items-baseline gap-3">
-                <span className="text-[11px] font-medium tracking-[0.18em] text-[oklch(0.68_0.08_305)]">
-                  {it.index}
-                </span>
-                <h3 className="text-[15px] font-semibold text-[oklch(0.33_0.045_300)]">
+              <span className="mt-[2px] shrink-0 text-[16px] font-semibold leading-[24px] tracking-[0.12em] text-[#B197E0]">
+                {it.index}
+              </span>
+              <div className="min-w-0">
+                <h3 className="text-[19px] font-semibold leading-[25px] text-[#2F2942]">
                   {it.title}
                 </h3>
+                <p className="mt-2.5 text-[16px] leading-[26px] text-[#6C647C]">
+                  {it.text}
+                </p>
               </div>
-              <p className="mt-2.5 text-[14px] leading-[1.75] text-[oklch(0.48_0.04_300)]">
-                {it.text}
-              </p>
-            </div>
+            </article>
           ))}
         </div>
       </section>
 
-      {/* 底部操作 */}
+      <div className="h-7" aria-hidden />
+
       <div
-        className="sticky bottom-0 z-20 mt-7 shrink-0 px-5 pt-3 pb-[max(20px,env(safe-area-inset-bottom))]"
+        className="sticky bottom-0 z-30 px-5 pt-3 pb-[max(20px,env(safe-area-inset-bottom))]"
         style={{
           background:
-            "linear-gradient(180deg, transparent, oklch(0.96 0.035 290 / 0.92) 35%, oklch(0.96 0.035 285 / 0.98) 100%)",
+            "linear-gradient(180deg, rgb(250 245 251 / 0), rgb(250 245 251 / 0.88) 35%, rgb(249 242 250 / 0.98) 100%)",
+          backdropFilter: "blur(18px)",
         }}
       >
         <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
             onClick={() => onRestart?.()}
-            className="touch-manipulation rounded-full bg-white px-4 py-3.5 text-[14px] font-medium text-[oklch(0.5_0.1_305)] transition-transform duration-75 active:scale-[0.98]"
+            className="touch-manipulation rounded-full bg-white/82 px-4 py-3.5 text-[17px] font-semibold text-[#7459B5] transition-transform duration-75 active:scale-[0.98]"
             style={{
-              border: "1.5px solid #C7B3F2",
-              boxShadow: "0 8px 20px -14px oklch(0.78 0.11 305 / 0.4)",
+              border: "1.5px solid #C5A6F0",
+              boxShadow: "0 12px 24px -20px rgba(93, 64, 139, 0.48)",
             }}
           >
             重新识别
@@ -361,10 +316,10 @@ export function Screen6Result({
           <button
             type="button"
             onClick={handleSave}
-            className="flex touch-manipulation items-center justify-center rounded-full px-4 py-3.5 text-[14px] font-medium text-white transition-transform duration-75 active:scale-[0.98]"
+            className="flex touch-manipulation items-center justify-center rounded-full px-4 py-3.5 text-[17px] font-semibold text-white transition-transform duration-75 active:scale-[0.98]"
             style={{
-              background: "linear-gradient(90deg, #B69AEF 0%, #E6B8CF 100%)",
-              boxShadow: "0 14px 28px -14px oklch(0.78 0.11 305 / 0.55)",
+              background: "linear-gradient(90deg, #AA8BE8 0%, #E9ABC9 100%)",
+              boxShadow: "0 16px 30px -16px rgba(148, 100, 203, 0.58)",
             }}
           >
             保存结果
@@ -377,66 +332,87 @@ export function Screen6Result({
   );
 }
 
-function SceneCard({
-  scene,
-  index,
-  total,
-}: {
-  scene: LittleWorldScene & { src: string };
-  index: number;
-  total: number;
-}) {
-  return (
-    <article
-      className="relative h-[260px] w-[70vw] max-w-[274px] shrink-0 snap-center overflow-hidden rounded-[24px]"
-      data-ai-prompt={scene.prompt}
-      style={{
-        border: "1px solid oklch(1 0 0 / 0.85)",
-        boxShadow: "0 18px 36px -26px oklch(0.6 0.12 305 / 0.55)",
-      }}
-    >
-      <div className="relative h-full w-full overflow-hidden bg-[oklch(0.93_0.035_305)]">
-        <img
-          src={scene.src}
-          alt=""
-          aria-hidden="true"
-          className="absolute inset-0 h-full w-full scale-110 object-cover opacity-35 blur-xl"
-        />
-        <img
-          src={scene.src}
-          alt={scene.title}
-          loading="lazy"
-          className="absolute inset-y-0 left-1/2 h-full aspect-[3/4] -translate-x-1/2 object-contain object-center"
-        />
-        <div
-          className="absolute inset-x-0 bottom-0 h-[52%]"
-          style={{
-            background:
-              "linear-gradient(180deg, transparent, oklch(0.2 0.05 300 / 0.55) 55%, oklch(0.18 0.05 300 / 0.72))",
-          }}
-        />
-        <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 px-4 pb-4">
-          <div className="min-w-0">
-            <div
-              className="text-[14px] font-medium tracking-[0.06em] text-white/95"
-              style={{ textShadow: "0 1px 8px oklch(0.2 0.05 300 / 0.6)" }}
-            >
-              {scene.title}
-            </div>
-            <p
-              className="mt-1 text-[12.5px] leading-[1.6] text-white/80"
-              style={{ textShadow: "0 1px 8px oklch(0.2 0.05 300 / 0.6)" }}
-            >
-              {scene.line}
-            </p>
-          </div>
-          <div className="shrink-0 pb-[2px] text-[10px] tracking-[0.16em] text-white/70">
-            {String(index + 1).padStart(2, "0")}/{String(total).padStart(2, "0")}
-          </div>
-        </div>
-      </div>
-    </article>
-  );
+function useHeroImagePosition(src: string) {
+  const [position, setPosition] = useState("60% 42%");
+
+  useEffect(() => {
+    let live = true;
+    const image = new Image();
+    image.onload = () => {
+      if (!live) return;
+      setPosition(resolveHeroImagePosition(image.naturalWidth, image.naturalHeight));
+    };
+    image.onerror = () => {
+      if (live) setPosition("60% 42%");
+    };
+    image.src = src;
+    return () => {
+      live = false;
+    };
+  }, [src]);
+
+  return position;
+}
+
+function resolveHeroImagePosition(width: number, height: number) {
+  if (!width || !height) return "60% 42%";
+  const ratio = width / height;
+  if (ratio < 0.78) return "52% 38%";
+  if (ratio > 1.25) return "64% 46%";
+  return "60% 42%";
+}
+
+function splitPersonaTitle(title: string) {
+  const clean = title.trim().replace(/\s+/g, "");
+  if (!clean) return ["猫咪", "观察家"];
+  if (clean.length <= 6) return [clean];
+
+  const possessiveIndex = clean.indexOf("的");
+  if (possessiveIndex >= 1 && possessiveIndex <= 4 && possessiveIndex < clean.length - 1) {
+    return [clean.slice(0, possessiveIndex + 1), clean.slice(possessiveIndex + 1)];
+  }
+
+  const splitAt = Math.ceil(clean.length / 2);
+  return [clean.slice(0, splitAt), clean.slice(splitAt)];
+}
+
+function buildPersonaKeywords(tags: string[] | undefined) {
+  const merged = [...(tags ?? []), ...KEYWORDS]
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+  return Array.from(new Set(merged)).slice(0, 3);
+}
+
+function shortenCopy(value: string, maxLength: number) {
+  const normalized = value
+    .trim()
+    .replace(/^[“"'「『]+|[”"'」』]+$/g, "")
+    .replace(/\s+/g, " ");
+  const chars = Array.from(normalized);
+  if (chars.length <= maxLength) return normalized;
+
+  const punctuation = new Set(["。", "！", "？", ".", "!", "?", "；", ";", "，", ","]);
+  const min = Math.floor(maxLength * 0.62);
+  let cutAt = -1;
+  for (let i = Math.min(chars.length, maxLength) - 1; i >= min; i -= 1) {
+    if (punctuation.has(chars[i])) {
+      cutAt = i + 1;
+      break;
+    }
+  }
+
+  const sliced = chars
+    .slice(0, cutAt > 0 ? cutAt : maxLength)
+    .join("")
+    .replace(/[，,；;：:]$/u, "。")
+    .trim();
+  return /[。！？.!?]$/u.test(sliced) ? sliced : `${sliced}。`;
+}
+
+function shortenLabel(value: string, maxLength: number) {
+  const chars = Array.from(value.trim());
+  if (chars.length <= maxLength) return value;
+  return chars.slice(0, maxLength).join("");
 }
 
 function ShareSheet({

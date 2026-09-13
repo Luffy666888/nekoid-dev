@@ -795,7 +795,7 @@ export function ScreenVoiceDetail({ id = 0 }: { id?: number }) {
               {voiceAnalysisText(v) ?? "它似乎在表达：这个瞬间里，它正在用自己的方式向你靠近。"}
             </p>
             <div className="mt-2.5 flex flex-wrap gap-1.5">
-              {(v.tags ?? ["💭 小心思", "✨ 想被看见"]).map((t) => (
+              {(v.tags ?? ["会用眼神表达", "喜欢待在附近"]).map((t) => (
                 <span key={t} className="rounded-full px-2 py-[3px] text-[10.5px]" style={{ background: "oklch(0.96 0.03 305)", color: "oklch(0.5 0.1 305)" }}>#{t}</span>
               ))}
             </div>
@@ -1161,12 +1161,12 @@ export function ScreenPublish3() {
     createdAt: Date.now(),
     location: "家里",
     grad: "linear-gradient(135deg, oklch(0.9 0.06 280), oklch(0.92 0.05 320))",
-    tags: ["💭 小心思", "🐾 想靠近"],
+    tags: ["会用眼神表达", "喜欢待在附近"],
     aspect: "3:4",
     text: "我在认真看你，也在等你靠近一点。",
     media: stablePhoto ?? uploadedPhoto ?? getPublishPhoto() ?? undefined,
     mediaType: "photo",
-    analysis: `${catName}的停留和注视，像是在用自己的方式回应你。`,
+    analysis: `${catName}不太会大声叫你，更习惯待在你看得见的地方。`,
   });
   const startPublish = () => {
     if (publishLockRef.current) return;
@@ -1366,7 +1366,7 @@ export function ScreenSuccess() {
             {/* meta below media */}
             <div className="flex items-center justify-between gap-2 px-4 pb-3.5 pt-3">
               <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                {(draftVoice?.tags ?? ["💗 想念", "😼 傲娇"]).slice(0, 2).map((tag) => (
+                {(draftVoice?.tags ?? ["会用眼神表达", "喜欢待在附近"]).slice(0, 2).map((tag) => (
                   <span key={tag} className="shrink-0 rounded-full px-2 py-[3px] text-[10.5px] font-medium text-[oklch(0.45_0.1_305)]"
                     style={{ background: "linear-gradient(135deg, oklch(0.96 0.04 320), oklch(0.95 0.05 270))" }}>{tag}</span>
                 ))}

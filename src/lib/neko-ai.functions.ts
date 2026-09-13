@@ -128,6 +128,120 @@ function personaInsightText(value: PersonaInsightValue | undefined, fallback = "
   return asText(value?.text, fallback);
 }
 
+function charLength(value: string) {
+  return Array.from(value).length;
+}
+
+function limitChars(value: string, max: number) {
+  return Array.from(value).slice(0, max).join("");
+}
+
+const plainCopyReplacements: Array<[RegExp, string]> = [
+  [/仪式感极强的眼神(?:催促|施压)者/g, "会用眼神叫你"],
+  [/眼神(?:催促|施压)/g, "用眼神提醒你"],
+  [/仪式感/g, "固定习惯"],
+  [/施压/g, "提醒"],
+  [/端庄地?定点/g, "安静坐着等你"],
+  [/克制讨关注/g, "安静等你发现"],
+  [/稳态陪伴/g, "喜欢待在附近"],
+  [/稳态/g, "安静"],
+  [/节奏掌控|掌控节奏/g, "按自己的想法来"],
+  [/秩序感/g, "固定习惯"],
+  [/高度敏锐/g, "很会观察动静"],
+  [/敏锐/g, "很会观察"],
+  [/策略性地?靠近/g, "先观察再靠近"],
+  [/策略性/g, "先试探一下"],
+  [/精准地?表达/g, "表达得很清楚"],
+  [/低频高质互动/g, "不常主动，但会认真回应"],
+  [/低频高质/g, "次数不多但会回应"],
+  [/视线必经的动线/g, "你看得见的地方"],
+  [/直球眼神确认你的注意力/g, "用眼神等你注意到它"],
+  [/端正坐好/g, "安静坐着"],
+];
+
+const jargonLabelPatterns = [
+  /仪式感/,
+  /施压/,
+  /掌控/,
+  /秩序感/,
+  /克制讨关注/,
+  /高度敏锐|敏锐/,
+  /策略性|策略/,
+  /精准/,
+  /端庄定点|定点/,
+  /稳态/,
+  /低频|高质/,
+  /动线/,
+  /节奏/,
+  /催促者/,
+  /观察家|守护者|陪伴者/,
+  /小小?探长|小小?侦探|观察员/,
+];
+
+const readableLabelReplacements: Array<[RegExp, string]> = [
+  [/眼神.*(?:催促|施压|提醒|表达|叫)/, "会用眼神表达"],
+  [/视线|看得见|动线/, "待在你看得见的地方"],
+  [/端庄|定点|端正坐好/, "安静坐着等你"],
+  [/克制.*关注|讨关注/, "安静等你发现"],
+  [/稳态.*陪伴|稳态/, "喜欢待在附近"],
+  [/低频|高质/, "不常主动但会回应"],
+  [/策略性.*靠近|先确认.*靠近/, "先观察再靠近"],
+  [/高度敏锐|敏锐/, "很会观察动静"],
+  [/掌控|节奏/, "按自己想法来"],
+  [/观察优先/, "先观察再靠近"],
+  [/保留距离/, "不急着靠近"],
+  [/心动不动/, "想靠近又犹豫"],
+  [/小小?探长|小小?侦探/, "会先看清楚"],
+  [/观察员/, "先观察再回应"],
+  [/关注镜头/, "看着镜头"],
+  [/暂不靠近/, "先不靠近"],
+];
+
+function simplifyNekoCopy(text: string) {
+  return plainCopyReplacements
+    .reduce((next, [pattern, replacement]) => next.replace(pattern, replacement), text)
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function hasJargonLabel(value: string) {
+  return jargonLabelPatterns.some((pattern) => pattern.test(value));
+}
+
+function readableLabelReplacement(value: string) {
+  return readableLabelReplacements.find(([pattern]) => pattern.test(value))?.[1] ?? "";
+}
+
+function cleanLabelText(value: string) {
+  return value
+    .replace(/^#+/, "")
+    .replace(/[^\p{Script=Han}A-Za-z0-9]/gu, "")
+    .trim();
+}
+
+function normalizeNaturalLabel(value: unknown, profile: CatProfile, max = 10) {
+  const copied = simplifyNekoCopy(normalizeCatFacts(value, profile));
+  const replaced = readableLabelReplacement(copied) || copied;
+  const cleaned = cleanLabelText(readableLabelReplacement(replaced) || replaced);
+  const natural = readableLabelReplacement(cleaned) || cleaned;
+  if (!natural || hasJargonLabel(natural)) return "";
+  return limitChars(natural, max);
+}
+
+function uniqueNaturalLabels(values: unknown[], profile: CatProfile, max = 10) {
+  return values
+    .map((value) => normalizeNaturalLabel(value, profile, max))
+    .filter((value, index, list) => charLength(value) >= 4 && list.indexOf(value) === index);
+}
+
+function normalizePersonaType(value: unknown, profile: CatProfile, fallback = "先观察再靠近") {
+  const copied = simplifyNekoCopy(normalizeCatFacts(value, profile, fallback));
+  const replaced = readableLabelReplacement(copied) || copied;
+  const cleaned = cleanLabelText(replaced);
+  const type = readableLabelReplacement(cleaned) || cleaned;
+  return isSpecificPersonaType(type) ? type : fallback;
+}
+
 function normalizeCatFacts(value: unknown, profile: CatProfile, fallback = "") {
   const text = asText(value, fallback);
   if (!text) return "";
@@ -153,31 +267,24 @@ function normalizeCatFacts(value: unknown, profile: CatProfile, fallback = "") {
     .replaceAll("他把", "它把")
     .replaceAll("他对", "它对")
     .replaceAll("他总", "它总");
-  return next;
+  return simplifyNekoCopy(next);
 }
 
 function boundedCopy(value: string, fallback: string, min: number, max: number) {
   const normalized = value.replace(/\s+/g, " ").trim();
-  const selected = Array.from(normalized).length >= min ? normalized : fallback;
-  return Array.from(selected).slice(0, max).join("");
-}
-
-function normalizeShareTag(value: unknown, profile: CatProfile) {
-  const normalized = normalizeCatFacts(value, profile)
-    .replace(/^#+/, "")
-    .replace(/[，。！？、,.!?:：；;\s]/g, "")
-    .trim();
-  return Array.from(normalized).slice(0, 8).join("");
+  const selected = charLength(normalized) >= min ? normalized : fallback;
+  return limitChars(selected, max);
 }
 
 function normalizePersonaForProfile(persona: CatPersona, profile: CatProfile): CatPersona {
   const parsedTags = Array.isArray(persona.tags) ? persona.tags : [];
   const parsedTraits = Array.isArray(persona.traits) ? persona.traits : [];
   const parsedObservations = Array.isArray(persona.observations) ? persona.observations : [];
+  const normalizedTags = uniqueNaturalLabels(parsedTags, profile);
   return {
     ...persona,
     name: profile.name || persona.name,
-    type: normalizeCatFacts(persona.type, profile) || persona.type,
+    type: normalizePersonaType(persona.type, profile),
     mbti: normalizeCatFacts(persona.mbti, profile) || persona.mbti,
     monologue: normalizeCatFacts(persona.monologue, profile),
     analysis: normalizeCatFacts(persona.analysis, profile),
@@ -188,7 +295,7 @@ function normalizePersonaForProfile(persona: CatPersona, profile: CatProfile): C
     ownerRole: normalizeCatFacts(persona.ownerRole, profile),
     ownerRelationship: normalizeCatFacts(persona.ownerRelationship, profile),
     dailyMood: normalizeCatFacts(persona.dailyMood, profile),
-    tags: parsedTags.map((tag) => normalizeCatFacts(tag, profile)).filter(Boolean),
+    tags: normalizedTags,
     traits: parsedTraits
       .map((trait) => {
         const raw = trait as { label?: unknown; value?: unknown } | string;
@@ -231,15 +338,23 @@ const genericPersonaTypePatterns = [
   /梦境观察家/,
   /月光陪伴者/,
   /治愈观察者/,
+  /仪式感/,
+  /眼神(?:催促|施压)/,
+  /端庄定点/,
+  /克制讨关注/,
+  /稳态陪伴/,
+  /低频高质/,
   /^(?:温柔|安静|优雅|梦幻|治愈)(?:观察家|守护者|陪伴者|探索家)$/,
 ];
 
 function isSpecificPersonaType(value: unknown): value is string {
   if (typeof value !== "string") return false;
-  const type = value.trim();
+  const type = cleanLabelText(simplifyNekoCopy(value));
+  const length = charLength(type);
   return (
-    type.length >= 4 &&
-    type.length <= 12 &&
+    length >= 4 &&
+    length <= 10 &&
+    !hasJargonLabel(type) &&
     !genericPersonaTypePatterns.some((pattern) => pattern.test(type))
   );
 }
@@ -250,20 +365,22 @@ function buildStablePersona(profile: CatProfile): CatPersona {
     return normalizePersonaForProfile(
       {
         name: profile.name,
-        type: "等你继续观察",
+        type: "还要多看看",
         mbti: "INFP-A",
         matchScore: 60,
         monologue: "先别急着定义我，再陪我多过几天日常吧。",
         analysis:
           "目前缺少日常行为答案，暂时不能确定它是否黏人、边界感如何，或习惯怎样表达亲近。继续记录后，判断会更贴近它。",
-        corePersonality: "现有线索只够做保守观察，还不足以概括长期人格。",
+        corePersonality: "现在知道得还不够多，先别急着给它下结论。",
         misunderstanding:
-          "目前缺少日常行为答案，暂时不能判断你是否误解了它的某种行为。多记录几次真实互动后，再寻找稳定的行为反差。",
+          "现在还缺少日常里的具体表现，暂时不能判断你有没有误会它。多记录几次它靠近、躲开、叫你或看着你的情况，会更准。",
         loveLanguage: "现有信息不足以判断它偏好贴贴、玩耍还是安静共处。",
         loveLanguageInsight: "现有信息不足以判断它偏好贴贴、玩耍还是安静共处。",
-        ownerRole: "目前还不能确定你在它关系中的具体位置，只能确认你正在认真观察和了解它。",
-        ownerRelationship: "目前还不能确定你在它关系中的具体位置，只能确认你正在认真观察和了解它。",
-        tags: ["等待更多日常", "关系线索不足", "保守观察中", "继续认识它"],
+        ownerRole:
+          "目前还不能确定你在它心里是什么位置，只能先确认：你正在认真观察它，也在慢慢了解它。",
+        ownerRelationship:
+          "目前还不能确定你在它心里是什么位置，只能先确认：你正在认真观察它，也在慢慢了解它。",
+        tags: ["还需要多观察", "日常线索不够", "先不急着判断", "继续认识它"],
         traits: [],
         observations: [],
         evidence: [],
@@ -281,44 +398,48 @@ function buildStablePersona(profile: CatProfile): CatPersona {
       type: "先冲再研究",
       mbti: "ENFP-A",
       mood: "今天也想探索新角落",
-      tags: ["好奇心旺", "撒娇高手", "活力满满", "需要陪玩", "软萌外表", "小小冒险"],
+      tags: ["看到新东西想去看", "喜欢找你玩", "累了会撒娇", "边玩边观察"],
       traits: [
         { label: "粘人度", value: 82 },
         { label: "探索欲", value: 90 },
-        { label: "安全感", value: 68 },
+        { label: "撒娇度", value: 76 },
+        { label: "行动派程度", value: 84 },
       ],
     },
     青年猫: {
       type: "先看再行动",
       mbti: "INFP-A",
       mood: "安静又温暖，适合窝在你身边",
-      tags: ["优雅独立", "温柔治愈", "好奇探索", "安静陪伴", "慢热亲近", "小小主见"],
+      tags: ["先观察再靠近", "喜欢待在附近", "熟了会更黏", "有自己的边界"],
       traits: [
         { label: "粘人度", value: 72 },
         { label: "独立性", value: 84 },
         { label: "好奇心", value: 88 },
+        { label: "边界感", value: 70 },
       ],
     },
     成熟猫: {
       type: "有主意陪伴派",
       mbti: "ISFJ-A",
       mood: "今天想安稳地陪你一会",
-      tags: ["稳定温柔", "懂得陪伴", "慢热可靠", "观察细腻", "亲密有度", "安心感"],
+      tags: ["喜欢安静陪你", "不急着要抱", "会看你的反应", "熟人面前放松"],
       traits: [
         { label: "粘人度", value: 76 },
-        { label: "稳定感", value: 90 },
-        { label: "观察力", value: 82 },
+        { label: "观察欲", value: 82 },
+        { label: "边界感", value: 74 },
+        { label: "情绪外露度", value: 58 },
       ],
     },
     资深猫: {
       type: "慢慢巡视派",
       mbti: "INFJ-A",
       mood: "慢慢看着你，就是它的温柔",
-      tags: ["沉稳安静", "经验丰富", "温柔守候", "安全感强", "慢节奏", "小智者"],
+      tags: ["慢慢走过来看", "喜欢固定位置", "安静等你回应", "不爱被催着动"],
       traits: [
         { label: "粘人度", value: 70 },
-        { label: "稳定感", value: 92 },
-        { label: "洞察力", value: 86 },
+        { label: "观察欲", value: 86 },
+        { label: "边界感", value: 80 },
+        { label: "行动派程度", value: 46 },
       ],
     },
   };
@@ -330,7 +451,7 @@ function buildStablePersona(profile: CatProfile): CatPersona {
       mbti: tone.mbti,
       matchScore: 88,
       monologue: `今天也想悄悄靠近你，陪你待一会。`,
-      analysis: `${profile.name}是${profile.ageStage}里的${profile.gender}，性格里带着独立和温柔。它会先观察环境，再用停留、靠近和注视表达亲近。`,
+      analysis: `${profile.name}通常会先看看周围，再决定要不要靠近。它不一定会大声叫你，但会用停留、靠近或看着你来表达。`,
       corePersonality:
         profile.quiz && Object.values(profile.quiz).some(Boolean)
           ? tone.type
@@ -338,8 +459,8 @@ function buildStablePersona(profile: CatProfile): CatPersona {
       misunderstanding: `它不是对周围没兴趣，只是更习惯先把情况看明白。平时坐着不动时，也可能早已把注意力放在眼前，只是在等自己认可的时机。`,
       loveLanguage: `如果它平时也常待在你附近却不紧贴，它可能更习惯用关注你的动向、共享同一片空间来表达亲近。`,
       loveLanguageInsight: `如果它平时也常待在你附近却不紧贴，它可能更习惯用关注你的动向、共享同一片空间来表达亲近。`,
-      ownerRole: `你可能不是它时时刻刻都要黏着的人，但很可能是它默认会在的人。对它来说，不需要反复确认你的存在，本身就是一种稳定的信任。`,
-      ownerRelationship: `你可能不是它时时刻刻都要黏着的人，但很可能是它默认会在的人。对它来说，不需要反复确认你的存在，本身就是一种稳定的信任。`,
+      ownerRole: `你可能不是它时时刻刻都要黏着的人，但很可能是它抬头会找的人。只要你在附近，它就更容易放松下来。`,
+      ownerRelationship: `你可能不是它时时刻刻都要黏着的人，但很可能是它抬头会找的人。只要你在附近，它就更容易放松下来。`,
       tags: tone.tags,
       traits: tone.traits,
       observations: [
@@ -370,12 +491,14 @@ function normalizeVoiceForProfile(
   imageDataUrl?: string | null,
 ): Voice {
   const tags = Array.isArray(input.tags)
-    ? input.tags
-        .map((tag) => normalizeShareTag(tag, profile))
-        .filter((tag) => Array.from(tag).length >= 4)
-        .slice(0, 3)
+    ? uniqueNaturalLabels(input.tags, profile).slice(0, 3)
     : [];
   const mood = normalizeCatFacts(input.mood, profile, "想被关注");
+  const voiceTags = (
+    tags.length >= 3
+      ? tags
+      : uniqueNaturalLabels([...tags, mood, "想靠近一点", "安静等你发现", "有点小主意"], profile)
+  ).slice(0, 3);
   const rawAnalysis =
     input.analysis && typeof input.analysis === "object"
       ? (input.analysis as Record<string, unknown>)
@@ -392,8 +515,8 @@ function normalizeVoiceForProfile(
     30,
   );
   const subtext = boundedCopy(
-    normalizeCatFacts(input.subtext, profile, "它没有急着行动，像是在等一个符合自己节奏的时机。"),
-    "它没有急着行动，像是在等一个符合自己节奏的时机。",
+    normalizeCatFacts(input.subtext, profile, "它没有急着行动，像是在等自己想动的时候。"),
+    "它没有急着行动，像是在等自己想动的时候。",
     15,
     30,
   );
@@ -405,18 +528,23 @@ function normalizeVoiceForProfile(
   );
   const rawShare =
     input.share && typeof input.share === "object" ? (input.share as Record<string, unknown>) : {};
-  const shareTags = Array.isArray(rawShare.tags)
-    ? rawShare.tags
-        .map((tag) => normalizeShareTag(tag, profile))
-        .filter((tag) => Array.from(tag).length >= 4)
-        .slice(0, 3)
+  const parsedShareTags = Array.isArray(rawShare.tags)
+    ? uniqueNaturalLabels(rawShare.tags, profile).slice(0, 3)
     : [];
+  const shareTags = (
+    parsedShareTags.length >= 2
+      ? parsedShareTags
+      : uniqueNaturalLabels(
+          [...parsedShareTags, ...voiceTags, "会用眼神表达", "先观察再回应", "有点小主意"],
+          profile,
+        )
+  ).slice(0, 3);
   return {
     time: "刚刚",
     createdAt: Date.now(),
     location: normalizeCatFacts(input.location, profile, "家里") || "家里",
     grad: "linear-gradient(135deg, oklch(0.9 0.06 280), oklch(0.92 0.05 320))",
-    tags: (tags.length ? tags : [`💭 ${mood}`, "✨ 小心思"]).slice(0, 3),
+    tags: voiceTags,
     aspect: "3:4",
     text: boundedCopy(
       normalizeCatFacts(input.text, profile, `靠近一点嘛，今天也想被你看见。`),
@@ -444,15 +572,7 @@ function normalizeVoiceForProfile(
         18,
         35,
       ),
-      tags:
-        shareTags.length >= 2
-          ? shareTags
-          : [...tags, `${mood}时刻`, `${profile.ageStage}小观察`]
-              .map((tag) => normalizeShareTag(tag, profile))
-              .filter(
-                (tag, index, list) => Array.from(tag).length >= 4 && list.indexOf(tag) === index,
-              )
-              .slice(0, 3),
+      tags: shareTags,
     },
   } as Voice;
 }
@@ -493,16 +613,16 @@ function buildStableVoice(
       text,
       analysis: {
         observation: analysisSummary,
-        personalityInterpretation: `它习惯先确认环境和你的反应，再决定是否靠近，体现了谨慎又有主见的性格。`,
+        personalityInterpretation: `它习惯先看看你的反应，再决定要不要靠近。`,
       },
       share: {
         headline: text,
-        insight: `它不是没有反应，只是在用自己的节奏确认这一刻是否值得靠近。`,
-        tags: [`${mood}观察员`, "先观察再回应", "这一刻有主意"],
+        insight: `它不是没反应，只是更习惯先看一会儿，等你注意到它。`,
+        tags: [mood, "先观察再回应", "有点小主意"],
       },
       mood,
       location: "家里",
-      tags: [`💭 ${mood}`, "🐾 想靠近", "✨ 小心思"],
+      tags: [mood, "想靠近一点", "有点小主意"],
     },
     profile,
     imageDataUrl,
@@ -998,6 +1118,17 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
 
 最终结果必须让主人产生“对，它就是这样”“原来这个行为是这个意思”“这句话很像我和它的关系”，而不是觉得 AI 只把照片复述了一遍。
 
+语言总原则：
+1. 第一优先级是人话。普通养猫人第一次看到，就应该马上懂。
+2. 禁止创造新概念。不要把简单行为包装成自造术语。
+3. 不要写成心理学报告、品牌广告、MBTI 博主或学术分析。
+4. 可理解性 > 创意；准确 > 高级感；像猫 > 像 AI。
+
+禁止在 type、tags 和用户可见洞察中使用这类抽象包装词：
+仪式感、施压、掌控节奏、节奏掌控、秩序感、克制讨关注、高度敏锐、策略性靠近、精准表达、端庄定点、稳态陪伴、低频高质互动、眼神施压、眼神催促。
+坏例：仪式感极强的眼神催促者、眼神施压、端庄定点、克制讨关注、低频高质互动。
+好例：安静观察型、慢热陪伴型、会用眼神叫你、外冷内黏型、好奇但谨慎、不黏人但总在附近、安静等你回应。
+
 请先在内部按以下顺序推理，但不要输出推理过程：
 照片事实 → 提炼 1–2 个真实行为模式 → 提炼 1 个最明显、有证据的性格反差 → 根据这些证据命名 type → 它可能如何看待主人。
 禁止先决定 MBTI 再寻找证据。
@@ -1010,16 +1141,16 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
 如果证据支持，优先提炼“A，但是 B”的真实反差，例如想靠近却保留距离；但绝不能为了反差虚构画面、动作、经历、主人行为或长期习惯。
 
 字段要求：
-- type：使用自然、易懂的中文短语，让主人一眼看懂它通常“怎么做”或“表面与实际有什么反差”；不要为了字数生造词，也不强制四到六字。可有一点趣味和猫的小脾气，但不使用空洞审美词。禁止“精致定格派、柔光守护者、梦境观察家、月光陪伴者、治愈观察者”，也避免“温柔/安静/优雅 + 观察家/守护者/陪伴者”式组合。
+- type：人格标题，优先 4–10 个中文字符。必须自然、易懂，让主人一眼看懂它通常“怎么做”或“表面和实际有什么反差”。可以有一点趣味，但不能牺牲可理解性。不要为了显得独特、高级、人格化而造词。禁止“仪式感极强的眼神催促者、眼神施压型、端庄定点、克制讨关注、精致定格派、柔光守护者、梦境观察家、月光陪伴者、治愈观察者”，也避免“温柔/安静/优雅 + 观察家/守护者/陪伴者”式组合。
 - mbti：完成人格判断后再选择最接近的趣味标签，格式必须为 XXXX-A 或 XXXX-T；不要把它当科学测量或用刻板印象改写事实。
 - matchScore：60–99 的整数，反映现有证据与结论的匹配程度。
 - monologue：最重要的分享文案。第一人称，优先 20–35 个中文字，结合具体场景，像这只猫此刻会说的话；允许一点小脾气、小傲娇和幽默，不写 AI 散文、鸡汤或泛宠物文学。
-- corePersonality：一句话概括最核心的行为特点，必须来自 Trait 组合，而不是 MBTI 或泛形容词。
-- misunderstanding：50–80 个中文字，找出主人最容易误解的行为模式，形成清晰的认知反转；不写照片说明，要能联想到日常相处。
-- loveLanguageInsight：50–80 个中文字，结合 loveLanguage 与 attachment/expressiveness/boundary，具体解释它如何表达亲近。
-- ownerRelationship：60–90 个中文字，结合 attachment/boundary/expressiveness 解释主人在关系中的位置；证据不足必须降低确定性。
+- corePersonality：一句话概括最核心的行为特点，先写主人能观察到的行为，再给一层轻度解释；不要只堆 Trait 名称、MBTI 或泛形容词。
+- misunderstanding：50–80 个中文字，找出主人最容易误解的行为模式。先描述日常能看到的真实行为，再解释可能含义。例如不要写“喜欢挑你视线必经的动线上端正坐好，用直球眼神确认你的注意力”，要写“它不太会大声叫你，更习惯安静待在你看得见的地方，等你自己发现它。”
+- loveLanguageInsight：50–80 个中文字，结合 loveLanguage 与 attachment/expressiveness/boundary，具体解释它如何表达亲近。必须写成日常相处里能看见的动作，不写抽象总结。
+- ownerRelationship：60–90 个中文字，结合 attachment/boundary/expressiveness 解释主人在关系中的位置；证据不足必须降低确定性。像一个很会观察猫的人在聊天，不像心理咨询师。
 - analysis：保留给旧版本兼容，内容与 misunderstanding.text 一致即可。
-- tags：恰好 4 个短标签，体现具体行为、反差和关系特点；不要全是正面形容词，不要使用“可爱、萌宠、治愈、快乐”等泛标签。
+- tags：恰好 4 个自然口语短标签，优先 4–10 个中文字符。必须是用户能直接理解的日常行为或关系特点，例如“会用眼神表达、喜欢待在附近、先观察再靠近、不爱大声催促、有自己的边界、熟了会更黏”。不要写“眼神施压、端庄定点、克制讨关注、稳态陪伴、节奏掌控、低频高质互动”，不要全是正面形容词，不要使用“可爱、萌宠、治愈、快乐”等泛标签。
 - traits：恰好 4 项，每项 value 为 0–100 整数。根据本次证据从粘人度、独立性、好奇心、警觉度、社交主动性、观察欲、撒娇度、边界感、探索欲、情绪外露度、主人关注度、行动派程度等维度中动态选择最有区分度的 4 项，禁止固定套用同一组维度或分数。
 - evidence：2–4 项，每项采用“真实可观察事实 → 内部判断依据”。它只用于 debug、质量检查与结果验证，绝不作为用户可见内容。
 
@@ -1072,15 +1203,16 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
 3. monologue 是否像猫真的会说的话；若不是，请重写。
 4. misunderstanding 是否真的形成认知反转，loveLanguage 是否说清具体表达方式；若没有，请重写。
 5. ownerRole 是否在证据不足时假装确定；若是，请降低确定性。
-5. 是否大量使用“温柔、敏感、细腻、陪伴、治愈”等通用词；若是，请换成具体行为。
-6. 是否提炼出一个有证据支持的独特特点或反差；若没有，请重新判断。`;
+6. 是否大量使用“温柔、敏感、细腻、陪伴、治愈”等通用词；若是，请换成具体行为。
+7. type 和 tags 是否一个普通养猫人第一次看到就能立刻理解；若不能，请改成更简单的中文。
+8. 是否提炼出一个有证据支持的特点或反差；若没有，请重新判断。`;
   try {
     const result = await callFirstAvailableJson<PersonaAIResponse>(
       (provider) => [
         {
           role: "system",
           content:
-            "你是「喵一下」的猫咪性格观察者。先从照片事实提取行为线索，再做克制的人格推测；准确和个体辨识度优先于可爱。严格区分可见事实与推断，不虚构、不做医疗诊断、不使用模板化营销或过度卖萌表达。只返回合法 JSON。",
+            "你是「喵一下」的猫咪性格观察者。先从照片事实提取行为线索，再做不过度解读的人格推测；人话、准确和个体辨识度优先于高级感。严格区分可见事实与推断，不虚构、不做医疗诊断、不使用模板化营销或过度卖萌表达。只返回合法 JSON。",
         },
         { role: "user", content: buildVisionContent(provider, prompt, data.imageDataUrl) },
       ],
@@ -1088,29 +1220,31 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
         maxTokens: 1000,
         temperature: 0.62,
         modelMode: data.imageDataUrl ? "vision" : "text",
-        validate: (parsed) =>
-          Boolean(
-            isSpecificPersonaType(parsed.type) &&
+        validate: (parsed) => {
+          const tags = Array.isArray(parsed.tags)
+            ? uniqueNaturalLabels(parsed.tags, data.profile)
+            : [];
+          return Boolean(
+            normalizePersonaType(parsed.type, data.profile, "") &&
             parsed.monologue?.trim() &&
             personaInsightText(parsed.misunderstanding).length >= 20 &&
             (parsed.loveLanguageInsight?.trim().length ?? 0) >= 20 &&
             (parsed.ownerRelationship?.trim().length ?? 0) >= 20 &&
-            Array.isArray(parsed.tags) &&
-            parsed.tags.length >= 4 &&
+            tags.length >= 4 &&
             Array.isArray(parsed.traits) &&
             parsed.traits.length >= 4 &&
             Array.isArray(parsed.evidence) &&
             parsed.evidence.length >= 2,
-          ),
+          );
+        },
       },
     );
     const parsed = result.parsed;
+    const stablePersona = buildStablePersona(data.profile);
     const normalized = normalizePersonaForProfile(
       {
         name: parsed.name || data.profile.name,
-        type: isSpecificPersonaType(parsed.type)
-          ? parsed.type.trim()
-          : buildStablePersona(data.profile).type,
+        type: normalizePersonaType(parsed.type, data.profile, stablePersona.type),
         mbti: parsed.mbti || "INFP-A",
         matchScore: Math.max(60, Math.min(99, Number(parsed.matchScore) || 88)),
         monologue: parsed.monologue || "今天也想悄悄靠近你，陪你待一会。",
@@ -1172,6 +1306,17 @@ ${JSON.stringify(data.persona)}
 【用户补充场景】
 ${data.scene || "无补充场景"}
 
+语言总原则：
+1. 第一优先级是人话。普通养猫人第一次看到，就应该马上懂。
+2. 禁止创造新概念。不要把简单行为包装成自造术语。
+3. 不要写成心理学报告、品牌广告、MBTI 博主或学术分析。
+4. 先描述主人能观察到的真实行为，再给一层轻度解释。
+
+禁止在 tags、analysis、subtext 和分享 insight 中使用这类抽象包装词：
+仪式感、施压、掌控节奏、节奏掌控、秩序感、克制讨关注、高度敏锐、策略性靠近、精准表达、端庄定点、稳态陪伴、低频高质互动、眼神施压、眼神催促。
+坏例：眼神施压、端庄定点、克制讨关注、稳态陪伴、低频高质互动。
+好例：会用眼神表达、喜欢待在附近、先观察再靠近、不爱大声催促、有自己的边界、熟了会更黏。
+
 请先在内部判断，不输出推理过程：
 1. 猫正在看什么？身体是在放松、准备行动、观察还是回避？
 2. 哪个物体、人或动作最吸引它？
@@ -1179,14 +1324,14 @@ ${data.scene || "无补充场景"}
 4. 当前行为与已有的人格有哪些一致或反差？
 优先选择其中最有戏的一个点，不要试图一次解释整张照片。
 
-人格档案只影响它说话的口吻、反应方式、行动节奏和表达亲近的方式。不要机械重复 persona 中“温柔、观察型、慢热”等标签，也不要先套人格再改写照片事实。同样的对象，应让冲动型、观察型、傲娇型猫表现出不同态度。
+人格档案只影响它说话的口吻、反应方式、靠近方式和表达亲近的方式。不要机械重复 persona 中“温柔、观察型、慢热”等标签，也不要先套人格再改写照片事实。同样的对象，应让冲动型、观察型、傲娇型猫表现出不同态度。
 
 字段要求：
 - text：最重要字段。第一人称猫咪口吻，优先 12–30 个中文字，最多 2 句；必须针对照片中的一个具体对象或行为，口语化，有一点猫的脾气、幽默或反差。写它对眼前事情的态度，不写“我喜欢你、我要陪你、我很开心”等泛泛情感。
-- subtext：15–30 个中文字，第三人称或旁白，比 text 克制；揭示表面行为之下的小反差，让主人觉得“它确实经常这样”，不能换句话重复 text。
-- analysis：拆成 observation 和 personalityInterpretation，两段合计优先 40–60 个中文字。observation 只保留一个具体可见行为及其可能含义；personalityInterpretation 用一句话联系既有人格。不要重复罗列前爪、仰头、注视、没有扑等同一组事实，不罗列与行为无关的花、家具或装饰。
+- subtext：15–30 个中文字，第三人称或旁白，比 text 安静一点；揭示表面行为之下的小反差，让主人觉得“它确实经常这样”，不能换句话重复 text。
+- analysis：拆成 observation 和 personalityInterpretation，两段合计优先 40–60 个中文字。observation 只保留一个具体可见行为及其可能含义；personalityInterpretation 用一句话联系既有人格。先写真实能看到的行为，再做轻度解释。不要重复罗列前爪、仰头、注视、没有扑等同一组事实，不罗列与行为无关的花、家具或装饰。
 - mood：2–6 个中文字，描述当前行为状态，例如观察中、跃跃欲试、假装淡定、正在评估、想玩但端着、警觉围观；禁止只写开心、温柔、治愈、平静等抽象情绪。
-- tags：严格生成 3 个、每个 4–8 个中文字，依次表达“当前行为、行为模式、反差或趣味”。必须一眼能懂，不造抽象新词，不只写人格形容词，不带 #；不要使用可爱猫咪、萌宠、治愈等泛标签。
+- tags：严格生成 3 个自然口语标签，每个优先 4–10 个中文字，依次表达“当前行为、行为模式、反差或趣味”。必须一眼能懂，不造抽象新词，不只写人格形容词，不带 #；不要使用可爱猫咪、萌宠、治愈等泛标签。
 
 不要频繁使用“赏脸、本喵、勉强、人类、铲屎官、高贵、本小姐”等通用傲娇猫套话。趣味必须来自当前可见行为，而不是把所有猫写成同一种傲娇角色。
 
@@ -1195,7 +1340,7 @@ ${data.scene || "无补充场景"}
 避免固定套用“别看我、我只是、表面其实、你继续我先、不是不只是”等句式。请在内部形成至少 3 个不同角度的候选表达，最终只选最符合当前照片、人格且最不像模板的一条。
 
 【喵一下文风】
-聪明、克制、轻幽默、有猫味、具体、有一点小脾气，让主人会心一笑。禁止 AI 腔、看图作文、宠物公众号文案、鸡汤、过度煽情、小红书营销腔、大量“喵～”，以及“绝绝子、谁懂、可爱暴击、治愈一整天”等表达。
+聪明、自然、轻幽默、有猫味、具体、有一点小脾气，让主人会心一笑。禁止 AI 腔、看图作文、宠物公众号文案、鸡汤、过度煽情、小红书营销腔、大量“喵～”，以及“绝绝子、谁懂、可爱暴击、治愈一整天”等表达。
 
 严格返回 JSON，不要 Markdown，不要附加说明：
 {
@@ -1203,7 +1348,7 @@ ${data.scene || "无补充场景"}
   "subtext": "它没说出口的小心思",
   "analysis": {
     "observation": "一个具体行为及其可能含义",
-    "personalityInterpretation": "该行为与既有人格的克制关联"
+    "personalityInterpretation": "该行为和既有人格的自然联系"
   },
   "mood": "当前行为状态",
   "tags": ["标签1", "标签2", "标签3"]
@@ -1215,7 +1360,8 @@ ${data.scene || "无补充场景"}
 3. analysis 是否提供了超越表面描述的新理解；若只是看图作文，请重写。
 4. subtext 是否多揭示了一层小心思；若只是重复 text，请重写。
 5. tags 是否体现这一刻；若只是通用人格词，请重写。
-6. 是否为了温柔牺牲了这只猫的脾气和个性；若是，请重写。`;
+6. 这句话一个普通养猫人第一次看到，能不能立刻理解；如果不能，请改成更简单的中文。
+7. 是否为了温柔牺牲了这只猫的脾气和个性；若是，请重写。`;
   try {
     const result = await callFirstAvailableJson<{
       text?: unknown;
