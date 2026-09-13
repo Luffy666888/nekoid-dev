@@ -1,6 +1,10 @@
 import { detectCatFaceServer, setCatFaceWorkerEnv } from "./catface.functions";
 import { handleIOSAuthRequest, IOSAuthError } from "./ios-auth.server";
-import { handleIOSCloudRequest, IOSCloudError } from "./ios-cloud.server";
+import {
+  handleIOSCloudMediaRequest,
+  handleIOSCloudRequest,
+  IOSCloudError,
+} from "./ios-cloud.server";
 import {
   generateCatPersonaServer,
   generateCatVoiceServer,
@@ -97,8 +101,7 @@ function requireBearerToken(request: Request) {
 
 async function requireSupabaseUser(request: Request, env: unknown) {
   const token = requireBearerToken(request);
-  const supabaseUrl =
-    getEnvValue(env, "SUPABASE_URL") || getEnvValue(env, "VITE_SUPABASE_URL");
+  const supabaseUrl = getEnvValue(env, "SUPABASE_URL") || getEnvValue(env, "VITE_SUPABASE_URL");
   const publishableKey =
     getEnvValue(env, "SUPABASE_PUBLISHABLE_KEY") ||
     getEnvValue(env, "VITE_SUPABASE_PUBLISHABLE_KEY");
@@ -165,6 +168,11 @@ export async function handleIOSAPIRequest(request: Request, env: unknown) {
   }
 
   try {
+    if (url.pathname === "/api/ios/cloud/media" && request.method === "GET") {
+      const { token, user } = await requireSupabaseUser(request, env);
+      return await handleIOSCloudMediaRequest(request, env, token, user);
+    }
+
     if (request.method !== "POST") {
       throw new APIError(405, "method_not_allowed", "Use POST");
     }
@@ -172,7 +180,9 @@ export async function handleIOSAPIRequest(request: Request, env: unknown) {
     const body = await readJson(request);
 
     if (url.pathname === "/api/ios/detect-cat-face") {
-      const result = await detectCatFaceServer(body as { imageDataUrl: string; mode?: "face" | "presence" });
+      const result = await detectCatFaceServer(
+        body as { imageDataUrl: string; mode?: "face" | "presence" },
+      );
       return jsonResponse({ ok: true, data: result });
     }
 
@@ -190,28 +200,37 @@ export async function handleIOSAPIRequest(request: Request, env: unknown) {
 
     const { token, user } = await requireSupabaseUser(request, env);
 
-    const cloudResult = await handleIOSCloudRequest(url.pathname, body, env, token, user);
+    const cloudResult = await handleIOSCloudRequest(
+      url.pathname,
+      body,
+      env,
+      token,
+      user,
+      url.origin,
+    );
     if (cloudResult !== null) {
       return jsonResponse({ ok: true, data: cloudResult });
     }
 
     if (url.pathname === "/api/ios/voice") {
-      const result = await generateCatVoiceServer(body as Parameters<typeof generateCatVoiceServer>[0]);
+      const result = await generateCatVoiceServer(
+        body as Parameters<typeof generateCatVoiceServer>[0],
+      );
       return jsonResponse({ ok: true, data: result });
     }
 
     return errorResponse(404, "not_found", "Unknown iOS API endpoint");
   } catch (error) {
-    if (error instanceof APIError || error instanceof IOSAuthError || error instanceof IOSCloudError) {
+    if (
+      error instanceof APIError ||
+      error instanceof IOSAuthError ||
+      error instanceof IOSCloudError
+    ) {
       return errorResponse(error.status, error.code, publicErrorMessage(error.code, error.message));
     }
 
     console.error("NEKO iOS API failed", error);
     const rawMessage = error instanceof Error ? error.message : "";
-    return errorResponse(
-      500,
-      "internal_error",
-      publicErrorMessage("internal_error", rawMessage),
-    );
+    return errorResponse(500, "internal_error", publicErrorMessage("internal_error", rawMessage));
   }
 }

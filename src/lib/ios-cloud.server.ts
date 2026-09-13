@@ -60,13 +60,13 @@ type VoiceRow = {
   created_at: string | null;
 };
 
-const SIGNED_URL_TTL_SECONDS = 60 * 60;
 const CAT_COLUMNS = "id,name,gender,age_stage,avatar_object_key,quiz,updated_at";
 const PERSONA_COLUMNS =
   "id,cat_id,type,mbti,match_score,monologue,analysis,owner_role,tags,traits,observations,daily_mood,provider,model,updated_at";
 const VOICE_COLUMNS =
   "id,text,analysis,analysis_summary,personality_interpretation,share_headline,share_insight,share_tags,location,tags,media_object_key,media_type,aspect,video_duration,grad,local_time_label,created_at";
-const PROFILE_COLUMNS = "id,email,display_name,avatar_object_key,onboarding_completed_at,created_at,updated_at";
+const PROFILE_COLUMNS =
+  "id,email,display_name,avatar_object_key,onboarding_completed_at,created_at,updated_at";
 
 export class IOSCloudError extends Error {
   constructor(
@@ -87,7 +87,8 @@ function getEnvValue(env: unknown, name: string) {
 function requireSupabaseConfig(env: unknown) {
   const url = getEnvValue(env, "SUPABASE_URL") || getEnvValue(env, "VITE_SUPABASE_URL");
   const publishableKey =
-    getEnvValue(env, "SUPABASE_PUBLISHABLE_KEY") || getEnvValue(env, "VITE_SUPABASE_PUBLISHABLE_KEY");
+    getEnvValue(env, "SUPABASE_PUBLISHABLE_KEY") ||
+    getEnvValue(env, "VITE_SUPABASE_PUBLISHABLE_KEY");
 
   if (!url || !publishableKey) {
     throw new IOSCloudError(500, "supabase_not_configured", "云端服务暂时不可用，请稍后再试。");
@@ -113,15 +114,61 @@ function createRequestClient(env: unknown, accessToken: string) {
 }
 
 function randomId() {
-  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return (
+    globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`
+  );
 }
 
 function cleanString(value: unknown, fallback = "") {
   return typeof value === "string" ? value.trim() : fallback;
 }
 
+function mediaProxyUrl(requestOrigin: string, objectKey: string | null | undefined) {
+  if (!objectKey) return undefined;
+  const url = new URL("/api/ios/cloud/media", requestOrigin);
+  url.searchParams.set("objectKey", objectKey);
+  return url.toString();
+}
+
+function requireOwnedObjectKey(user: IOSUser, value: unknown) {
+  const objectKey = cleanString(value);
+  if (!objectKey) {
+    throw new IOSCloudError(400, "missing_media_key", "图片地址已失效，请刷新后再试。");
+  }
+
+  if (
+    objectKey.startsWith("/") ||
+    objectKey.includes("\\") ||
+    objectKey.includes("..") ||
+    objectKey.includes("//")
+  ) {
+    throw new IOSCloudError(400, "invalid_media_key", "图片地址格式异常，请刷新后再试。");
+  }
+
+  if (!objectKey.startsWith(`${user.id}/`)) {
+    throw new IOSCloudError(403, "media_forbidden", "没有权限查看这张图片。");
+  }
+
+  return objectKey;
+}
+
+function contentTypeForObjectKey(objectKey: string) {
+  const lower = objectKey.toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".gif")) return "image/gif";
+  if (lower.endsWith(".mp4")) return "video/mp4";
+  if (lower.endsWith(".webm")) return "video/webm";
+  return "image/jpeg";
+}
+
 function cleanStringList(value: unknown) {
-  return Array.isArray(value) ? value.map((item) => String(item).trim()).filter(Boolean).slice(0, 12) : [];
+  return Array.isArray(value)
+    ? value
+        .map((item) => String(item).trim())
+        .filter(Boolean)
+        .slice(0, 12)
+    : [];
 }
 
 function cleanQuiz(value: unknown) {
@@ -190,13 +237,6 @@ function decodeDataURL(dataUrl: string) {
   };
 }
 
-async function signedMediaUrl(client: SupabaseClient, objectKey: string | null | undefined) {
-  if (!objectKey) return undefined;
-  const { data, error } = await client.storage.from(NEKO_MEDIA_BUCKET).createSignedUrl(objectKey, SIGNED_URL_TTL_SECONDS);
-  if (error) return undefined;
-  return data.signedUrl;
-}
-
 async function uploadDataUrl(
   client: SupabaseClient,
   userId: string,
@@ -227,18 +267,19 @@ function mapProfileRow(row: JsonRecord, user: IOSUser) {
   return {
     id: String(row.id ?? user.id),
     email: typeof row.email === "string" ? row.email : (user.email ?? null),
-    displayName: typeof row.display_name === "string" ? row.display_name : fallbackDisplayName(user),
+    displayName:
+      typeof row.display_name === "string" ? row.display_name : fallbackDisplayName(user),
   };
 }
 
-async function mapCatRow(client: SupabaseClient, row: CatRow) {
+async function mapCatRow(row: CatRow, requestOrigin: string) {
   return {
     id: row.id,
     name: row.name,
     gender: row.gender,
     ageStage: row.age_stage,
     avatarObjectKey: row.avatar_object_key ?? undefined,
-    avatarURL: await signedMediaUrl(client, row.avatar_object_key),
+    avatarURL: mediaProxyUrl(requestOrigin, row.avatar_object_key),
     updatedAt: row.updated_at ?? undefined,
   };
 }
@@ -261,7 +302,7 @@ function mapPersonaRow(row: PersonaRow | null | undefined) {
   };
 }
 
-async function mapVoiceRow(client: SupabaseClient, row: VoiceRow) {
+async function mapVoiceRow(row: VoiceRow, requestOrigin: string) {
   return {
     cloudId: row.id,
     time: row.local_time_label || formatTimeLabel(row.created_at),
@@ -274,20 +315,22 @@ async function mapVoiceRow(client: SupabaseClient, row: VoiceRow) {
     mediaType: row.media_type ?? "photo",
     aspect: row.aspect ?? "3:4",
     videoDuration: row.video_duration ?? undefined,
-    analysis: row.analysis_summary || row.personality_interpretation
-      ? {
-          observation: row.analysis_summary ?? row.analysis ?? "",
-          personalityInterpretation: row.personality_interpretation ?? "",
-        }
-      : row.analysis ?? undefined,
-    share: row.share_headline || row.share_insight || row.share_tags?.length
-      ? {
-          headline: row.share_headline ?? row.text,
-          insight: row.share_insight ?? row.personality_interpretation ?? row.analysis ?? "",
-          tags: row.share_tags ?? row.tags ?? [],
-        }
-      : undefined,
-    mediaURL: await signedMediaUrl(client, row.media_object_key),
+    analysis:
+      row.analysis_summary || row.personality_interpretation
+        ? {
+            observation: row.analysis_summary ?? row.analysis ?? "",
+            personalityInterpretation: row.personality_interpretation ?? "",
+          }
+        : (row.analysis ?? undefined),
+    share:
+      row.share_headline || row.share_insight || row.share_tags?.length
+        ? {
+            headline: row.share_headline ?? row.text,
+            insight: row.share_insight ?? row.personality_interpretation ?? row.analysis ?? "",
+            tags: row.share_tags ?? row.tags ?? [],
+          }
+        : undefined,
+    mediaURL: mediaProxyUrl(requestOrigin, row.media_object_key),
   };
 }
 
@@ -315,11 +358,22 @@ async function loadOrCreateProfile(client: SupabaseClient, user: IOSUser) {
   return mapProfileRow(data as JsonRecord, user);
 }
 
-async function countOwnedRows(client: SupabaseClient, table: "cats" | "cat_voices", userId: string) {
-  const { count, error } = await client.from(table).select("id", { count: "exact", head: true }).eq("user_id", userId);
+async function countOwnedRows(
+  client: SupabaseClient,
+  table: "cats" | "cat_voices",
+  userId: string,
+) {
+  const { count, error } = await client
+    .from(table)
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId);
   if (!error) return count ?? 0;
 
-  const { data, error: fallbackError } = await client.from(table).select("id").eq("user_id", userId).limit(1000);
+  const { data, error: fallbackError } = await client
+    .from(table)
+    .select("id")
+    .eq("user_id", userId)
+    .limit(1000);
   if (fallbackError) return 0;
   return data?.length ?? 0;
 }
@@ -349,12 +403,21 @@ async function fetchActiveCatRow(client: SupabaseClient, user: IOSUser) {
 }
 
 async function fetchPersona(client: SupabaseClient, catId: string) {
-  const { data, error } = await client.from("cat_personas").select(PERSONA_COLUMNS).eq("cat_id", catId).maybeSingle();
+  const { data, error } = await client
+    .from("cat_personas")
+    .select(PERSONA_COLUMNS)
+    .eq("cat_id", catId)
+    .maybeSingle();
   if (error) throw new IOSCloudError(500, "persona_load_failed", error.message);
   return mapPersonaRow(data as PersonaRow | null);
 }
 
-async function fetchVoices(client: SupabaseClient, user: IOSUser, catId: string) {
+async function fetchVoices(
+  client: SupabaseClient,
+  user: IOSUser,
+  catId: string,
+  requestOrigin: string,
+) {
   const { data, error } = await client
     .from("cat_voices")
     .select(VOICE_COLUMNS)
@@ -363,10 +426,10 @@ async function fetchVoices(client: SupabaseClient, user: IOSUser, catId: string)
     .order("created_at", { ascending: false });
 
   if (error) throw new IOSCloudError(500, "voices_load_failed", error.message);
-  return Promise.all(((data ?? []) as VoiceRow[]).map((row) => mapVoiceRow(client, row)));
+  return Promise.all(((data ?? []) as VoiceRow[]).map((row) => mapVoiceRow(row, requestOrigin)));
 }
 
-async function fetchCloudState(client: SupabaseClient, user: IOSUser) {
+async function fetchCloudState(client: SupabaseClient, user: IOSUser, requestOrigin: string) {
   await loadOrCreateProfile(client, user);
   const catRow = await fetchActiveCatRow(client, user);
   if (!catRow) {
@@ -374,9 +437,9 @@ async function fetchCloudState(client: SupabaseClient, user: IOSUser) {
   }
 
   const [profile, persona, voices] = await Promise.all([
-    mapCatRow(client, catRow),
+    mapCatRow(catRow, requestOrigin),
     fetchPersona(client, catRow.id),
-    fetchVoices(client, user, catRow.id),
+    fetchVoices(client, user, catRow.id, requestOrigin),
   ]);
 
   return { profile, persona, voices };
@@ -392,7 +455,12 @@ async function markOnboardingCompleted(client: SupabaseClient, user: IOSUser) {
   if (error) throw new IOSCloudError(500, "profile_update_failed", error.message);
 }
 
-async function upsertPersona(client: SupabaseClient, user: IOSUser, catId: string, persona: unknown) {
+async function upsertPersona(
+  client: SupabaseClient,
+  user: IOSUser,
+  catId: string,
+  persona: unknown,
+) {
   if (!persona || typeof persona !== "object") return fetchPersona(client, catId);
   const value = persona as JsonRecord;
   const { data, error } = await client
@@ -405,7 +473,10 @@ async function upsertPersona(client: SupabaseClient, user: IOSUser, catId: strin
         mbti: cleanString(value.mbti, "ISFJ-A"),
         match_score: Number(value.matchScore ?? 93),
         monologue: cleanString(value.monologue, "我先观察一下，再决定要不要把小爪爪交给你。"),
-        analysis: cleanString(value.analysis, "它正在用自己的节奏理解世界，也在确认你是可靠的陪伴。"),
+        analysis: cleanString(
+          value.analysis,
+          "它正在用自己的节奏理解世界，也在确认你是可靠的陪伴。",
+        ),
         owner_role: cleanString(value.ownerRole, "你是它安心回来的据点。"),
         tags: cleanStringList(value.tags),
         traits: Array.isArray(value.traits) ? value.traits : [],
@@ -423,14 +494,19 @@ async function upsertPersona(client: SupabaseClient, user: IOSUser, catId: strin
   return mapPersonaRow(data as PersonaRow);
 }
 
-async function saveCatProfile(client: SupabaseClient, user: IOSUser, body: JsonRecord) {
+async function saveCatProfile(
+  client: SupabaseClient,
+  user: IOSUser,
+  body: JsonRecord,
+  requestOrigin: string,
+) {
   const currentCatId = cleanString(body.currentCatId);
 
   if (!currentCatId) {
     const existingActiveCat = await fetchActiveCatRow(client, user);
     if (existingActiveCat) {
       const [profile, persona] = await Promise.all([
-        mapCatRow(client, existingActiveCat),
+        mapCatRow(existingActiveCat, requestOrigin),
         fetchPersona(client, existingActiveCat.id),
       ]);
 
@@ -457,10 +533,19 @@ async function saveCatProfile(client: SupabaseClient, user: IOSUser, body: JsonR
     throw new IOSCloudError(404, "cat_not_found", "没有找到这份猫咪档案，请刷新后再试。");
   }
 
-  const existingCat = existing?.data as { avatar_object_key?: string | null; quiz?: Record<string, string> | null } | null;
+  const existingCat = existing?.data as {
+    avatar_object_key?: string | null;
+    quiz?: Record<string, string> | null;
+  } | null;
   const currentAvatarObjectKey = existingCat?.avatar_object_key ?? null;
   const quizPayload = Object.keys(quiz).length ? quiz : (existingCat?.quiz ?? {});
-  const avatarObjectKey = await uploadDataUrl(client, user.id, `cats/${catId}/avatar`, body.avatarImageDataUrl, currentAvatarObjectKey);
+  const avatarObjectKey = await uploadDataUrl(
+    client,
+    user.id,
+    `cats/${catId}/avatar`,
+    body.avatarImageDataUrl,
+    currentAvatarObjectKey,
+  );
 
   const { data, error } = await client
     .from("cats")
@@ -487,12 +572,17 @@ async function saveCatProfile(client: SupabaseClient, user: IOSUser, body: JsonR
 
   const persona = await upsertPersona(client, user, catId, body.persona);
   return {
-    profile: await mapCatRow(client, data as CatRow),
+    profile: await mapCatRow(data as CatRow, requestOrigin),
     persona,
   };
 }
 
-async function updateAvatar(client: SupabaseClient, user: IOSUser, body: JsonRecord) {
+async function updateAvatar(
+  client: SupabaseClient,
+  user: IOSUser,
+  body: JsonRecord,
+  requestOrigin: string,
+) {
   const catId = cleanString(body.catId);
   if (!catId) throw new IOSCloudError(400, "missing_cat_id", "猫咪档案状态异常，请刷新后再试。");
 
@@ -521,11 +611,13 @@ async function updateAvatar(client: SupabaseClient, user: IOSUser, body: JsonRec
     .single();
 
   if (error) throw new IOSCloudError(500, "avatar_update_failed", error.message);
-  return await mapCatRow(client, data as CatRow);
+  return await mapCatRow(data as CatRow, requestOrigin);
 }
 
 async function updateUserProfile(client: SupabaseClient, user: IOSUser, body: JsonRecord) {
-  const displayName = cleanString(body.displayName, fallbackDisplayName(user)).slice(0, 40) || fallbackDisplayName(user);
+  const displayName =
+    cleanString(body.displayName, fallbackDisplayName(user)).slice(0, 40) ||
+    fallbackDisplayName(user);
   const { data, error } = await client
     .from("profiles")
     .upsert(
@@ -543,17 +635,30 @@ async function updateUserProfile(client: SupabaseClient, user: IOSUser, body: Js
   return mapProfileRow(data as JsonRecord, user);
 }
 
-async function saveVoice(client: SupabaseClient, user: IOSUser, body: JsonRecord) {
+async function saveVoice(
+  client: SupabaseClient,
+  user: IOSUser,
+  body: JsonRecord,
+  requestOrigin: string,
+) {
   const catId = cleanString(body.catId);
   const voice = (body.voice && typeof body.voice === "object" ? body.voice : {}) as JsonRecord;
   const voiceId = cleanString(voice.cloudId) || randomId();
   if (!catId) throw new IOSCloudError(400, "missing_cat_id", "猫咪档案状态异常，请刷新后再试。");
-  if (!cleanString(voice.text)) throw new IOSCloudError(400, "missing_voice_text", "心声内容为空，请重新识别后再试。");
+  if (!cleanString(voice.text))
+    throw new IOSCloudError(400, "missing_voice_text", "心声内容为空，请重新识别后再试。");
 
-  const mediaObjectKey = await uploadDataUrl(client, user.id, `voices/${voiceId}/media`, body.imageDataUrl, cleanString(voice.mediaObjectKey));
+  const mediaObjectKey = await uploadDataUrl(
+    client,
+    user.id,
+    `voices/${voiceId}/media`,
+    body.imageDataUrl,
+    cleanString(voice.mediaObjectKey),
+  );
   const createdAt = msToIso(voice.createdAt);
-  const analysis = voice.analysis && typeof voice.analysis === "object" ? voice.analysis as JsonRecord : {};
-  const share = voice.share && typeof voice.share === "object" ? voice.share as JsonRecord : {};
+  const analysis =
+    voice.analysis && typeof voice.analysis === "object" ? (voice.analysis as JsonRecord) : {};
+  const share = voice.share && typeof voice.share === "object" ? (voice.share as JsonRecord) : {};
   const legacyAnalysis = typeof voice.analysis === "string" ? cleanString(voice.analysis) : "";
   const analysisSummary = cleanString(analysis.observation || analysis.summary);
   const personalityInterpretation = cleanString(analysis.personalityInterpretation);
@@ -565,7 +670,10 @@ async function saveVoice(client: SupabaseClient, user: IOSUser, body: JsonRecord
         cat_id: catId,
         user_id: user.id,
         text: cleanString(voice.text),
-        analysis: legacyAnalysis || [analysisSummary, personalityInterpretation].filter(Boolean).join("\n\n") || null,
+        analysis:
+          legacyAnalysis ||
+          [analysisSummary, personalityInterpretation].filter(Boolean).join("\n\n") ||
+          null,
         analysis_summary: analysisSummary || null,
         personality_interpretation: personalityInterpretation || null,
         share_headline: cleanString(share.headline) || null,
@@ -577,7 +685,10 @@ async function saveVoice(client: SupabaseClient, user: IOSUser, body: JsonRecord
         media_type: cleanString(voice.mediaType, "photo"),
         aspect: cleanString(voice.aspect, "3:4"),
         video_duration: cleanString(voice.videoDuration) || null,
-        grad: cleanString(voice.grad, "linear-gradient(135deg, oklch(0.9 0.06 280), oklch(0.92 0.05 320))"),
+        grad: cleanString(
+          voice.grad,
+          "linear-gradient(135deg, oklch(0.9 0.06 280), oklch(0.92 0.05 320))",
+        ),
         local_time_label: cleanString(voice.time, "刚刚"),
         created_at: createdAt,
       },
@@ -587,7 +698,7 @@ async function saveVoice(client: SupabaseClient, user: IOSUser, body: JsonRecord
     .single();
 
   if (error) throw new IOSCloudError(500, "voice_save_failed", error.message);
-  return await mapVoiceRow(client, data as VoiceRow);
+  return await mapVoiceRow(data as VoiceRow, requestOrigin);
 }
 
 async function deleteVoices(client: SupabaseClient, user: IOSUser, body: JsonRecord) {
@@ -604,9 +715,16 @@ async function deleteVoices(client: SupabaseClient, user: IOSUser, body: JsonRec
     .in("id", ids);
 
   if (loadError) throw new IOSCloudError(500, "voice_load_failed", loadError.message);
-  const mediaKeys = ((rows ?? []) as Array<{ media_object_key?: string | null }>).map((row) => row.media_object_key).filter(Boolean) as string[];
+  const mediaKeys = ((rows ?? []) as Array<{ media_object_key?: string | null }>)
+    .map((row) => row.media_object_key)
+    .filter(Boolean) as string[];
 
-  const { error } = await client.from("cat_voices").delete().eq("cat_id", catId).eq("user_id", user.id).in("id", ids);
+  const { error } = await client
+    .from("cat_voices")
+    .delete()
+    .eq("cat_id", catId)
+    .eq("user_id", user.id)
+    .in("id", ids);
   if (error) throw new IOSCloudError(500, "voice_delete_failed", error.message);
 
   if (mediaKeys.length) {
@@ -616,12 +734,51 @@ async function deleteVoices(client: SupabaseClient, user: IOSUser, body: JsonRec
   return { deleted: ids.length };
 }
 
-async function refreshMediaUrl(client: SupabaseClient, body: JsonRecord) {
+async function refreshMediaUrl(_client: SupabaseClient, body: JsonRecord, requestOrigin: string) {
   const objectKey = cleanString(body.objectKey);
-  return { mediaURL: await signedMediaUrl(client, objectKey) };
+  return { mediaURL: mediaProxyUrl(requestOrigin, objectKey) };
 }
 
-export async function handleIOSCloudRequest(pathname: string, body: unknown, env: unknown, accessToken: string, user: IOSUser) {
+export async function handleIOSCloudMediaRequest(
+  request: Request,
+  env: unknown,
+  accessToken: string,
+  user: IOSUser,
+) {
+  const url = new URL(request.url);
+  if (url.pathname !== "/api/ios/cloud/media") return null;
+
+  const objectKey = requireOwnedObjectKey(user, url.searchParams.get("objectKey"));
+  const client = createRequestClient(env, accessToken);
+  const { data, error } = await client.storage.from(NEKO_MEDIA_BUCKET).download(objectKey);
+
+  if (error || !data) {
+    const message = error?.message ?? "Storage object not found";
+    const status = /not found|does not exist/i.test(message) ? 404 : 500;
+    throw new IOSCloudError(status, "media_download_failed", message);
+  }
+
+  const headers = new Headers({
+    "access-control-allow-origin": "*",
+    "cache-control": "private, max-age=300",
+    "content-type": data.type || contentTypeForObjectKey(objectKey),
+  });
+
+  if (typeof data.size === "number") {
+    headers.set("content-length", String(data.size));
+  }
+
+  return new Response(data, { status: 200, headers });
+}
+
+export async function handleIOSCloudRequest(
+  pathname: string,
+  body: unknown,
+  env: unknown,
+  accessToken: string,
+  user: IOSUser,
+  requestOrigin: string,
+) {
   if (!pathname.startsWith("/api/ios/cloud/")) return null;
 
   const client = createRequestClient(env, accessToken);
@@ -629,23 +786,25 @@ export async function handleIOSCloudRequest(pathname: string, body: unknown, env
 
   switch (pathname) {
     case "/api/ios/cloud/state":
-      return fetchCloudState(client, user);
+      return fetchCloudState(client, user, requestOrigin);
     case "/api/ios/cloud/account-summary":
       return fetchAccountSummary(client, user);
     case "/api/ios/cloud/user-profile":
       return updateUserProfile(client, user, payload);
     case "/api/ios/cloud/cat-profile":
-      return saveCatProfile(client, user, payload);
+      return saveCatProfile(client, user, payload, requestOrigin);
     case "/api/ios/cloud/avatar":
-      return updateAvatar(client, user, payload);
+      return updateAvatar(client, user, payload, requestOrigin);
     case "/api/ios/cloud/voices":
-      return payload.catId ? fetchVoices(client, user, cleanString(payload.catId)) : fetchCloudState(client, user).then((state) => state.voices);
+      return payload.catId
+        ? fetchVoices(client, user, cleanString(payload.catId), requestOrigin)
+        : fetchCloudState(client, user, requestOrigin).then((state) => state.voices);
     case "/api/ios/cloud/voice":
-      return saveVoice(client, user, payload);
+      return saveVoice(client, user, payload, requestOrigin);
     case "/api/ios/cloud/voices/delete":
       return deleteVoices(client, user, payload);
     case "/api/ios/cloud/media-url":
-      return refreshMediaUrl(client, payload);
+      return refreshMediaUrl(client, payload, requestOrigin);
     default:
       return null;
   }
