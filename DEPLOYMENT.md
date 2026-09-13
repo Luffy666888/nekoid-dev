@@ -59,6 +59,29 @@ pnpm dlx wrangler@latest secret bulk .env.local --name nekoid
 
 Supabase persistence uses project `jbjgrkivscrombvnlcrl` and the private Storage bucket `neko-media`. Apply database changes through committed files under `supabase/migrations/` before deploying code that depends on them.
 
+For Mainland China, iOS media is stored in Volcengine TOS while Supabase/Postgres
+continues to hold Auth and metadata. The app asks the server for short-lived signed
+URLs, then uploads/downloads media directly with TOS, so media bandwidth does not pass
+through the Node server. Set these only on the China server or another server-side
+runtime:
+
+```sh
+MEDIA_STORAGE_PROVIDER=tos
+TOS_ACCESS_KEY_ID=...
+TOS_SECRET_ACCESS_KEY=...
+TOS_REGION=cn-beijing
+TOS_ENDPOINT=https://tos-cn-beijing.volces.com
+TOS_BUCKET=...
+TOS_PATH_STYLE=false
+MEDIA_UPLOAD_URL_TTL_SECONDS=600
+MEDIA_SIGNED_URL_TTL_SECONDS=3600
+MEDIA_STORAGE_SUPABASE_READ_FALLBACK=0
+```
+
+`MEDIA_STORAGE_SUPABASE_READ_FALLBACK=1` is only for a temporary migration window
+when old object keys still exist in Supabase Storage but have not yet been copied
+to TOS. Keep it off for testing the real TOS path.
+
 ByteCat backup integration was deployed and verified in production on 2026-09-12.
 Current verified Worker version: `78332390-403a-4a57-b501-28a9f57a3881`.
 The `split_cat_voice_analysis_and_share` migration was applied before deployment;

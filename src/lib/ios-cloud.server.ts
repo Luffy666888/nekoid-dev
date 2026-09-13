@@ -1,7 +1,15 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  createSignedMediaDownloadUrl,
+  createSignedMediaUploadUrl,
+  downloadStoredMedia,
+  MediaStorageError,
+  removeStoredMedia,
+  resolveMediaStorageProvider,
+  uploadStoredMedia,
+} from "@/lib/media-storage.server";
 import { NEKO_MAX_UPLOAD_BYTES, NEKO_MAX_UPLOAD_LABEL } from "@/lib/neko-upload-limits";
-import { NEKO_MEDIA_BUCKET } from "@/lib/supabase/client";
 
 type EnvLike = Record<string, string | undefined>;
 
@@ -142,6 +150,20 @@ function mediaProxyUrl(
   return url.toString();
 }
 
+async function mediaDownloadUrl(
+  env: unknown,
+  requestOrigin: string,
+  objectKey: string | null | undefined,
+  version?: string | null,
+) {
+  if (!objectKey) return undefined;
+  if (resolveMediaStorageProvider(env) === "tos") {
+    return translateMediaStorageError(() => createSignedMediaDownloadUrl(env, objectKey));
+  }
+
+  return mediaProxyUrl(requestOrigin, objectKey, version);
+}
+
 function requireOwnedObjectKey(user: IOSUser, value: unknown) {
   const objectKey = cleanString(value);
   if (!objectKey) {
@@ -222,6 +244,20 @@ function extFromMime(mime: string) {
   return "bin";
 }
 
+function cleanObjectId(value: unknown) {
+  const cleaned = cleanString(value);
+  return cleaned && /^[A-Za-z0-9_-]+$/.test(cleaned) ? cleaned : "";
+}
+
+function requireUploadMime(value: unknown) {
+  const mime = cleanString(value, "image/jpeg").split(";")[0].trim().toLowerCase();
+  if (["image/jpeg", "image/png", "image/webp", "image/gif"].includes(mime)) {
+    return mime;
+  }
+
+  throw new IOSCloudError(400, "unsupported_media_type", "这张图片格式暂时不支持。");
+}
+
 function decodeDataURL(dataUrl: string) {
   const match = dataUrl.match(/^data:([^;,]+)?(;base64)?,(.*)$/);
   if (!match) {
@@ -251,6 +287,7 @@ function decodeDataURL(dataUrl: string) {
 
 async function uploadDataUrl(
   client: SupabaseClient,
+  env: unknown,
   userId: string,
   objectPath: string,
   dataUrl: unknown,
@@ -262,17 +299,40 @@ async function uploadDataUrl(
 
   const upload = decodeDataURL(dataUrl);
   const objectKey = `${userId}/${objectPath}.${upload.extension}`;
-  const { error } = await client.storage.from(NEKO_MEDIA_BUCKET).upload(objectKey, upload.blob, {
-    cacheControl: "3600",
-    contentType: upload.mime,
-    upsert: true,
-  });
-
-  if (error) {
-    throw new IOSCloudError(500, "storage_upload_failed", error.message);
-  }
+  await translateMediaStorageError(() =>
+    uploadStoredMedia(client, env, objectKey, upload.blob, upload.mime),
+  );
 
   return objectKey;
+}
+
+async function resolveMediaObjectKey(
+  client: SupabaseClient,
+  env: unknown,
+  user: IOSUser,
+  objectPath: string,
+  dataUrl: unknown,
+  uploadedObjectKey: unknown,
+  currentObjectKey?: string | null,
+) {
+  const providedObjectKey = cleanString(uploadedObjectKey);
+  if (providedObjectKey) {
+    return requireOwnedObjectKey(user, providedObjectKey);
+  }
+
+  return uploadDataUrl(client, env, user.id, objectPath, dataUrl, currentObjectKey);
+}
+
+async function translateMediaStorageError<T>(operation: () => Promise<T>) {
+  try {
+    return await operation();
+  } catch (error) {
+    if (error instanceof MediaStorageError) {
+      throw new IOSCloudError(error.status, error.code, error.message);
+    }
+
+    throw error;
+  }
 }
 
 function mapProfileRow(row: JsonRecord, user: IOSUser) {
@@ -284,14 +344,14 @@ function mapProfileRow(row: JsonRecord, user: IOSUser) {
   };
 }
 
-async function mapCatRow(row: CatRow, requestOrigin: string) {
+async function mapCatRow(row: CatRow, env: unknown, requestOrigin: string) {
   return {
     id: row.id,
     name: row.name,
     gender: row.gender,
     ageStage: row.age_stage,
     avatarObjectKey: row.avatar_object_key ?? undefined,
-    avatarURL: mediaProxyUrl(requestOrigin, row.avatar_object_key, row.updated_at),
+    avatarURL: await mediaDownloadUrl(env, requestOrigin, row.avatar_object_key, row.updated_at),
     updatedAt: row.updated_at ?? undefined,
   };
 }
@@ -320,7 +380,7 @@ function mapPersonaRow(row: PersonaRow | null | undefined) {
   };
 }
 
-async function mapVoiceRow(row: VoiceRow, requestOrigin: string) {
+async function mapVoiceRow(row: VoiceRow, env: unknown, requestOrigin: string) {
   return {
     cloudId: row.id,
     time: row.local_time_label || formatTimeLabel(row.created_at),
@@ -349,7 +409,7 @@ async function mapVoiceRow(row: VoiceRow, requestOrigin: string) {
             tags: row.share_tags ?? row.tags ?? [],
           }
         : undefined,
-    mediaURL: mediaProxyUrl(requestOrigin, row.media_object_key, row.created_at),
+    mediaURL: await mediaDownloadUrl(env, requestOrigin, row.media_object_key, row.created_at),
   };
 }
 
@@ -433,6 +493,7 @@ async function fetchPersona(client: SupabaseClient, catId: string) {
 
 async function fetchVoices(
   client: SupabaseClient,
+  env: unknown,
   user: IOSUser,
   catId: string,
   requestOrigin: string,
@@ -445,10 +506,17 @@ async function fetchVoices(
     .order("created_at", { ascending: false });
 
   if (error) throw new IOSCloudError(500, "voices_load_failed", error.message);
-  return Promise.all(((data ?? []) as VoiceRow[]).map((row) => mapVoiceRow(row, requestOrigin)));
+  return Promise.all(
+    ((data ?? []) as VoiceRow[]).map((row) => mapVoiceRow(row, env, requestOrigin)),
+  );
 }
 
-async function fetchCloudState(client: SupabaseClient, user: IOSUser, requestOrigin: string) {
+async function fetchCloudState(
+  client: SupabaseClient,
+  env: unknown,
+  user: IOSUser,
+  requestOrigin: string,
+) {
   await loadOrCreateProfile(client, user);
   const catRow = await fetchActiveCatRow(client, user);
   if (!catRow) {
@@ -456,9 +524,9 @@ async function fetchCloudState(client: SupabaseClient, user: IOSUser, requestOri
   }
 
   const [profile, persona, voices] = await Promise.all([
-    mapCatRow(catRow, requestOrigin),
+    mapCatRow(catRow, env, requestOrigin),
     fetchPersona(client, catRow.id),
-    fetchVoices(client, user, catRow.id, requestOrigin),
+    fetchVoices(client, env, user, catRow.id, requestOrigin),
   ]);
 
   return { profile, persona, voices };
@@ -523,6 +591,7 @@ async function upsertPersona(
 
 async function saveCatProfile(
   client: SupabaseClient,
+  env: unknown,
   user: IOSUser,
   body: JsonRecord,
   requestOrigin: string,
@@ -533,7 +602,7 @@ async function saveCatProfile(
     const existingActiveCat = await fetchActiveCatRow(client, user);
     if (existingActiveCat) {
       const [profile, persona] = await Promise.all([
-        mapCatRow(existingActiveCat, requestOrigin),
+        mapCatRow(existingActiveCat, env, requestOrigin),
         fetchPersona(client, existingActiveCat.id),
       ]);
 
@@ -541,7 +610,7 @@ async function saveCatProfile(
     }
   }
 
-  const catId = currentCatId || randomId();
+  const catId = currentCatId || cleanObjectId(body.catId) || randomId();
   const name = cleanString(body.name, "丸子").slice(0, 40);
   const gender = cleanString(body.gender, "小母猫");
   const ageStage = cleanString(body.ageStage, "青年猫");
@@ -566,11 +635,13 @@ async function saveCatProfile(
   } | null;
   const currentAvatarObjectKey = existingCat?.avatar_object_key ?? null;
   const quizPayload = Object.keys(quiz).length ? quiz : (existingCat?.quiz ?? {});
-  const avatarObjectKey = await uploadDataUrl(
+  const avatarObjectKey = await resolveMediaObjectKey(
     client,
-    user.id,
+    env,
+    user,
     `cats/${catId}/avatar`,
     body.avatarImageDataUrl,
+    body.avatarObjectKey,
     currentAvatarObjectKey,
   );
 
@@ -599,13 +670,14 @@ async function saveCatProfile(
 
   const persona = await upsertPersona(client, user, catId, body.persona);
   return {
-    profile: await mapCatRow(data as CatRow, requestOrigin),
+    profile: await mapCatRow(data as CatRow, env, requestOrigin),
     persona,
   };
 }
 
 async function updateAvatar(
   client: SupabaseClient,
+  env: unknown,
   user: IOSUser,
   body: JsonRecord,
   requestOrigin: string,
@@ -621,11 +693,13 @@ async function updateAvatar(
     .single();
 
   if (loadError) throw new IOSCloudError(404, "cat_not_found", loadError.message);
-  const avatarObjectKey = await uploadDataUrl(
+  const avatarObjectKey = await resolveMediaObjectKey(
     client,
-    user.id,
+    env,
+    user,
     `cats/${catId}/avatar`,
     body.avatarImageDataUrl,
+    body.avatarObjectKey,
     (existing as { avatar_object_key?: string | null }).avatar_object_key,
   );
 
@@ -638,7 +712,7 @@ async function updateAvatar(
     .single();
 
   if (error) throw new IOSCloudError(500, "avatar_update_failed", error.message);
-  return await mapCatRow(data as CatRow, requestOrigin);
+  return await mapCatRow(data as CatRow, env, requestOrigin);
 }
 
 async function updateUserProfile(client: SupabaseClient, user: IOSUser, body: JsonRecord) {
@@ -664,6 +738,7 @@ async function updateUserProfile(client: SupabaseClient, user: IOSUser, body: Js
 
 async function saveVoice(
   client: SupabaseClient,
+  env: unknown,
   user: IOSUser,
   body: JsonRecord,
   requestOrigin: string,
@@ -675,11 +750,13 @@ async function saveVoice(
   if (!cleanString(voice.text))
     throw new IOSCloudError(400, "missing_voice_text", "心声内容为空，请重新识别后再试。");
 
-  const mediaObjectKey = await uploadDataUrl(
+  const mediaObjectKey = await resolveMediaObjectKey(
     client,
-    user.id,
+    env,
+    user,
     `voices/${voiceId}/media`,
     body.imageDataUrl,
+    body.mediaObjectKey,
     cleanString(voice.mediaObjectKey),
   );
   const createdAt = msToIso(voice.createdAt);
@@ -726,10 +803,10 @@ async function saveVoice(
     .single();
 
   if (error) throw new IOSCloudError(500, "voice_save_failed", error.message);
-  return await mapVoiceRow(data as VoiceRow, requestOrigin);
+  return await mapVoiceRow(data as VoiceRow, env, requestOrigin);
 }
 
-async function deleteVoices(client: SupabaseClient, user: IOSUser, body: JsonRecord) {
+async function deleteVoices(client: SupabaseClient, env: unknown, user: IOSUser, body: JsonRecord) {
   const catId = cleanString(body.catId);
   const ids = Array.isArray(body.ids) ? body.ids.map(String).filter(Boolean) : [];
   if (!catId) throw new IOSCloudError(400, "missing_cat_id", "猫咪档案状态异常，请刷新后再试。");
@@ -756,15 +833,49 @@ async function deleteVoices(client: SupabaseClient, user: IOSUser, body: JsonRec
   if (error) throw new IOSCloudError(500, "voice_delete_failed", error.message);
 
   if (mediaKeys.length) {
-    await client.storage.from(NEKO_MEDIA_BUCKET).remove(mediaKeys);
+    await translateMediaStorageError(() => removeStoredMedia(client, env, mediaKeys));
   }
 
   return { deleted: ids.length };
 }
 
-async function refreshMediaUrl(_client: SupabaseClient, body: JsonRecord, requestOrigin: string) {
-  const objectKey = cleanString(body.objectKey);
-  return { mediaURL: mediaProxyUrl(requestOrigin, objectKey) };
+async function prepareMediaUpload(env: unknown, user: IOSUser, body: JsonRecord) {
+  const purpose = cleanString(body.purpose);
+  const contentType = requireUploadMime(body.contentType);
+  const extension = extFromMime(contentType);
+  const byteSize = Number(body.byteSize);
+  let objectKey: string;
+
+  if (Number.isFinite(byteSize) && byteSize > NEKO_MAX_UPLOAD_BYTES) {
+    throw new IOSCloudError(413, "media_too_large", `图片不能超过 ${NEKO_MAX_UPLOAD_LABEL}`);
+  }
+
+  if (purpose === "cat_avatar") {
+    const catId = cleanObjectId(body.catId) || randomId();
+    objectKey = `${user.id}/cats/${catId}/avatar.${extension}`;
+  } else if (purpose === "voice_media") {
+    const voiceId = cleanObjectId(body.voiceId) || randomId();
+    objectKey = `${user.id}/voices/${voiceId}/media.${extension}`;
+  } else {
+    throw new IOSCloudError(400, "invalid_media_purpose", "媒体上传类型不正确，请刷新后再试。");
+  }
+
+  return {
+    objectKey,
+    ...(await translateMediaStorageError(() =>
+      createSignedMediaUploadUrl(env, objectKey, contentType),
+    )),
+  };
+}
+
+async function refreshMediaUrl(
+  env: unknown,
+  user: IOSUser,
+  body: JsonRecord,
+  requestOrigin: string,
+) {
+  const objectKey = requireOwnedObjectKey(user, body.objectKey);
+  return { mediaURL: await mediaDownloadUrl(env, requestOrigin, objectKey) };
 }
 
 export async function handleIOSCloudMediaRequest(
@@ -778,25 +889,19 @@ export async function handleIOSCloudMediaRequest(
 
   const objectKey = requireOwnedObjectKey(user, url.searchParams.get("objectKey"));
   const client = createRequestClient(env, accessToken);
-  const { data, error } = await client.storage.from(NEKO_MEDIA_BUCKET).download(objectKey);
-
-  if (error || !data) {
-    const message = error?.message ?? "Storage object not found";
-    const status = /not found|does not exist/i.test(message) ? 404 : 500;
-    throw new IOSCloudError(status, "media_download_failed", message);
-  }
+  const media = await translateMediaStorageError(() => downloadStoredMedia(client, env, objectKey));
 
   const headers = new Headers({
     "access-control-allow-origin": "*",
     "cache-control": "private, max-age=300",
-    "content-type": data.type || contentTypeForObjectKey(objectKey),
+    "content-type": media.contentType || contentTypeForObjectKey(objectKey),
   });
 
-  if (typeof data.size === "number") {
-    headers.set("content-length", String(data.size));
+  if (typeof media.contentLength === "number") {
+    headers.set("content-length", String(media.contentLength));
   }
 
-  return new Response(data, { status: 200, headers });
+  return new Response(media.body, { status: 200, headers });
 }
 
 export async function handleIOSCloudRequest(
@@ -814,25 +919,27 @@ export async function handleIOSCloudRequest(
 
   switch (pathname) {
     case "/api/ios/cloud/state":
-      return fetchCloudState(client, user, requestOrigin);
+      return fetchCloudState(client, env, user, requestOrigin);
     case "/api/ios/cloud/account-summary":
       return fetchAccountSummary(client, user);
     case "/api/ios/cloud/user-profile":
       return updateUserProfile(client, user, payload);
     case "/api/ios/cloud/cat-profile":
-      return saveCatProfile(client, user, payload, requestOrigin);
+      return saveCatProfile(client, env, user, payload, requestOrigin);
     case "/api/ios/cloud/avatar":
-      return updateAvatar(client, user, payload, requestOrigin);
+      return updateAvatar(client, env, user, payload, requestOrigin);
     case "/api/ios/cloud/voices":
       return payload.catId
-        ? fetchVoices(client, user, cleanString(payload.catId), requestOrigin)
-        : fetchCloudState(client, user, requestOrigin).then((state) => state.voices);
+        ? fetchVoices(client, env, user, cleanString(payload.catId), requestOrigin)
+        : fetchCloudState(client, env, user, requestOrigin).then((state) => state.voices);
     case "/api/ios/cloud/voice":
-      return saveVoice(client, user, payload, requestOrigin);
+      return saveVoice(client, env, user, payload, requestOrigin);
     case "/api/ios/cloud/voices/delete":
-      return deleteVoices(client, user, payload);
+      return deleteVoices(client, env, user, payload);
+    case "/api/ios/cloud/media-upload":
+      return prepareMediaUpload(env, user, payload);
     case "/api/ios/cloud/media-url":
-      return refreshMediaUrl(client, payload, requestOrigin);
+      return refreshMediaUrl(env, user, payload, requestOrigin);
     default:
       return null;
   }
