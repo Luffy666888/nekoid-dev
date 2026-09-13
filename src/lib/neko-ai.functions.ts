@@ -239,12 +239,40 @@ function isSpecificPersonaType(value: unknown): value is string {
   const type = value.trim();
   return (
     type.length >= 4 &&
-    type.length <= 8 &&
+    type.length <= 12 &&
     !genericPersonaTypePatterns.some((pattern) => pattern.test(type))
   );
 }
 
 function buildStablePersona(profile: CatProfile): CatPersona {
+  const behavior = buildBehaviorProfile(profile.quiz);
+  if (behavior.answeredCount === 0) {
+    return normalizePersonaForProfile(
+      {
+        name: profile.name,
+        type: "等你继续观察",
+        mbti: "INFP-A",
+        matchScore: 60,
+        monologue: "先别急着定义我，再陪我多过几天日常吧。",
+        analysis:
+          "目前缺少日常行为答案，暂时不能确定它是否黏人、边界感如何，或习惯怎样表达亲近。继续记录后，判断会更贴近它。",
+        corePersonality: "现有线索只够做保守观察，还不足以概括长期人格。",
+        misunderstanding:
+          "目前缺少日常行为答案，暂时不能判断你是否误解了它的某种行为。多记录几次真实互动后，再寻找稳定的行为反差。",
+        loveLanguage: "现有信息不足以判断它偏好贴贴、玩耍还是安静共处。",
+        loveLanguageInsight: "现有信息不足以判断它偏好贴贴、玩耍还是安静共处。",
+        ownerRole: "目前还不能确定你在它关系中的具体位置，只能确认你正在认真观察和了解它。",
+        ownerRelationship: "目前还不能确定你在它关系中的具体位置，只能确认你正在认真观察和了解它。",
+        tags: ["等待更多日常", "关系线索不足", "保守观察中", "继续认识它"],
+        traits: [],
+        observations: [],
+        evidence: [],
+        dailyMood: "",
+        savedAt: Date.now(),
+      },
+      profile,
+    );
+  }
   const ageTone: Record<
     CatProfile["ageStage"],
     { type: string; mbti: string; mood: string; tags: string[]; traits: CatPersona["traits"] }
@@ -982,7 +1010,7 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
 如果证据支持，优先提炼“A，但是 B”的真实反差，例如想靠近却保留距离；但绝不能为了反差虚构画面、动作、经历、主人行为或长期习惯。
 
 字段要求：
-- type：4–8 个中文字符，让主人一眼看懂它通常“怎么做”或“表面与实际有什么反差”；可有一点趣味和猫的小脾气，但不使用空洞审美词。禁止“精致定格派、柔光守护者、梦境观察家、月光陪伴者、治愈观察者”，也避免“温柔/安静/优雅 + 观察家/守护者/陪伴者”式组合。
+- type：使用自然、易懂的中文短语，让主人一眼看懂它通常“怎么做”或“表面与实际有什么反差”；不要为了字数生造词，也不强制四到六字。可有一点趣味和猫的小脾气，但不使用空洞审美词。禁止“精致定格派、柔光守护者、梦境观察家、月光陪伴者、治愈观察者”，也避免“温柔/安静/优雅 + 观察家/守护者/陪伴者”式组合。
 - mbti：完成人格判断后再选择最接近的趣味标签，格式必须为 XXXX-A 或 XXXX-T；不要把它当科学测量或用刻板印象改写事实。
 - matchScore：60–99 的整数，反映现有证据与结论的匹配程度。
 - monologue：最重要的分享文案。第一人称，优先 20–35 个中文字，结合具体场景，像这只猫此刻会说的话；允许一点小脾气、小傲娇和幽默，不写 AI 散文、鸡汤或泛宠物文学。
@@ -998,7 +1026,7 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
 输出严格 JSON，不要 Markdown，不要附加说明。字段：
 {
   "name": "猫名",
-  "type": "4-8个中文字、能由真实行为模式或性格反差解释的人格称号",
+  "type": "自然易懂、能由真实行为模式或性格反差解释的人格称号",
   "mbti": "四字母加-A或-T的趣味人格类型",
   "matchScore": "60-99的整数，表示现有证据与人格描述的匹配度",
   "monologue": "猫咪第一人称心声",
