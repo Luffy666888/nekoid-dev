@@ -52,9 +52,9 @@ type PersonaAIResponse = Omit<CatPersona, "misunderstanding" | "loveLanguage" | 
 };
 
 export const PERSONA_PROMPT_VERSIONS = {
-  stage1: "persona_stage1_v1",
+  stage1: "persona_stage1_v2",
   stage2: "persona_stage2_v1",
-  stage3: "persona_stage3_v1",
+  stage3: "persona_stage3_v2",
 } as const;
 
 type PersonaPromptStage = keyof typeof PERSONA_PROMPT_VERSIONS;
@@ -128,6 +128,24 @@ export type PersonaEvalResult = {
   total: number;
   passed: boolean;
   fatalRules: Array<{ id: string; passed: boolean; detail?: string }>;
+  warnings: string[];
+  consistency?: PersonaDriftCheckResult;
+};
+
+export type PersonaDriftCheckResult = {
+  hasPrevious: boolean;
+  previousHasRawInputs: boolean;
+  anchored: boolean;
+  action: "keep_current" | "anchor_previous";
+  reason: string;
+  quizChanges: number | null;
+  behaviorAverageDifference: number | null;
+  coreTraitSimilarity: number;
+  personaTitleSimilarity: number;
+  tagOverlap: number;
+  insightConsistency: number;
+  mbtiStable: boolean;
+  strongNewEvidence: boolean;
   warnings: string[];
 };
 
@@ -430,6 +448,18 @@ const readableLabelReplacements: Array<[RegExp, string]> = [
   [/暂不靠近/, "先不靠近"],
 ];
 
+const readablePersonaTypeReplacements: Array<[RegExp, string]> = [
+  [/^亲近有边界$/, "边界感亲近派"],
+  [/^好奇但谨慎$/, "好奇谨慎型"],
+  [/^热情有分寸$/, "热情有分寸型"],
+  [/^不黏但在旁$/, "不黏人陪伴型"],
+  [/^先观察再靠近$/, "慢热观察型"],
+  [/^会先看清楚$/, "先看再行动"],
+  [/^先看再动$/, "先看再行动"],
+  [/仪式感极强的眼神(?:催促|施压)者/, "会用眼神表达"],
+  [/小小?探长|小小?侦探/, "先看再行动"],
+];
+
 function simplifyNekoCopy(text: string) {
   return plainCopyReplacements
     .reduce((next, [pattern, replacement]) => next.replace(pattern, replacement), text)
@@ -464,14 +494,19 @@ function normalizeNaturalLabel(value: unknown, profile: CatProfile, max = 10) {
 function uniqueNaturalLabels(values: unknown[], profile: CatProfile, max = 10) {
   return values
     .map((value) => normalizeNaturalLabel(value, profile, max))
-    .filter((value, index, list) => charLength(value) >= 4 && list.indexOf(value) === index);
+    .filter((value, index, list) => charLength(value) >= 2 && list.indexOf(value) === index);
+}
+
+function personaTypeReplacement(value: string) {
+  const match = readablePersonaTypeReplacements.find(([pattern]) => pattern.test(value));
+  return match ? match[1] : "";
 }
 
 function normalizePersonaType(value: unknown, profile: CatProfile, fallback = "先观察再靠近") {
   const copied = simplifyNekoCopy(normalizeCatFacts(value, profile, fallback));
-  const replaced = readableLabelReplacement(copied) || copied;
+  const replaced = personaTypeReplacement(copied) || readableLabelReplacement(copied) || copied;
   const cleaned = cleanLabelText(replaced);
-  const type = readableLabelReplacement(cleaned) || cleaned;
+  const type = personaTypeReplacement(cleaned) || readableLabelReplacement(cleaned) || cleaned;
   return isSpecificPersonaType(type) ? type : fallback;
 }
 
@@ -1049,13 +1084,14 @@ function mappedMbti(behaviorProfile: PersonaBehaviorProfile) {
 
 function choosePersonaTitle(stage1: PersonaStage1Output) {
   const b = stage1.behaviorProfile;
-  if (b.sociability >= 62 && b.attachmentExpression >= 62 && b.boundary >= 58) return "热情有分寸";
+  if (b.sociability >= 62 && b.attachmentExpression >= 62 && b.boundary >= 58)
+    return "热情有分寸型";
   if (b.sociability >= 62 && b.attachmentExpression >= 62) return "主动亲近型";
-  if (b.attachmentExpression >= 60 && b.boundary >= 62) return "亲近有边界";
-  if (b.curiosity >= 62 && b.caution >= 62) return "好奇但谨慎";
-  if (b.independence >= 62 && b.interactionPreference <= 50) return "不黏但在旁";
+  if (b.attachmentExpression >= 60 && b.boundary >= 62) return "边界感亲近派";
+  if (b.curiosity >= 62 && b.caution >= 62) return "好奇谨慎型";
+  if (b.independence >= 62 && b.interactionPreference <= 50) return "不黏人陪伴型";
   if (b.sociability <= 42 && b.attachmentExpression >= 58) return "慢热陪伴型";
-  if (b.caution >= 64) return "先观察再靠近";
+  if (b.caution >= 64) return "慢热观察型";
   return "安静观察型";
 }
 
@@ -1071,13 +1107,13 @@ function tagsFromStage1(stage1: PersonaStage1Output, profile: CatProfile) {
   if (stage1.behaviorProfile.attachmentExpression >= 60) tags.push("喜欢待在附近");
   if (stage1.behaviorProfile.boundary >= 60) tags.push("不爱强抱");
   if (stage1.behaviorProfile.curiosity >= 60) tags.push("对新东西好奇");
-  const normalized = uniqueNaturalLabels(tags, profile, 10).slice(0, 4);
+  const normalized = uniqueNaturalLabels(tags, profile, 8).slice(0, 4);
   return normalized.length >= 4
     ? normalized
     : uniqueNaturalLabels(
         [...normalized, "先观察再靠近", "喜欢待在附近", "有自己的边界", "会用眼神表达"],
         profile,
-        10,
+        8,
       ).slice(0, 4);
 }
 
@@ -1106,18 +1142,22 @@ function buildStableStage3(
   return {
     personaTitle: choosePersonaTitle(stage1),
     mbti: mappedMbti(stage1.behaviorProfile),
-    summary:
+    summary: boundedCopy(
       stage1.coreTraits[0]?.description ??
-      "现在的线索还不够多，先保守判断它更习惯按自己的节奏观察和靠近。",
+        "现在的线索还不够多，先保守判断它更习惯按自己的节奏观察和靠近。",
+      "它更习惯按自己的节奏观察和靠近。",
+      10,
+      50,
+    ),
     monologue:
       stage1.behaviorProfile.caution >= 62
         ? "让我先看清楚，再决定要不要靠近。"
         : "我在附近啦，只是要按自己的节奏来。",
     tags: tagsFromStage1(stage1, profile),
     insights: {
-      misunderstanding: stage2.misunderstanding.explanation,
-      affection: stage2.affection.explanation,
-      ownerRelationship: stage2.ownerRelationship.explanation,
+      misunderstanding: boundedCopy(stage2.misunderstanding.explanation, "", 16, 60),
+      affection: boundedCopy(stage2.affection.explanation, "", 16, 60),
+      ownerRelationship: boundedCopy(stage2.ownerRelationship.explanation, "", 16, 60),
     },
     matchScore: stage1.coreTraits.length >= 3 ? 88 : stage1.coreTraits.length ? 76 : 62,
     traits: catPersonaTraits(stage1),
@@ -1238,6 +1278,276 @@ function semanticSimilarity(a: string, b: string) {
   return overlap / Math.min(left.size, right.size);
 }
 
+const behaviorProfileKeys: Array<keyof PersonaBehaviorProfile> = [
+  "sociability",
+  "curiosity",
+  "caution",
+  "attachmentExpression",
+  "independence",
+  "boundary",
+  "environmentalSensitivity",
+  "interactionPreference",
+];
+
+function behaviorProfileFromJson(value: unknown): PersonaBehaviorProfile | null {
+  const raw = getObjectRecord(value);
+  if (!raw) return null;
+  let seen = 0;
+  const profile = behaviorProfileKeys.reduce((next, key) => {
+    const numeric = Number(raw[key]);
+    if (Number.isFinite(numeric)) seen += 1;
+    return {
+      ...next,
+      [key]: Number.isFinite(numeric) ? clampScore(numeric) : 50,
+    };
+  }, {} as PersonaBehaviorProfile);
+  return seen >= 4 ? profile : null;
+}
+
+function quizAnswersFromJson(value: unknown): Record<string, string> | null {
+  const raw = getObjectRecord(value);
+  if (!raw) return null;
+  const answers: Record<string, string> = {};
+  for (const [key, rawValue] of Object.entries(raw)) {
+    const answer = asText(rawValue).toLowerCase();
+    if (answer === "a" || answer === "b" || answer === "c") answers[String(key)] = answer;
+  }
+  return Object.keys(answers).length ? answers : null;
+}
+
+function countQuizChanges(
+  current: Record<string, string> | null,
+  previous: Record<string, string> | null,
+) {
+  if (!current || !previous) return null;
+  const keys = Array.from(new Set([...Object.keys(current), ...Object.keys(previous)]));
+  return keys.reduce((sum, key) => sum + (current[key] === previous[key] ? 0 : 1), 0);
+}
+
+function averageBehaviorDifference(
+  current: PersonaBehaviorProfile,
+  previous: PersonaBehaviorProfile | null,
+) {
+  if (!previous) return null;
+  const total = behaviorProfileKeys.reduce(
+    (sum, key) => sum + Math.abs(current[key] - previous[key]),
+    0,
+  );
+  return Math.round((total / behaviorProfileKeys.length) * 10) / 10;
+}
+
+function extractPreviousQuiz(previous: CatPersona) {
+  const generation = getObjectRecord(previous.generation);
+  const rawInputs = getObjectRecord(generation?.rawInputs);
+  const rawProfile = getObjectRecord(rawInputs?.profile);
+  return (
+    quizAnswersFromJson(generation?.questionnaireAnswers) ??
+    quizAnswersFromJson(rawProfile?.quiz) ??
+    quizAnswersFromJson(rawInputs?.questionnaireAnswers)
+  );
+}
+
+function extractPreviousBehavior(previous: CatPersona) {
+  const generation = getObjectRecord(previous.generation);
+  const rawInputs = getObjectRecord(generation?.rawInputs);
+  return (
+    behaviorProfileFromJson(generation?.behaviorProfile) ??
+    behaviorProfileFromJson(rawInputs?.behaviorProfile)
+  );
+}
+
+function previousHasRawInputs(previous: CatPersona) {
+  const generation = getObjectRecord(previous.generation);
+  return Boolean(
+    generation?.rawInputs || generation?.behaviorProfile || generation?.questionnaireAnswers,
+  );
+}
+
+function hasStrongNewBehaviorEvidence(data: PersonaInput) {
+  return (data.videoObservations ?? []).some(
+    (observation) =>
+      observation.containsCat &&
+      observation.confidence === "high" &&
+      observation.personalityEvidence.some(
+        (evidence) => charLength(`${evidence.fact}${evidence.interpretation}`) >= 12,
+      ),
+  );
+}
+
+function tagOverlapRatio(currentTags: string[], previousTags: string[]) {
+  const current = currentTags.slice(0, 3);
+  const previous = previousTags.slice(0, 3);
+  const denominator = Math.min(current.length, previous.length);
+  if (!denominator) return 0;
+  const overlap = current.filter((tag) => previous.includes(tag)).length;
+  return Math.round((overlap / denominator) * 100) / 100;
+}
+
+function evaluatePersonaDrift(
+  data: PersonaInput,
+  stage1: PersonaStage1Output,
+  finalCopy: PersonaStage3Output,
+): PersonaDriftCheckResult {
+  const previous = data.previousPersona;
+  if (!previous) {
+    return {
+      hasPrevious: false,
+      previousHasRawInputs: false,
+      anchored: false,
+      action: "keep_current",
+      reason: "no_previous_persona",
+      quizChanges: null,
+      behaviorAverageDifference: null,
+      coreTraitSimilarity: 0,
+      personaTitleSimilarity: 0,
+      tagOverlap: 0,
+      insightConsistency: 0,
+      mbtiStable: true,
+      strongNewEvidence: false,
+      warnings: [],
+    };
+  }
+
+  const currentQuiz = quizAnswersFromJson(data.profile.quiz ?? {});
+  const previousQuiz = extractPreviousQuiz(previous);
+  const previousBehavior = extractPreviousBehavior(previous);
+  const quizChanges = countQuizChanges(currentQuiz, previousQuiz);
+  const behaviorAverageDifference = averageBehaviorDifference(
+    stage1.behaviorProfile,
+    previousBehavior,
+  );
+  const strongNewEvidence = hasStrongNewBehaviorEvidence(data);
+  const previousTitle = normalizePersonaType(previous.type, data.profile, "");
+  const currentTitle = normalizePersonaType(finalCopy.personaTitle, data.profile, "");
+  const previousTags = uniqueNaturalLabels(previous.tags ?? [], data.profile, 8);
+  const currentTags = uniqueNaturalLabels(finalCopy.tags, data.profile, 8);
+  const previousText = [
+    previousTitle,
+    previous.corePersonality,
+    previous.analysis,
+    ...previousTags,
+  ].join("");
+  const currentText = [
+    currentTitle,
+    finalCopy.summary,
+    ...currentTags,
+    ...stage1.coreTraits.map((trait) => `${trait.trait}${trait.description}`),
+  ].join("");
+  const previousInsights = [
+    previous.misunderstanding,
+    previous.loveLanguageInsight ?? previous.loveLanguage,
+    previous.ownerRelationship ?? previous.ownerRole,
+  ].filter(Boolean) as string[];
+  const currentInsights = Object.values(finalCopy.insights);
+  const insightConsistency = previousInsights.length
+    ? Math.round(
+        (previousInsights.reduce(
+          (sum, text, index) => sum + semanticSimilarity(text, currentInsights[index] ?? ""),
+          0,
+        ) /
+          previousInsights.length) *
+          100,
+      ) / 100
+    : 0;
+  const titleSimilarity = semanticSimilarity(previousTitle, currentTitle);
+  const coreTraitSimilarity = semanticSimilarity(previousText, currentText);
+  const tagOverlap = tagOverlapRatio(currentTags, previousTags);
+  const mbtiStable = !previous.mbti || previous.mbti === finalCopy.mbti;
+  const hasRaw = previousHasRawInputs(previous);
+
+  const rawStable =
+    hasRaw &&
+    quizChanges !== null &&
+    quizChanges <= 1 &&
+    behaviorAverageDifference !== null &&
+    behaviorAverageDifference < 15 &&
+    !strongNewEvidence;
+  const rawLikelyStable =
+    hasRaw &&
+    quizChanges !== null &&
+    quizChanges <= 1 &&
+    behaviorAverageDifference === null &&
+    !strongNewEvidence &&
+    (mbtiStable || tagOverlap >= 0.34 || coreTraitSimilarity >= 0.18);
+  const visibleLikelyStable =
+    !hasRaw &&
+    !strongNewEvidence &&
+    (mbtiStable || tagOverlap >= 0.34 || titleSimilarity >= 0.3 || coreTraitSimilarity >= 0.18);
+  const anchored = Boolean(previousTitle) && (rawStable || rawLikelyStable || visibleLikelyStable);
+
+  const warnings = [];
+  if (!anchored && previousTitle && !strongNewEvidence && !mbtiStable) {
+    warnings.push("persona_drift_allowed_without_strong_video_evidence");
+  }
+  if (anchored && tagOverlap < 0.67) warnings.push("tag_overlap_repaired_to_previous_anchor");
+  if (anchored && !mbtiStable) warnings.push("mbti_repaired_to_previous_anchor");
+
+  return {
+    hasPrevious: true,
+    previousHasRawInputs: hasRaw,
+    anchored,
+    action: anchored ? "anchor_previous" : "keep_current",
+    reason: anchored
+      ? hasRaw
+        ? "similar_questionnaire_and_behavior_profile"
+        : "visible_previous_persona_matches_current_direction"
+      : strongNewEvidence
+        ? "strong_new_video_evidence"
+        : "input_or_semantic_direction_changed",
+    quizChanges,
+    behaviorAverageDifference,
+    coreTraitSimilarity,
+    personaTitleSimilarity: titleSimilarity,
+    tagOverlap,
+    insightConsistency,
+    mbtiStable,
+    strongNewEvidence,
+    warnings,
+  };
+}
+
+function applyPreviousPersonaAnchor(
+  finalCopy: PersonaStage3Output,
+  previous: CatPersona,
+  fallback: PersonaStage3Output,
+  profile: CatProfile,
+): PersonaStage3Output {
+  const previousTitle = normalizePersonaType(previous.type, profile, "");
+  const previousTags = uniqueNaturalLabels(previous.tags ?? [], profile, 8);
+  const tags = uniqueNaturalLabels(
+    [...previousTags.slice(0, 3), ...finalCopy.tags, ...fallback.tags],
+    profile,
+    8,
+  ).slice(0, 4);
+  const previousMbti = /^[IE][NS][FT][JP]-[AT]$/.test(previous.mbti) ? previous.mbti : "";
+  return {
+    ...finalCopy,
+    personaTitle: previousTitle || finalCopy.personaTitle,
+    mbti: previousMbti || finalCopy.mbti,
+    summary: boundedCopy(
+      normalizeCatFacts(previous.corePersonality ?? previous.analysis ?? "", profile),
+      finalCopy.summary,
+      10,
+      50,
+    ),
+    tags: tags.length >= 4 ? tags : fallback.tags,
+    insights: {
+      misunderstanding: normalizeFinalInsight(
+        previous.misunderstanding,
+        finalCopy.insights.misunderstanding,
+      ),
+      affection: normalizeFinalInsight(
+        previous.loveLanguageInsight ?? previous.loveLanguage,
+        finalCopy.insights.affection,
+      ),
+      ownerRelationship: normalizeFinalInsight(
+        previous.ownerRelationship ?? previous.ownerRole,
+        finalCopy.insights.ownerRelationship,
+      ),
+    },
+  };
+}
+
 function dedupeStage2Insights(stage2: PersonaStage2Output, fallback: PersonaStage2Output) {
   const next = { ...stage2 };
   const pairs: Array<[keyof PersonaStage2Output, keyof PersonaStage2Output]> = [
@@ -1266,9 +1576,9 @@ function normalizeStage2Output(value: unknown, fallback: PersonaStage2Output) {
 }
 
 function normalizeFinalInsight(value: unknown, fallback: string) {
-  if (typeof value === "string") return boundedCopy(value, fallback, 16, 130);
+  if (typeof value === "string") return boundedCopy(value, fallback, 16, 60);
   const raw = getObjectRecord(value);
-  return boundedCopy(asText(raw?.text ?? raw?.explanation ?? raw?.claim), fallback, 16, 130);
+  return boundedCopy(asText(raw?.text ?? raw?.explanation ?? raw?.claim), fallback, 16, 60);
 }
 
 function normalizeStage3Output(
@@ -1278,9 +1588,7 @@ function normalizeStage3Output(
 ): PersonaStage3Output {
   const raw = getObjectRecord(value) ?? {};
   const rawInsights = getObjectRecord(raw.insights) ?? {};
-  const tags = Array.isArray(raw.tags)
-    ? uniqueNaturalLabels(raw.tags, profile, 10).slice(0, 4)
-    : [];
+  const tags = Array.isArray(raw.tags) ? uniqueNaturalLabels(raw.tags, profile, 8).slice(0, 4) : [];
   const rawTraits = Array.isArray(raw.traits)
     ? raw.traits
         .map((item) => {
@@ -1306,7 +1614,7 @@ function normalizeStage3Output(
       normalizeCatFacts(raw.summary ?? raw.corePersonality, profile),
       fallback.summary,
       10,
-      90,
+      50,
     ),
     monologue: boundedCopy(normalizeCatFacts(raw.monologue, profile), fallback.monologue, 10, 36),
     tags: tags.length >= 4 ? tags : fallback.tags,
@@ -1410,11 +1718,13 @@ export function evaluatePersonaGeneration({
   profile,
   stage1,
   finalCopy,
+  consistency,
 }: {
   profile: CatProfile;
   stage1: PersonaStage1Output;
   stage2: PersonaStage2Output;
   finalCopy: PersonaStage3Output;
+  consistency?: PersonaDriftCheckResult;
 }): PersonaEvalResult {
   const allText = [
     finalCopy.personaTitle,
@@ -1506,6 +1816,7 @@ export function evaluatePersonaGeneration({
   const warnings = [
     ...selfCheck.issues,
     ...stage1.unsupportedClaims.map((claim) => `unsupported:${claim.claim}`),
+    ...(consistency?.warnings ?? []),
   ];
   return {
     scores,
@@ -1513,6 +1824,7 @@ export function evaluatePersonaGeneration({
     passed: total >= 80 && fatalRules.every((rule) => rule.passed),
     fatalRules,
     warnings,
+    ...(consistency ? { consistency } : {}),
   };
 }
 
@@ -2389,6 +2701,14 @@ function personaInputSnapshot(
           mbti: data.previousPersona.mbti,
           tags: data.previousPersona.tags,
           corePersonality: data.previousPersona.corePersonality,
+          generation: data.previousPersona.generation
+            ? {
+                inputHash: data.previousPersona.generation.inputHash,
+                questionnaireAnswers: data.previousPersona.generation.questionnaireAnswers,
+                behaviorProfile: data.previousPersona.generation.behaviorProfile,
+                finalCopy: data.previousPersona.generation.finalCopy,
+              }
+            : null,
         }
       : null,
     promptVersion: PERSONA_PROMPT_VERSIONS,
@@ -2407,6 +2727,16 @@ function stage1Prompt(data: PersonaInput, behaviorProfile: PersonaBehaviorProfil
 规则化 Behavior Profile：${JSON.stringify(behaviorProfile)}
 照片状态：${data.imageDataUrl ? "已提供；只能支持当下可见事实，不能支持长期习惯" : "未提供"}
 结构化视频观察：${JSON.stringify(data.videoObservations ?? [])}
+上一版人格 prior：${JSON.stringify(
+    data.previousPersona
+      ? {
+          type: data.previousPersona.type,
+          mbti: data.previousPersona.mbti,
+          tags: data.previousPersona.tags,
+          corePersonality: data.previousPersona.corePersonality,
+        }
+      : null,
+  )}
 
 核心规则：
 1. 每个 coreTrait 必须有 supportedBy，且至少 2 个独立信号支持。
@@ -2414,6 +2744,7 @@ function stage1Prompt(data: PersonaInput, behaviorProfile: PersonaBehaviorProfil
 3. 如果证据不足，就降低 confidence 或不要生成 trait。
 4. 不要为了凑完整人格而创造 trait。
 5. 禁止把固定时间、固定路线、每天按点、生活秩序严格、主人不在时一定怎样等长期频率事实写成结论；出现这类内容必须进入 unsupportedClaims。
+6. previousPersona 只能作为稳定性参考。如果当前问卷/视频没有强新证据，不要轻易改变核心方向；如果强证据变化，必须以当前输入为准。
 
 输出严格 JSON，不要 Markdown：
 {
@@ -2484,6 +2815,7 @@ function stage3Prompt(
   stage1: PersonaStage1Output,
   stage2: PersonaStage2Output,
   profile: CatProfile,
+  previousPersona?: CatPersona | null,
 ) {
   return `你是「喵一下」Persona Generation Pipeline 的 Stage 3：最终用户文案改写。
 
@@ -2496,16 +2828,36 @@ function stage3Prompt(
   })}
 Grounded Traits：${JSON.stringify(stage1.coreTraits)}
 Insights：${JSON.stringify(stage2)}
+上一版人格 prior：${JSON.stringify(
+    previousPersona
+      ? {
+          type: previousPersona.type,
+          mbti: previousPersona.mbti,
+          tags: previousPersona.tags,
+          corePersonality: previousPersona.corePersonality,
+          misunderstanding: previousPersona.misunderstanding,
+          loveLanguageInsight: previousPersona.loveLanguageInsight ?? previousPersona.loveLanguage,
+          ownerRelationship: previousPersona.ownerRelationship ?? previousPersona.ownerRole,
+        }
+      : null,
+  )}
 
 人格标题规则：
 - 可理解性 > 准确 > 共鸣 > 创意。
 - 禁止造词，禁止 XX控、XX王、XX机、营业、控场、发令、施压、稳态、高质互动、策略性靠近、仪式感极强、端庄定点、克制讨关注。
-- 优先 4-10 个中文字符；句式标题最多 12-14 字；普通养猫人第一次看到就懂。
+- 标题必须像一个人格名称，不要只是形容词短语。优先 “XX型/派/系”“XX的XX者”，或“主动亲近，但很有边界”这类轻句式。
+- 优先 4-10 个中文字符；句式标题最多 12-14 字；如果超过 14 字必须改短；普通养猫人第一次看到就懂。
+- 避免“亲近有边界”“按自己节奏营业的互动控”这类不自然标题；可改为“边界感亲近派”“慢热观察型”。
+- 如果上一版 prior 与当前 grounded traits 没有明显冲突，保持标题语义方向、MBTI 和前 3 个 tags 的大部分重合。
 
 Tags 规则：
 - 必须是自然行为语言，每个 2-6 个中文字为佳。
 - 好例：主动靠近、不爱强抱、先观察再靠近、喜欢待在附近、边界感强、会用眼神表达。
 - 坏例：互动控场王、眼神发令机、克制讨关注、稳态陪伴、精准互动。
+
+Insight 规则：
+- 三条 insight 每条 35-60 个中文字符，2-3 行即可，不要写成 80-100 字报告。
+- 只写用户能理解的相处观察，不要写心理学报告腔。
 
 Final Copy Self-check：
 输出前逐条检查：普通养猫人能否一眼看懂；有没有需要解释的词；有没有 AI 造词感；有没有把推测写成事实；有没有重复表达；有没有营销腔或心理学报告腔。任一不通过，自动改写。
@@ -2630,7 +2982,7 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
       normalize: (value, fallback) => normalizeStage1Output(value, fallback, data.profile),
       options: {
         maxTokens: 1200,
-        temperature: 0.25,
+        temperature: 0.12,
         timeoutMs: data.imageDataUrl ? 24_000 : 16_000,
         modelMode: data.imageDataUrl ? "vision" : "text",
         validate: (parsed) => {
@@ -2692,7 +3044,10 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
           content:
             "你是「喵一下」Persona Pipeline 的 Stage 3。只做人话改写，不改变 Stage 1/2 事实；标题和标签必须自然易懂。只返回合法 JSON。",
         },
-        { role: "user", content: stage3Prompt(stage1Run.output, stage2Output, data.profile) },
+        {
+          role: "user",
+          content: stage3Prompt(stage1Run.output, stage2Output, data.profile, data.previousPersona),
+        },
       ],
       normalize: (value, fallback) => normalizeStage3Output(value, fallback, data.profile),
       options: {
@@ -2730,19 +3085,58 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
       retryCount += 1;
     }
 
+    let driftCheck = evaluatePersonaDrift(data, stage1Run.output, finalCopy);
+    if (driftCheck.anchored && data.previousPersona) {
+      finalCopy = repairStage3Output(
+        applyPreviousPersonaAnchor(finalCopy, data.previousPersona, stableStage3, data.profile),
+        stableStage3,
+        data.profile,
+      );
+      driftCheck = {
+        ...evaluatePersonaDrift(data, stage1Run.output, finalCopy),
+        anchored: true,
+        action: "anchor_previous",
+        reason: driftCheck.reason,
+        warnings: driftCheck.warnings,
+      };
+      stage3Run.log.retryCount += 1;
+      stage3Run.log.output = finalCopy;
+      stage3Run.log.error = [
+        stage3Run.log.error,
+        `Persona drift check anchored previous persona: ${driftCheck.reason}`,
+      ]
+        .filter(Boolean)
+        .join("; ");
+      retryCount += 1;
+    }
+
     let evalResult = evaluatePersonaGeneration({
       profile: data.profile,
       stage1: stage1Run.output,
       stage2: stage2Output,
       finalCopy,
+      consistency: driftCheck,
     });
     if (!evalResult.passed && evalResult.fatalRules.some((rule) => !rule.passed)) {
-      finalCopy = stableStage3;
+      finalCopy =
+        driftCheck.anchored && data.previousPersona
+          ? repairStage3Output(
+              applyPreviousPersonaAnchor(
+                stableStage3,
+                data.previousPersona,
+                stableStage3,
+                data.profile,
+              ),
+              stableStage3,
+              data.profile,
+            )
+          : stableStage3;
       evalResult = evaluatePersonaGeneration({
         profile: data.profile,
         stage1: stage1Run.output,
         stage2: stage2Output,
         finalCopy,
+        consistency: driftCheck,
       });
       stage3Run.log.ok = false;
       stage3Run.log.error = [

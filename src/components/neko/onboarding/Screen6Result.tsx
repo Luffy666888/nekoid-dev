@@ -12,8 +12,10 @@ import { voicesStore } from "../app/voicesStore";
 import { saveLocalNekoToCloud } from "@/lib/neko-cloud";
 import { getPhotoDraft } from "./onboardingDraftStore";
 
-const KEYWORDS = ["温柔观察者", "慢热", "安静陪伴"];
-const EDITORIAL_FONT = '"Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", serif';
+const KEYWORDS = ["先观察再靠近", "喜欢待在附近", "边界感强", "会用眼神表达"];
+const TITLE_FONT = '"Songti SC", "Songti SC Bold", "STSong", "Noto Serif CJK SC", serif';
+const EDITORIAL_FONT = '"Didot", "Bodoni 72", "Baskerville", "Times New Roman", serif';
+const UI_FONT = '"PingFang SC", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif';
 
 export function Screen6Result({
   onRestart,
@@ -41,10 +43,11 @@ export function Screen6Result({
     hero;
   const catName = useCatName();
   const persona = useCatPersona();
-  const personaType = persona?.type ?? "安静观察型";
+  const personaType = normalizePersonaTitle(persona?.type ?? "安静观察型");
   const personaMbti = persona?.mbti ?? "ISFJ-A";
   const personaKeywords = buildPersonaKeywords(persona?.tags);
   const titleLines = useMemo(() => splitPersonaTitle(personaType), [personaType]);
+  const titleSize = personaTitleSize(personaType);
   const heroImagePosition = useHeroImagePosition(avatarSrc);
   const goBack = onBack ?? onPrev;
   const heroDescription = shortenCopy(
@@ -52,7 +55,7 @@ export function Screen6Result({
       persona?.monologue ||
       persona?.analysis ||
       "它用自己的节奏观察世界，也珍惜熟悉的陪伴。",
-    48,
+    50,
   );
   const resultInsights = [
     {
@@ -62,7 +65,7 @@ export function Screen6Result({
         persona?.misunderstanding ||
           persona?.analysis ||
           "它不是不感兴趣，只是更习惯先把情况看明白。坐着不动时，也可能早已把注意力放在眼前。",
-        76,
+        60,
       ),
     },
     {
@@ -72,7 +75,7 @@ export function Screen6Result({
         persona?.loveLanguageInsight ||
           persona?.loveLanguage ||
           "如果它平时也常待在你附近却不紧贴，它可能更习惯用关注你的动向、共享同一片空间来表达亲近。",
-        76,
+        60,
       ),
     },
     {
@@ -82,7 +85,7 @@ export function Screen6Result({
         persona?.ownerRelationship ||
           persona?.ownerRole ||
           "你可能不是它时时刻刻都要黏着的人，但很可能是它默认会在的人。不需要反复确认你的存在，本身就是一种稳定的信任。",
-        76,
+        60,
       ),
     },
   ];
@@ -140,6 +143,7 @@ export function Screen6Result({
       ref={cardRef}
       className="absolute inset-0 overflow-y-auto scrollbar-none"
       style={{
+        fontFamily: UI_FONT,
         background:
           "linear-gradient(180deg, oklch(0.985 0.012 82) 0%, oklch(0.978 0.022 320) 54%, oklch(0.965 0.026 292) 100%)",
       }}
@@ -173,7 +177,7 @@ export function Screen6Result({
           }
         />
 
-        <section className="relative isolate h-[clamp(550px,68dvh,640px)] min-h-[550px] w-full overflow-hidden rounded-b-[22px]">
+        <section className="relative isolate h-[clamp(650px,80dvh,700px)] min-h-[650px] w-full overflow-hidden rounded-b-[22px]">
           <img
             src={avatarSrc}
             alt={catName}
@@ -188,27 +192,22 @@ export function Screen6Result({
             className="absolute inset-0"
             style={{
               background:
-                "linear-gradient(90deg, oklch(0.99 0.013 84 / 0.86) 0%, oklch(0.985 0.02 320 / 0.52) 28%, transparent 58%), linear-gradient(180deg, oklch(1 0 0 / 0.42) 0%, transparent 25%, transparent 52%, oklch(0.985 0.024 318 / 0.92) 100%)",
+                "linear-gradient(90deg, oklch(0.99 0.012 78 / 0.42) 0%, oklch(0.99 0.012 78 / 0.22) 28%, transparent 52%), linear-gradient(180deg, oklch(1 0 0 / 0.16) 0%, transparent 30%, transparent 56%, oklch(0.985 0.018 78 / 0.74) 100%)",
             }}
-          />
-          <div
-            aria-hidden="true"
-            className="absolute -left-24 -top-14 h-[260px] w-[280px] rounded-full bg-[#F8D7E7]/50 blur-3xl"
-          />
-          <div
-            aria-hidden="true"
-            className="absolute -right-20 bottom-16 h-[260px] w-[220px] rounded-full bg-[#E7DBFF]/45 blur-3xl"
           />
           <div
             aria-hidden="true"
             className="absolute inset-x-0 bottom-0 h-[280px]"
             style={{
               background:
-                "linear-gradient(180deg, transparent 0%, oklch(0.98 0.025 318 / 0.42) 30%, oklch(0.985 0.018 84 / 0.96) 100%)",
+                "linear-gradient(180deg, transparent 0%, oklch(0.985 0.015 82 / 0.34) 38%, oklch(0.985 0.018 84 / 0.88) 100%)",
             }}
           />
 
-          <div className="absolute left-6 top-[calc(env(safe-area-inset-top,0px)+92px)] z-20 text-[#5F5674]/78">
+          <div
+            className="absolute left-6 top-[calc(env(safe-area-inset-top,0px)+92px)] z-20 text-[#5F5674]/78"
+            style={{ fontFamily: EDITORIAL_FONT }}
+          >
             <div className="text-[24px] font-medium leading-[1.02] tracking-[0.02em]">
               CAT
               <br />
@@ -224,16 +223,19 @@ export function Screen6Result({
             </div>
           </div>
 
-          <div className="absolute bottom-6 left-6 z-20 w-[min(74%,340px)]">
-            <div className="text-[20px] font-medium leading-none text-[#2E2741]">{catName}</div>
-            <div className="mt-2 text-[17px] font-semibold leading-none tracking-[0.03em] text-[#2E2741]">
-              {personaMbti}
+          <div className="absolute bottom-6 left-6 right-6 z-20 max-w-[360px]">
+            <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 text-[#2E2741]">
+              <span className="text-[21px] font-semibold leading-none">{catName}</span>
+              <span className="text-[17px] font-medium leading-none tracking-[0.03em]">
+                {personaMbti}
+              </span>
             </div>
             <div className="mt-4 h-px w-8 bg-[#75668E]/60" />
             <h1
-              className="mt-3 text-[40px] font-bold leading-[1.06] text-[#2E225D] min-[420px]:text-[44px]"
+              className="mt-3 font-semibold leading-[1.08] text-[#2E225D]"
               style={{
-                fontFamily: EDITORIAL_FONT,
+                fontFamily: TITLE_FONT,
+                fontSize: titleSize,
                 textShadow: "0 1px 16px rgb(255 255 255 / 0.72)",
               }}
             >
@@ -243,16 +245,16 @@ export function Screen6Result({
                 </span>
               ))}
             </h1>
-            <p className="mt-4 max-w-[310px] text-[17px] font-medium leading-[26px] text-[#5A5370]">
+            <p className="mt-4 max-w-[330px] text-[16px] font-normal leading-[25px] text-[#5A5370]">
               {heroDescription}
             </p>
-            <div className="mt-5 grid max-w-[340px] grid-cols-3 gap-3">
+            <div className="mt-5 flex max-w-[340px] flex-wrap gap-x-[11px] gap-y-[10px]">
               {personaKeywords.map((k) => (
                 <span
                   key={k}
-                  className="flex min-h-9 items-center justify-center rounded-full bg-white/72 px-3 text-center text-[14px] font-semibold leading-[18px] text-[#7259B5] shadow-[0_12px_26px_-22px_rgba(93,64,139,0.65)] backdrop-blur-md"
+                  className="flex min-h-8 items-center justify-center rounded-full bg-white/78 px-3 text-center text-[14px] font-medium leading-[18px] text-[#7259B5] shadow-[0_12px_26px_-22px_rgba(93,64,139,0.65)] backdrop-blur-md"
                 >
-                  {shortenLabel(k, 7)}
+                  {k}
                 </span>
               ))}
             </div>
@@ -292,7 +294,7 @@ export function Screen6Result({
         </div>
       </section>
 
-      <div className="h-7" aria-hidden />
+      <div className="h-28" aria-hidden />
 
       <div
         className="sticky bottom-0 z-30 px-5 pt-3 pb-[max(20px,env(safe-area-inset-bottom))]"
@@ -316,7 +318,7 @@ export function Screen6Result({
           <button
             type="button"
             onClick={() => onRestart?.()}
-            className="touch-manipulation rounded-full bg-white/82 px-4 py-3.5 text-[17px] font-semibold text-[#7459B5] transition-transform duration-75 active:scale-[0.98]"
+            className="min-h-[52px] touch-manipulation rounded-full bg-white/82 px-4 text-[17px] font-semibold text-[#7459B5] transition-transform duration-75 active:scale-[0.98]"
             style={{
               border: "1.5px solid #C5A6F0",
               boxShadow: "0 12px 24px -20px rgba(93, 64, 139, 0.48)",
@@ -327,7 +329,7 @@ export function Screen6Result({
           <button
             type="button"
             onClick={handleSave}
-            className="flex touch-manipulation items-center justify-center rounded-full px-4 py-3.5 text-[17px] font-semibold text-white transition-transform duration-75 active:scale-[0.98]"
+            className="flex min-h-[52px] touch-manipulation items-center justify-center rounded-full px-4 text-[17px] font-semibold text-white transition-transform duration-75 active:scale-[0.98]"
             style={{
               background: "linear-gradient(90deg, #AA8BE8 0%, #E9ABC9 100%)",
               boxShadow: "0 16px 30px -16px rgba(148, 100, 203, 0.58)",
@@ -377,22 +379,91 @@ function resolveHeroImagePosition(width: number, height: number) {
 }
 
 function splitPersonaTitle(title: string) {
-  const clean = title.trim().replace(/\s+/g, "");
+  const clean = normalizePersonaTitle(title);
   if (!clean) return ["猫咪", "观察家"];
   if (clean.length <= 6) return [clean];
 
   const possessiveIndex = clean.indexOf("的");
-  if (possessiveIndex >= 1 && possessiveIndex <= 4 && possessiveIndex < clean.length - 1) {
+  if (possessiveIndex >= 2 && possessiveIndex <= clean.length - 4) {
     return [clean.slice(0, possessiveIndex + 1), clean.slice(possessiveIndex + 1)];
   }
 
-  const splitAt = Math.ceil(clean.length / 2);
+  const min = 3;
+  const max = Math.max(min, clean.length - 3);
+  let splitAt = Math.round(clean.length / 2);
+  splitAt = Math.min(Math.max(splitAt, min), max);
   return [clean.slice(0, splitAt), clean.slice(splitAt)];
 }
 
 function buildPersonaKeywords(tags: string[] | undefined) {
-  const merged = [...(tags ?? []), ...KEYWORDS].map((tag) => tag.trim()).filter(Boolean);
-  return Array.from(new Set(merged)).slice(0, 3);
+  const merged = [...(tags ?? []), ...KEYWORDS].map(normalizePersonaTag).filter(Boolean);
+  return Array.from(new Set(merged)).slice(0, 4);
+}
+
+function personaTitleSize(title: string) {
+  const length = Array.from(title).length;
+  if (length <= 6) return "42px";
+  if (length <= 10) return "38px";
+  return "34px";
+}
+
+const titleReplacements: Record<string, string> = {
+  亲近有边界: "边界感亲近派",
+  好奇但谨慎: "好奇谨慎型",
+  热情有分寸: "热情有分寸型",
+  不黏但在旁: "不黏人陪伴型",
+  先观察再靠近: "慢热观察型",
+  会先看清楚: "先看再行动",
+  先看再动: "先看再行动",
+};
+
+const labelReplacements: Array<[RegExp, string]> = [
+  [/观察优先/g, "先观察再靠近"],
+  [/保留距离/g, "不急着靠近"],
+  [/心动不动/g, "想靠近又犹豫"],
+  [/小小?探长|小小?侦探/g, "会先看清楚"],
+  [/互动控场王/g, "喜欢互动"],
+  [/眼神(?:发令机|施压|催促)/g, "会用眼神表达"],
+  [/克制讨关注/g, "安静等你发现"],
+  [/稳态陪伴/g, "喜欢待在附近"],
+  [/精准互动/g, "表达得很清楚"],
+];
+
+const bannedCopyPattern =
+  /营业|控场|发令|施压|稳态|高质|策略性|仪式感极强|端庄定点|克制讨关注|精准互动|节奏掌控|掌控节奏/u;
+const jargonSuffixPattern = /[\p{Script=Han}A-Za-z0-9]{1,8}[控王机]$/u;
+
+function normalizePersonaTitle(value: string) {
+  let clean = value.trim().replace(/\s+/g, "");
+  clean = titleReplacements[clean] ?? clean;
+  const length = Array.from(clean).length;
+  if (
+    length < 4 ||
+    length > 14 ||
+    bannedCopyPattern.test(clean) ||
+    jargonSuffixPattern.test(clean)
+  ) {
+    return "安静观察型";
+  }
+  return clean;
+}
+
+function normalizePersonaTag(value: string) {
+  let clean = value.trim().replace(/\s+/g, "");
+  for (const [pattern, replacement] of labelReplacements) {
+    clean = clean.replace(pattern, replacement);
+  }
+  clean = clean.replace(/[^\p{Script=Han}A-Za-z0-9]/gu, "");
+  const length = Array.from(clean).length;
+  if (
+    length < 2 ||
+    length > 8 ||
+    bannedCopyPattern.test(clean) ||
+    jargonSuffixPattern.test(clean)
+  ) {
+    return "";
+  }
+  return clean;
 }
 
 function shortenCopy(value: string, maxLength: number) {
@@ -419,12 +490,6 @@ function shortenCopy(value: string, maxLength: number) {
     .replace(/[，,；;：:]$/u, "。")
     .trim();
   return /[。！？.!?]$/u.test(sliced) ? sliced : `${sliced}。`;
-}
-
-function shortenLabel(value: string, maxLength: number) {
-  const chars = Array.from(value.trim());
-  if (chars.length <= maxLength) return value;
-  return chars.slice(0, maxLength).join("");
 }
 
 function PersonaDebugPanel({

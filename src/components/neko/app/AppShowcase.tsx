@@ -636,6 +636,7 @@ function aspectToClass(a?: string) {
   switch (a) {
     case "9:16": return "aspect-[9/16]";
     case "4:5": return "aspect-[4/5]";
+    case "4:3": return "aspect-[4/3]";
     case "1:1": return "aspect-square";
     case "3:4":
     default: return "aspect-[3/4]";

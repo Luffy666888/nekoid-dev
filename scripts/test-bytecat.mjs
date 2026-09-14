@@ -428,7 +428,7 @@ test("merged persona preserves four traits and the updated generation settings",
       const body = JSON.parse(init.body);
       if (calls === 1) {
         assert.equal(body.max_tokens, 1200);
-        assert.equal(body.temperature, 0.25);
+        assert.equal(body.temperature, 0.12);
       } else if (calls === 2) {
         assert.equal(body.max_tokens, 820);
         assert.equal(body.temperature, 0.42);
@@ -515,7 +515,7 @@ test("merged persona preserves four traits and the updated generation settings",
   });
   const result = await api.generateCatPersonaServer({ profile: mergedProfile });
   assert.equal(calls, 3);
-  assert.equal(result.type, "会先看清楚");
+  assert.equal(result.type, "先看再行动");
   assert.deepEqual(Array.from(result.tags), [
     "先观察再靠近",
     "不急着靠近",
@@ -644,8 +644,168 @@ test("persona uses video observations as text and does not resend video frames",
     ],
   });
   assert.equal(calls, 3);
-  assert.equal(result.type, "先看再动");
+  assert.equal(result.type, "先看再行动");
   assert.ok(result.evidence.length >= 2);
+});
+
+test("persona drift check keeps 六六 stable across five same-input runs", async () => {
+  let stage3Calls = 0;
+  const liuliuProfile = {
+    ...mergedProfile,
+    name: "六六",
+    quiz: {
+      0: "b",
+      1: "a",
+      2: "b",
+      3: "a",
+      4: "b",
+      5: "a",
+      6: "b",
+      7: "a",
+    },
+  };
+  const stableStage1 = {
+    behaviorProfile: {
+      sociability: 58,
+      curiosity: 68,
+      caution: 72,
+      attachmentExpression: 66,
+      independence: 60,
+      boundary: 70,
+      environmentalSensitivity: 71,
+      interactionPreference: 59,
+    },
+    coreTraits: [
+      {
+        trait: "亲近但有边界",
+        description: "它在意和人的关系，同时希望自己决定靠近和接触的距离。",
+        supportedBy: ["Q3:A", "Q6:B"],
+        confidence: 0.84,
+      },
+      {
+        trait: "先观察再行动",
+        description: "遇到变化或互动时，它更习惯先看清楚，再决定下一步。",
+        supportedBy: ["Q1:A", "Q4:B"],
+        confidence: 0.82,
+      },
+    ],
+    unsupportedClaims: [],
+  };
+  const stableStage2 = {
+    misunderstanding: {
+      claim: "它不是不亲人，只是需要自己决定距离。",
+      explanation: "它愿意靠近你，但不一定喜欢被持续抱住。能自己决定距离，对它也是信任的一部分。",
+      supportedBy: ["trait:亲近但有边界"],
+      confidence: 0.82,
+    },
+    affection: {
+      claim: "它会靠近你，也保留一点自己的边界。",
+      explanation: "它可能会待在你附近、看你的反应；接触多久、距离多近，它更想自己决定。",
+      supportedBy: ["trait:亲近但有边界"],
+      confidence: 0.82,
+    },
+    ownerRelationship: {
+      claim: "你是它可以放心靠近的人。",
+      explanation: "你不一定是它时时刻刻黏住的人，但很可能是它愿意回到附近的人。",
+      supportedBy: ["trait:先观察再行动"],
+      confidence: 0.8,
+    },
+  };
+  const driftingStage3 = [
+    {
+      personaTitle: "边界感亲近派",
+      mbti: "INFJ-A",
+      tags: ["边界感强", "喜欢待在附近", "先观察再靠近", "不爱强抱"],
+    },
+    {
+      personaTitle: "好奇谨慎型",
+      mbti: "ENFP-A",
+      tags: ["对新东西好奇", "会先看清楚", "主动靠近", "表达得很清楚"],
+    },
+    {
+      personaTitle: "热情有分寸型",
+      mbti: "ENTP-A",
+      tags: ["喜欢互动", "主动靠近", "熟了会更黏", "看着镜头"],
+    },
+    {
+      personaTitle: "慢热观察型",
+      mbti: "ISFP-T",
+      tags: ["先不靠近", "安静坐着", "会先看清楚", "想靠近又犹豫"],
+    },
+    {
+      personaTitle: "主动亲近型",
+      mbti: "ESFJ-A",
+      tags: ["主动靠近", "喜欢找你玩", "表达得很清楚", "喜欢互动"],
+    },
+  ];
+  const api = loadAIServer("neko-ai", {
+    env: { ...env, NEKO_PERSONA_DEBUG: "true" },
+    logger,
+    fetch: async (_url, init) => {
+      const body = JSON.parse(init.body);
+      const prompt = promptTextFromBody(body);
+      if (prompt.includes("Stage 3")) {
+        const variant = driftingStage3[Math.min(stage3Calls, driftingStage3.length - 1)];
+        stage3Calls++;
+        return Response.json({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  personaTitle: variant.personaTitle,
+                  mbti: variant.mbti,
+                  matchScore: 88,
+                  monologue: "我会靠近你，但想自己决定距离。",
+                  summary: "它愿意靠近熟悉的人，也希望自己决定互动距离。",
+                  insights: {
+                    misunderstanding:
+                      "它不是不亲人，只是更希望自己决定距离；靠近你和保留边界可以同时存在。",
+                    affection: "它表达喜欢时，会待在你附近看你的反应，也会选择自己舒服的接触方式。",
+                    ownerRelationship:
+                      "你像一个让它安心的人，它愿意回到你附近，也希望你尊重它的节奏。",
+                  },
+                  tags: variant.tags,
+                  traits: ["边界感", "亲近表达", "观察欲", "互动偏好"].map((label) => ({
+                    label,
+                    value: 72,
+                  })),
+                }),
+              },
+            },
+          ],
+        });
+      }
+      if (prompt.includes("Stage 2")) {
+        return Response.json({ choices: [{ message: { content: JSON.stringify(stableStage2) } }] });
+      }
+      if (prompt.includes("Stage 1")) {
+        assert.equal(body.temperature, 0.12);
+        return Response.json({ choices: [{ message: { content: JSON.stringify(stableStage1) } }] });
+      }
+      throw new Error(`Unknown persona prompt: ${prompt.slice(0, 80)}`);
+    },
+  });
+
+  const results = [];
+  let previousPersona = null;
+  for (let index = 0; index < 5; index++) {
+    const result = await api.generateCatPersonaServer({
+      profile: liuliuProfile,
+      previousPersona,
+    });
+    results.push(result);
+    previousPersona = result;
+  }
+
+  assert.equal(stage3Calls, 5);
+  assert.equal(new Set(results.map((result) => result.type)).size, 1);
+  assert.equal(new Set(results.map((result) => result.mbti)).size, 1);
+  assert.ok(results.every((result) => result.tags.slice(0, 3).includes("边界感强")));
+  for (const result of results.slice(1)) {
+    assert.equal(result.generation.evalResult.consistency.anchored, true);
+    assert.equal(result.generation.evalResult.consistency.behaviorAverageDifference, 0);
+    assert.equal(result.generation.evalResult.consistency.quizChanges, 0);
+  }
 });
 
 test("persona and voice labels rewrite AI-ish phrases into plain cat-owner language", () => {
@@ -869,7 +1029,7 @@ test("updated persona falls through Terra timeout and incomplete Gemini 3.7 resu
       if (model === "gemini-3.7-flash") {
         assert.equal(init.headers["x-goog-api-key"], "test-gemini-key");
         assert.equal(body.generationConfig.maxOutputTokens, 2224);
-        assert.equal(body.generationConfig.temperature, 0.25);
+        assert.equal(body.generationConfig.temperature, 0.12);
         return geminiResponse(JSON.stringify({ ok: true }));
       }
       if (model === "gemini-3-flash-preview") {

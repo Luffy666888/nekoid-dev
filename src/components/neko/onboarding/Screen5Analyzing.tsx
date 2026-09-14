@@ -5,7 +5,7 @@ import { getCurrentSessionCatAvatar } from "../catAvatarStore";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { generateCatPersona } from "@/lib/neko-ai.functions";
-import { getCatProfile, setCatPersona } from "../catProfileStore";
+import { getCatPersona, getCatProfile, setCatPersona } from "../catProfileStore";
 import { getPhotoDraft, getVideoDraft } from "./onboardingDraftStore";
 
 const STEPS = [
@@ -46,6 +46,7 @@ export function Screen5Analyzing({
               .filter((observation): observation is NonNullable<typeof observation> =>
                 Boolean(observation?.containsCat),
               ),
+            previousPersona: getCatPersona(),
           },
         });
         if (!cancelled) {
