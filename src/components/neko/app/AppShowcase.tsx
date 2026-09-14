@@ -1068,7 +1068,7 @@ export function ScreenPublish1() {
   return (
     <ScreenShell>
       <StatusBar />
-      <div className="absolute inset-0 flex flex-col overflow-y-auto scrollbar-none pt-[52px] pb-[110px]">
+      <div className={`absolute inset-0 flex flex-col overflow-y-auto scrollbar-none pt-[52px] ${photoUploaded ? "pb-[110px]" : "pb-10"}`}>
         {/* top bar */}
         <div className="flex items-center justify-between px-6">
           <AppBackButton to="/app" />
@@ -1176,20 +1176,21 @@ export function ScreenPublish1() {
 
       </div>
 
-      {/* floating bottom CTA */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 px-5 pb-[max(10px,env(safe-area-inset-bottom))] pt-5">
-        <button
-          onClick={handleNext}
-          disabled={!photoUploaded || checking}
-          className="pointer-events-auto flex w-full items-center justify-center rounded-full px-6 py-4 neko-text-button text-white active:scale-[0.97] active:brightness-[0.92] transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
-          style={{
-            background: "var(--gradient-cta)",
-            boxShadow: photoUploaded ? "0 16px 32px -14px oklch(0.70 0.14 305 / 0.6)" : "none",
-          }}
-        >
-          {checking ? "识别中…" : "下一步"}
-        </button>
-      </div>
+      {photoUploaded && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 px-5 pb-[max(10px,env(safe-area-inset-bottom))] pt-5">
+          <button
+            onClick={handleNext}
+            disabled={checking}
+            className="pointer-events-auto flex w-full items-center justify-center rounded-full px-6 py-4 neko-text-button text-white active:scale-[0.97] active:brightness-[0.92] transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
+            style={{
+              background: "var(--gradient-cta)",
+              boxShadow: "0 16px 32px -14px oklch(0.70 0.14 305 / 0.6)",
+            }}
+          >
+            {checking ? "识别中…" : "下一步"}
+          </button>
+        </div>
+      )}
 
       {uploading && <LoadingOverlay title="正在上传照片…" hint="UPLOADING" />}
       {uploadError && <ErrorOverlay title="上传失败了喵" hint="请检查网络后重试" onRetry={() => { setUploadError(false); triggerFileInput(); }} onCancel={() => setUploadError(false)} />}
