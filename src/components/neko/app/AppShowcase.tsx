@@ -97,8 +97,8 @@ export function TabBar({ active }: { active: "home" | "publish" | "me" }) {
 function SimpleTabIcon({ symbol, label, active }: { symbol: string; label: string; active: boolean }) {
   return (
     <div className="flex min-w-[64px] flex-col items-center gap-0.5 py-1" style={{ color: active ? "#9B76CB" : "#7B7290" }}>
-      <span className="text-[20px] leading-none">{symbol}</span>
-      <span className="text-[10px] font-medium tracking-[0.16em]">{label}</span>
+      <span className="neko-text-module-title">{symbol}</span>
+      <span className="neko-text-tab-bar-label">{label}</span>
     </div>
   );
 }
@@ -113,7 +113,7 @@ function TabIcon({ label, active, Icon }: { label: string; active: boolean; Icon
         )}
         <Icon active={active} />
       </div>
-      <span className="text-[10px] font-medium tracking-[0.18em]" style={{ color }}>{label}</span>
+      <span className="neko-text-tab-bar-label" style={{ color }}>{label}</span>
     </div>
   );
 }
@@ -164,8 +164,8 @@ function LoadingOverlay({ title, hint }: { title: string; hint?: string }) {
           <circle cx="25" cy="25" r="20" fill="none" stroke="oklch(0.78 0.11 305)" strokeWidth="3" strokeLinecap="round" strokeDasharray="50 200" />
         </svg>
       </div>
-      <div className="mt-5 text-[13px] font-medium text-foreground">{title}</div>
-      {hint && <div className="mt-1 text-[11px] tracking-[0.2em] text-[oklch(0.55_0.06_300)]">{hint}</div>}
+      <div className="mt-5 neko-text-caption text-foreground">{title}</div>
+      {hint && <div className="mt-1 neko-text-tiny text-[oklch(0.55_0.06_300)]">{hint}</div>}
     </div>
   );
 }
@@ -173,12 +173,12 @@ function LoadingOverlay({ title, hint }: { title: string; hint?: string }) {
 function ErrorOverlay({ title, hint, onRetry, onCancel }: { title: string; hint?: string; onRetry: () => void; onCancel: () => void }) {
   return (
     <div className="absolute inset-0 z-50 flex flex-col items-center justify-center px-8" style={{ background: "oklch(1 0 0 / 0.6)", backdropFilter: "blur(10px)" }}>
-      <div className="flex h-16 w-16 items-center justify-center rounded-full text-[28px]" style={{ background: "linear-gradient(135deg, oklch(0.95 0.06 30), oklch(0.93 0.07 10))", boxShadow: "var(--shadow-soft)" }}>!</div>
-      <div className="mt-5 text-center text-[14px] font-medium text-foreground">{title}</div>
-      {hint && <div className="mt-1 text-center text-[11.5px] leading-relaxed text-[oklch(0.55_0.06_300)]">{hint}</div>}
+      <div className="flex h-16 w-16 items-center justify-center rounded-full neko-text-page-title" style={{ background: "linear-gradient(135deg, oklch(0.95 0.06 30), oklch(0.93 0.07 10))", boxShadow: "var(--shadow-soft)" }}>!</div>
+      <div className="mt-5 text-center neko-text-support text-foreground">{title}</div>
+      {hint && <div className="mt-1 text-center neko-text-tiny text-[oklch(0.55_0.06_300)]">{hint}</div>}
       <div className="mt-5 flex w-full max-w-[240px] gap-2.5">
-        <button onClick={onCancel} className="flex-1 rounded-full bg-white/85 py-3 text-[12.5px] text-foreground backdrop-blur active:bg-white/95 active:scale-[0.98] transition-all duration-150" style={{ boxShadow: "var(--shadow-soft)" }}>取消</button>
-        <button onClick={onRetry} className="flex-1 rounded-full py-3 text-[12.5px] font-medium text-white active:scale-[0.97] active:brightness-[0.92] transition-all duration-150" style={{ background: "var(--gradient-cta)" }}>重试</button>
+        <button onClick={onCancel} className="flex-1 rounded-full bg-white/85 py-3 neko-text-button text-foreground backdrop-blur active:bg-white/95 active:scale-[0.98] transition-all duration-150" style={{ boxShadow: "var(--shadow-soft)" }}>取消</button>
+        <button onClick={onRetry} className="flex-1 rounded-full py-3 neko-text-button text-white active:scale-[0.97] active:brightness-[0.92] transition-all duration-150" style={{ background: "var(--gradient-cta)" }}>重试</button>
       </div>
     </div>
   );
@@ -191,11 +191,11 @@ function ConfirmSheet({ open, title, hint, confirmText = "确认", danger, onCon
       <div className="absolute inset-0 bg-black/35 backdrop-blur-sm" />
       <div className="relative rounded-t-[28px] bg-white/95 px-6 pb-6 pt-5 backdrop-blur-xl" style={{ boxShadow: "0 -20px 40px -20px oklch(0.3 0.05 300 / 0.35)" }} onClick={(e) => e.stopPropagation()}>
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[oklch(0.85_0.02_300)]" />
-        <div className="text-center text-[15px] font-medium text-foreground">{title}</div>
-        {hint && <div className="mt-1.5 text-center text-[12px] leading-relaxed text-[oklch(0.55_0.06_300)]">{hint}</div>}
+        <div className="text-center neko-text-support text-foreground">{title}</div>
+        {hint && <div className="mt-1.5 text-center neko-text-micro text-[oklch(0.55_0.06_300)]">{hint}</div>}
         <div className="mt-5 grid grid-cols-2 gap-2.5">
-          <button onClick={onCancel} className="rounded-full bg-[oklch(0.96_0.02_300)] py-3 text-[12.5px] text-[oklch(0.5_0.06_300)]">取消</button>
-          <button onClick={onConfirm} className="rounded-full py-3 text-[12.5px] font-medium text-white active:scale-[0.97] active:brightness-[0.92] transition-all duration-150"
+          <button onClick={onCancel} className="rounded-full bg-[oklch(0.96_0.02_300)] py-3 neko-text-button text-[oklch(0.5_0.06_300)]">取消</button>
+          <button onClick={onConfirm} className="rounded-full py-3 neko-text-button text-white active:scale-[0.97] active:brightness-[0.92] transition-all duration-150"
             style={{ background: danger ? "linear-gradient(135deg, oklch(0.7 0.16 25), oklch(0.66 0.18 15))" : "var(--gradient-cta)" }}>
             {confirmText}
           </button>
@@ -262,19 +262,19 @@ export function ScreenHome() {
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <div className="text-[18px] font-semibold text-foreground">{catName}</div>
-                <span className="rounded-full bg-white/65 px-2 py-0.5 text-[13px] tracking-[0.06em] text-[oklch(0.52_0.08_320)]">{persona?.mbti ?? "INTJ-A"}</span>
+                <div className="neko-text-card-title text-foreground">{catName}</div>
+                <span className="rounded-full bg-white/65 px-2 py-0.5 neko-text-badge text-[oklch(0.52_0.08_320)]">{persona?.mbti ?? "INTJ-A"}</span>
               </div>
-              <div className="mt-1 text-[15px] text-[oklch(0.55_0.05_300)]">{persona?.type ?? "高冷观察者"}</div>
+              <div className="mt-1 neko-text-support text-[oklch(0.55_0.05_300)]">{persona?.type ?? "高冷观察者"}</div>
             </div>
-            <Link to="/app/profile" className="flex min-h-11 shrink-0 items-center px-1 text-[14px] font-medium text-[oklch(0.5_0.1_320)] active:opacity-60">查看人格&nbsp;›</Link>
+            <Link to="/app/profile" className="flex min-h-11 shrink-0 items-center px-1 neko-text-button text-[oklch(0.5_0.1_320)] active:opacity-60">查看人格&nbsp;›</Link>
           </div>
         </div>
 
         {/* ── SECTION 2 · 猫咪心声 title only ─────────────── */}
         <div className="mt-5 flex items-center px-4">
-          <div className="flex items-center gap-2 text-[23px] font-semibold text-foreground">
-            <span className="text-[22px]">💭</span>
+          <div className="flex items-center gap-2 neko-text-module-title text-foreground">
+            <span className="neko-text-module-title">💭</span>
             <span>猫咪心声</span>
           </div>
         </div>
@@ -301,7 +301,7 @@ export function ScreenHome() {
 
       {previewPhoto && (
         <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/92" onClick={() => setPreviewPhoto(null)}>
-          <button type="button" aria-label="关闭原图" className="absolute left-4 top-[max(16px,env(safe-area-inset-top))] flex h-11 w-11 items-center justify-center rounded-full bg-black/40 text-[26px] text-white">×</button>
+          <button type="button" aria-label="关闭原图" className="absolute left-4 top-[max(16px,env(safe-area-inset-top))] flex h-11 w-11 items-center justify-center rounded-full bg-black/40 neko-text-page-title text-white">×</button>
           <img src={previewPhoto} alt="猫咪完整原图" className="h-full w-full object-contain" />
         </div>
       )}
@@ -329,7 +329,7 @@ export function ScreenHome() {
                     <path d="M16 17l3 3 3-3" />
                   </svg>
                 </span>
-                <span className="text-[12.5px]" style={{ color: "#3E315E" }}>{generating ? "生成中…" : "保存长图"}</span>
+                <span className="neko-text-button" style={{ color: "#3E315E" }}>{generating ? "生成中…" : "保存长图"}</span>
               </button>
               <button
                 onClick={() => { const i = moreIdx; setMoreIdx(null); setConfirmDelIdx(i); }}
@@ -338,7 +338,7 @@ export function ScreenHome() {
                 <span className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: "#FCE8ED" }}>
                   <Trash2 size={22} strokeWidth={2} color="#F08AA3" />
                 </span>
-                <span className="text-[12.5px]" style={{ color: "#7B7290" }}>删除</span>
+                <span className="neko-text-button" style={{ color: "#7B7290" }}>删除</span>
               </button>
             </div>
           </div>
@@ -359,7 +359,7 @@ function DayDivider({ label }: { label: string }) {
   return (
     <div className="my-3 flex items-center gap-3">
       <div className="h-px flex-1" style={{ background: "linear-gradient(90deg, transparent, oklch(0.85 0.04 305 / 0.6))" }} />
-      <div className="rounded-full bg-white/80 px-3 py-1 text-[13px] tracking-[0.12em] text-[oklch(0.58_0.06_305)] backdrop-blur" style={{ boxShadow: "0 4px 12px -8px oklch(0.7 0.12 305 / 0.5)" }}>
+      <div className="rounded-full bg-white/80 px-3 py-1 neko-text-caption text-[oklch(0.58_0.06_305)] backdrop-blur" style={{ boxShadow: "0 4px 12px -8px oklch(0.7 0.12 305 / 0.5)" }}>
         {label}
       </div>
       <div className="h-px flex-1" style={{ background: "linear-gradient(270deg, transparent, oklch(0.85 0.04 305 / 0.6))" }} />
@@ -373,7 +373,7 @@ function ShareTarget({ label, onClick, bg, children }: { label: string; onClick?
       <span className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: bg, boxShadow: "0 8px 18px -10px oklch(0.4 0.08 300 / 0.4)" }}>
         {children}
       </span>
-      <span className="text-[11.5px] text-[oklch(0.4_0.05_300)]">{label}</span>
+      <span className="neko-text-tiny text-[oklch(0.4_0.05_300)]">{label}</span>
     </button>
   );
 }
@@ -406,20 +406,77 @@ function voiceInsightParagraphs(voice: Voice | null | undefined, fallback: strin
   return [sentences.slice(0, midpoint).join(""), sentences.slice(midpoint).join("")];
 }
 
+function VoiceSkeletonLine({ className = "" }: { className?: string }) {
+  return (
+    <div aria-hidden className={`overflow-hidden rounded-full bg-[oklch(0.86_0.025_305_/_0.28)] ${className}`}>
+      <div
+        className="h-full w-full animate-shimmer"
+        style={{
+          background: "linear-gradient(90deg, transparent, oklch(1 0 0 / 0.58), transparent)",
+          backgroundSize: "200% 100%",
+        }}
+      />
+    </div>
+  );
+}
+
 function VoiceResultInfo({
   voice,
   catName,
   className = "",
   analysisFallback,
+  isLoading = false,
 }: {
   voice: Voice | null | undefined;
   catName: string;
   className?: string;
   analysisFallback?: string;
+  isLoading?: boolean;
 }) {
   const tags = (voice?.tags?.length ? voice.tags : voice?.share?.tags ?? ["先观察再靠近", "想被你发现", "有点小主意"]).slice(0, 3);
   const summary = voiceCoreSummary(voice, "它正在用自己的节奏靠近你，等你先看懂这个小暗号。");
   const paragraphs = voiceInsightParagraphs(voice, analysisFallback ?? `暂未获得${catName}的 AI 心声解析。`);
+
+  if (isLoading) {
+    return (
+      <section className={className} aria-busy="true">
+        <div className="flex flex-wrap gap-2.5">
+          <VoiceSkeletonLine className="h-[34px] w-[116px]" />
+          <VoiceSkeletonLine className="h-[34px] w-[98px]" />
+          <VoiceSkeletonLine className="h-[34px] w-[106px]" />
+        </div>
+
+        <div className="mt-5">
+          <h2 className="neko-text-card-title text-[oklch(0.33_0.045_295)]">
+            它没说出口的小心思
+          </h2>
+          <div className="mt-3 space-y-3">
+            <VoiceSkeletonLine className="h-[24px] w-[92%]" />
+            <VoiceSkeletonLine className="h-[24px] w-[64%]" />
+          </div>
+        </div>
+
+        <div
+          className="mt-[22px] rounded-[22px] px-[22px] py-[22px] backdrop-blur"
+          style={{
+            background: "linear-gradient(160deg, oklch(0.995 0.006 80 / 0.94), oklch(0.975 0.018 315 / 0.9))",
+            boxShadow: "0 16px 36px -20px oklch(0.55 0.1 305 / 0.3), 0 2px 8px -3px oklch(0.55 0.1 305 / 0.12)",
+            border: "1px solid oklch(1 0 0 / 0.78)",
+          }}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-soul neko-text-support">✦</span>
+            <h2 className="neko-text-card-title text-[oklch(0.33_0.045_295)]">AI 解读</h2>
+          </div>
+          <div className="mt-4 space-y-3.5">
+            <VoiceSkeletonLine className="h-4 w-[94%]" />
+            <VoiceSkeletonLine className="h-4 w-[84%]" />
+            <VoiceSkeletonLine className="h-4 w-[58%]" />
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className={className}>
@@ -427,7 +484,7 @@ function VoiceResultInfo({
         {tags.map((tag) => (
           <span
             key={tag}
-            className="inline-flex min-h-[34px] items-center rounded-full px-4 py-2.5 text-[13.5px] font-medium leading-[1.1] text-[oklch(0.41_0.07_305)]"
+            className="inline-flex min-h-[34px] items-center rounded-full px-4 py-2.5 neko-text-caption text-[oklch(0.41_0.07_305)]"
             style={{ background: "linear-gradient(135deg, oklch(0.965 0.032 320), oklch(0.952 0.038 275))" }}
           >
             {tag}
@@ -436,10 +493,10 @@ function VoiceResultInfo({
       </div>
 
       <div className="mt-5">
-        <h2 className="text-[18px] font-semibold leading-[1.32] text-[oklch(0.33_0.045_295)]">
+        <h2 className="neko-text-card-title text-[oklch(0.33_0.045_295)]">
           它没说出口的小心思
         </h2>
-        <p className="mt-3 text-[24px] font-semibold leading-[1.5] text-[oklch(0.22_0.035_292)]">
+        <p className="mt-3 neko-text-module-title text-[oklch(0.22_0.035_292)]">
           {summary}
         </p>
       </div>
@@ -453,10 +510,10 @@ function VoiceResultInfo({
         }}
       >
         <div className="flex items-center gap-2">
-          <span className="text-soul text-[14px]">✦</span>
-          <h2 className="text-[18px] font-semibold leading-[1.32] text-[oklch(0.33_0.045_295)]">AI 解读</h2>
+          <span className="text-soul neko-text-support">✦</span>
+          <h2 className="neko-text-card-title text-[oklch(0.33_0.045_295)]">AI 解读</h2>
         </div>
-        <div className="mt-3.5 space-y-4 text-[16px] leading-[1.68] text-[oklch(0.31_0.04_295)]">
+        <div className="mt-3.5 space-y-4 neko-text-body text-[oklch(0.31_0.04_295)]">
           {paragraphs.map((paragraph, index) => (
             <p key={`${paragraph}-${index}`}>{paragraph}</p>
           ))}
@@ -475,18 +532,18 @@ const PosterTemplate = forwardRef<HTMLDivElement, { v: import("./voicesStore").V
     return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   })();
   return (
-    <div ref={ref} style={{ width: 750, padding: 36, background: "linear-gradient(180deg, #FBF6FF 0%, #F8EFFA 55%, #FCEEF1 100%)", fontFamily: "-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif", color: "#2a2233" }}>
+    <div ref={ref} className="neko-text-body" style={{ width: 750, padding: 36, background: "linear-gradient(180deg, #FBF6FF 0%, #F8EFFA 55%, #FCEEF1 100%)", color: "#2a2233" }}>
       {/* header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
         <div>
-          <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: 4, background: "linear-gradient(135deg, #B69AEF, #E6B8CF)", WebkitBackgroundClip: "text", color: "transparent" }}>喵一下</div>
-          <div style={{ fontSize: 12, color: "#8a7fa0", marginTop: 4, letterSpacing: 2 }}>读懂它的小世界</div>
+          <div className="neko-text-module-title" style={{ background: "linear-gradient(135deg, #B69AEF, #E6B8CF)", WebkitBackgroundClip: "text", color: "transparent" }}>喵一下</div>
+          <div className="neko-text-micro" style={{ color: "#8a7fa0", marginTop: 4 }}>读懂它的小世界</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 14px", background: "rgba(255,255,255,0.7)", borderRadius: 999 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 999, background: "linear-gradient(135deg, #F4DCE8, #E9D7F7)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🐱</div>
-          <div style={{ lineHeight: 1.2 }}>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>{catName}</div>
-            <div style={{ fontSize: 10, color: "#8a7fa0" }}>{persona?.type ?? "高冷观察者"} · {persona?.mbti ?? "INTJ-A"}</div>
+          <div className="neko-text-body" style={{ width: 36, height: 36, borderRadius: 999, background: "linear-gradient(135deg, #F4DCE8, #E9D7F7)", display: "flex", alignItems: "center", justifyContent: "center" }}>🐱</div>
+          <div>
+            <div className="neko-text-support">{catName}</div>
+            <div className="neko-text-badge" style={{ color: "#8a7fa0" }}>{persona?.type ?? "高冷观察者"} · {persona?.mbti ?? "INTJ-A"}</div>
           </div>
         </div>
       </div>
@@ -496,15 +553,15 @@ const PosterTemplate = forwardRef<HTMLDivElement, { v: import("./voicesStore").V
         {photo ? (
           <img src={photo} alt="" crossOrigin="anonymous" style={{ display: "block", width: "100%", maxHeight: 760, objectFit: "contain", background: "linear-gradient(135deg, #f7ecff, #fce9ef)" }} />
         ) : (
-          <div style={{ height: 560, display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg, #f7ecff, #fce9ef)", color: "#8a7fa0", fontSize: 18, letterSpacing: 6 }}>
+          <div className="neko-text-card-title" style={{ height: 560, display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg, #f7ecff, #fce9ef)", color: "#8a7fa0" }}>
             等待照片
           </div>
         )}
         {/* speech bubble */}
         <div style={{ position: "absolute", left: 24, right: 60, top: 24 }}>
           <div style={{ background: "rgba(255,255,255,0.96)", padding: "14px 18px", borderRadius: 22, borderBottomLeftRadius: 6, boxShadow: "0 14px 28px -14px rgba(80,40,120,0.35)" }}>
-            <div style={{ fontSize: 9, letterSpacing: 5, color: "#8a7fa0", marginBottom: 4 }}>{catName}</div>
-            <div style={{ fontSize: 15, lineHeight: 1.6, color: "#2a2233" }}>💭 {v.text}</div>
+            <div className="neko-text-tiny" style={{ color: "#8a7fa0", marginBottom: 4 }}>{catName}</div>
+            <div className="neko-text-badge" style={{ color: "#2a2233" }}>💭 {v.text}</div>
           </div>
         </div>
       </div>
@@ -513,27 +570,27 @@ const PosterTemplate = forwardRef<HTMLDivElement, { v: import("./voicesStore").V
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 18, padding: "0 4px", gap: 12 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "nowrap", flexShrink: 0 }}>
           {(v.tags ?? []).slice(0, 3).map((t) => (
-            <span key={t} style={{ fontSize: 12, padding: "5px 12px", borderRadius: 999, background: "linear-gradient(135deg, #fbe9f1, #ece4fb)", color: "#7a5ab8", whiteSpace: "nowrap" }}>{t}</span>
+            <span key={t} className="neko-text-badge" style={{ padding: "5px 12px", borderRadius: 999, background: "linear-gradient(135deg, #fbe9f1, #ece4fb)", color: "#7a5ab8", whiteSpace: "nowrap" }}>{t}</span>
           ))}
         </div>
-        <div style={{ fontSize: 11, color: "#8a7fa0", letterSpacing: 1 }}>{dateStr}</div>
+        <div className="neko-text-tiny" style={{ color: "#8a7fa0" }}>{dateStr}</div>
       </div>
 
       {/* AI 心声解析 */}
       <div style={{ marginTop: 20, padding: "18px 20px", borderRadius: 22, background: "rgba(255,255,255,0.75)", border: "1px solid rgba(255,255,255,0.85)", boxShadow: "0 14px 30px -18px rgba(140,100,200,0.3)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-          <span style={{ fontSize: 12, color: "#B69AEF" }}>✦</span>
-          <span style={{ fontSize: 10, letterSpacing: 5, color: "#7B7290" }}>AI 心 声 解 析</span>
+          <span className="neko-text-micro" style={{ color: "#B69AEF" }}>✦</span>
+          <span className="neko-text-tiny" style={{ color: "#7B7290" }}>AI 心 声 解 析</span>
         </div>
-        <div style={{ fontSize: 13, lineHeight: 1.75, color: "#3E315E" }}>
+        <div className="neko-text-caption" style={{ color: "#3E315E" }}>
           {voiceAnalysisText(v) ?? "它似乎在表达：这个瞬间里，它正在用自己的方式向你靠近。"}
         </div>
       </div>
 
       {/* footer */}
       <div style={{ marginTop: 30, paddingTop: 22, borderTop: "1px dashed rgba(180,160,220,0.5)", textAlign: "center" }}>
-        <div style={{ fontSize: 10, letterSpacing: 6, color: "#a39ab5" }}>来自 · 喵一下</div>
-        <div style={{ fontSize: 13, color: "#5a4d75", marginTop: 8, lineHeight: 1.7 }}>如果猫会说话，<br />它也许会这样告诉你。</div>
+        <div className="neko-text-tiny" style={{ color: "#a39ab5" }}>来自 · 喵一下</div>
+        <div className="neko-text-caption" style={{ color: "#5a4d75", marginTop: 8 }}>如果猫会说话，<br />它也许会这样告诉你。</div>
       </div>
     </div>
   );
@@ -546,7 +603,7 @@ function TimelineRow({ v, idx, onMore, onPhotoClick }: { v: import("./voicesStor
     <div className="relative flex gap-2">
       {/* time rail */}
       <div className="flex w-[38px] shrink-0 flex-col items-center pt-1">
-        <span className="tabular-nums text-[13px] text-[oklch(0.62_0.04_305)]">{hhmm}</span>
+        <span className="tabular-nums neko-text-caption text-[oklch(0.62_0.04_305)]">{hhmm}</span>
         <span className="mt-1.5 h-1.5 w-1.5 rounded-full" style={{ background: "var(--gradient-cta)", boxShadow: "0 0 0 3px oklch(1 0 0 / 0.7)" }} />
         <span className="mt-1 w-px flex-1" style={{ background: "linear-gradient(180deg, oklch(0.88 0.025 305 / 0.45), transparent)" }} />
       </div>
@@ -588,10 +645,10 @@ function VoiceCard({ v, idx, onMore, onPhotoClick }: { v: import("./voicesStore"
         {isVideo && (
           <>
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/85 text-[18px] text-[oklch(0.45_0.12_305)] backdrop-blur" style={{ boxShadow: "0 10px 24px -10px oklch(0.3 0.05 300 / 0.5)" }}>▶</div>
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/85 neko-text-card-title text-[oklch(0.45_0.12_305)] backdrop-blur" style={{ boxShadow: "0 10px 24px -10px oklch(0.3 0.05 300 / 0.5)" }}>▶</div>
             </div>
             {v.videoDuration && (
-              <div className="absolute right-3 top-3 rounded-full bg-black/45 px-2 py-[2px] text-[10px] tabular-nums text-white backdrop-blur">{v.videoDuration}</div>
+              <div className="absolute right-3 top-3 rounded-full bg-black/45 px-2 py-[2px] neko-text-tiny tabular-nums text-white backdrop-blur">{v.videoDuration}</div>
             )}
           </>
         )}
@@ -600,8 +657,8 @@ function VoiceCard({ v, idx, onMore, onPhotoClick }: { v: import("./voicesStore"
         <div className="absolute left-3.5 right-10 top-3.5 z-10">
           <div className="relative inline-block max-w-full rounded-[20px] rounded-bl-[6px] bg-white/95 px-3.5 py-2.5 backdrop-blur-md"
             style={{ boxShadow: "0 14px 28px -14px oklch(0.3 0.05 300 / 0.45)" }}>
-            <div className="mb-1 text-[14px] font-medium text-[oklch(0.55_0.06_300)]">{catName}</div>
-            <p className="text-[17px] font-medium leading-[1.5] text-foreground">
+            <div className="mb-1 neko-text-support text-[oklch(0.55_0.06_300)]">{catName}</div>
+            <p className="neko-text-button text-foreground">
               <span className="mr-1">💭</span>{v.text}
             </p>
           </div>
@@ -612,17 +669,17 @@ function VoiceCard({ v, idx, onMore, onPhotoClick }: { v: import("./voicesStore"
       <div className="flex items-center justify-between gap-2 px-3.5 pb-3 pt-2.5">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           {(v.share?.tags ?? v.tags ?? []).slice(0, 3).map((t) => (
-            <span key={t} className="shrink-0 rounded-full px-2 py-1 text-[13px] font-medium text-[oklch(0.45_0.1_305)]"
+            <span key={t} className="shrink-0 rounded-full px-2 py-1 neko-text-badge text-[oklch(0.45_0.1_305)]"
               style={{ background: "linear-gradient(135deg, oklch(0.96 0.04 320), oklch(0.95 0.05 270))" }}>{t}</span>
           ))}
           {v.location && (
-            <span className="ml-1 truncate text-[14px] text-[oklch(0.55_0.06_300)]">· {v.location}</span>
+            <span className="ml-1 truncate neko-text-support text-[oklch(0.55_0.06_300)]">· {v.location}</span>
           )}
         </div>
         <button
           aria-label="更多"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); onMore?.(idx); }}
-          className="-mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[20px] leading-none text-[oklch(0.55_0.05_300)] active:bg-[oklch(0.96_0.02_300)] active:scale-95 transition-all duration-150"
+          className="-mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full neko-text-module-title text-[oklch(0.55_0.05_300)] active:bg-[oklch(0.96_0.02_300)] active:scale-95 transition-all duration-150"
         >
           ⋯
         </button>
@@ -708,10 +765,10 @@ function EmptyFeed() {
     <div className="relative mx-5 mt-5 overflow-hidden rounded-[24px] bg-white/80 backdrop-blur text-center"
       style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)", minHeight: 300 }}>
       {/* floating sparkles */}
-      <span className="pointer-events-none absolute left-6 top-7 text-[10px] text-[oklch(0.78_0.11_305_/_0.55)] animate-breathe">✦</span>
-      <span className="pointer-events-none absolute right-7 top-10 text-[8px] text-[oklch(0.78_0.11_260_/_0.55)] animate-breathe" style={{ animationDelay: "0.6s" }}>✦</span>
-      <span className="pointer-events-none absolute left-10 bottom-16 text-[9px] text-[oklch(0.85_0.09_330_/_0.6)] animate-breathe" style={{ animationDelay: "1.1s" }}>✧</span>
-      <span className="pointer-events-none absolute right-8 bottom-20 text-[10px] text-[oklch(0.85_0.08_300_/_0.55)] animate-breathe" style={{ animationDelay: "0.3s" }}>✧</span>
+      <span className="pointer-events-none absolute left-6 top-7 neko-text-tiny text-[oklch(0.78_0.11_305_/_0.55)] animate-breathe">✦</span>
+      <span className="pointer-events-none absolute right-7 top-10 neko-text-tiny text-[oklch(0.78_0.11_260_/_0.55)] animate-breathe" style={{ animationDelay: "0.6s" }}>✦</span>
+      <span className="pointer-events-none absolute left-10 bottom-16 neko-text-tiny text-[oklch(0.85_0.09_330_/_0.6)] animate-breathe" style={{ animationDelay: "1.1s" }}>✧</span>
+      <span className="pointer-events-none absolute right-8 bottom-20 neko-text-tiny text-[oklch(0.85_0.08_300_/_0.55)] animate-breathe" style={{ animationDelay: "0.3s" }}>✧</span>
 
       <div className="flex flex-col items-center justify-center h-full px-6 py-8">
         {/* avatar + thought bubble */}
@@ -726,18 +783,18 @@ function EmptyFeed() {
           <span className="absolute -right-3 -top-1 h-1.5 w-1.5 rounded-full bg-[oklch(0.88_0.08_320_/_0.7)]" />
           <span className="absolute -right-6 -top-4 h-2 w-2 rounded-full bg-[oklch(0.86_0.09_300_/_0.65)]" />
           {/* speech bubble */}
-          <div className="absolute -right-2 -top-6 rounded-2xl rounded-bl-sm bg-white/95 px-2.5 py-1 text-[11px] text-[oklch(0.5_0.1_320)]"
+          <div className="absolute -right-2 -top-6 rounded-2xl rounded-bl-sm bg-white/95 px-2.5 py-1 neko-text-tiny text-[oklch(0.5_0.1_320)]"
             style={{ boxShadow: "0 6px 16px -8px oklch(0.78 0.11 305 / 0.45)", border: "1px solid oklch(0.92 0.04 320 / 0.6)" }}>
             喵～？
           </div>
         </div>
 
-        <div className="mt-5 text-[15px] font-medium text-foreground">还没有心声哦</div>
-        <p className="mt-1.5 text-[12px] leading-relaxed text-[oklch(0.55_0.06_300)]">
+        <div className="mt-5 neko-text-support text-foreground">还没有心声哦</div>
+        <p className="mt-1.5 neko-text-micro text-[oklch(0.55_0.06_300)]">
           记录一个瞬间，听听它怎么说
         </p>
         <Link to="/app/publish"
-          className="mx-auto mt-5 inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-[13px] font-medium text-white active:scale-[0.96] active:brightness-[0.92] transition-all duration-150"
+          className="mx-auto mt-5 inline-flex items-center gap-2 rounded-full px-6 py-2.5 neko-text-button text-white active:scale-[0.96] active:brightness-[0.92] transition-all duration-150"
           style={{ background: "var(--gradient-cta)", boxShadow: "0 12px 24px -10px oklch(0.70 0.14 305 / 0.6)" }}>
           <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             {/* cat ears */}
@@ -832,7 +889,7 @@ export function ScreenVoiceDetail({ id = 0 }: { id?: number }) {
       {/* top bar */}
       <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between px-5 pt-[48px]">
         <AppBackButton onClick={() => navigate({ to: ".." })} />
-        <div className="rounded-full bg-white/80 px-3.5 py-1.5 text-[11px] tracking-[0.3em] text-[oklch(0.45_0.06_300)] backdrop-blur">心声 · {v.time}</div>
+        <div className="rounded-full bg-white/80 px-3.5 py-1.5 neko-text-tiny text-[oklch(0.45_0.06_300)] backdrop-blur">心声 · {v.time}</div>
         <div className="w-9" />
       </div>
 
@@ -851,7 +908,7 @@ export function ScreenVoiceDetail({ id = 0 }: { id?: number }) {
             {detailPhoto ? (
               <img src={detailPhoto} alt="此刻" className="h-full w-full object-cover" />
             ) : (
-              <div className="flex h-full w-full items-center justify-center bg-[oklch(0.97_0.025_320)] text-[12px] tracking-[0.2em] text-[oklch(0.56_0.06_300)]">
+              <div className="flex h-full w-full items-center justify-center bg-[oklch(0.97_0.025_320)] neko-text-micro text-[oklch(0.56_0.06_300)]">
                 等待照片
               </div>
             )}
@@ -861,8 +918,8 @@ export function ScreenVoiceDetail({ id = 0 }: { id?: number }) {
               className="absolute left-4 right-10 top-4 rounded-[20px] bg-white px-5 py-3.5"
               style={{ boxShadow: "0 14px 32px -16px oklch(0.3 0.05 300 / 0.3), 0 2px 6px -2px oklch(0.3 0.05 300 / 0.08)", border: "1px solid oklch(1 0 0 / 0.9)" }}
             >
-              <div className="text-[10px] tracking-[0.3em] text-[#7B7290]">{catName}</div>
-              <p className="mt-1.5 whitespace-pre-line text-[12.5px] leading-[1.75] text-foreground/90">{v.text}</p>
+              <div className="neko-text-tiny text-[#7B7290]">{catName}</div>
+              <p className="mt-1.5 whitespace-pre-line neko-text-micro text-foreground/90">{v.text}</p>
               <span
                 aria-hidden
                 className="absolute h-3 w-3 rotate-45 bg-white"
@@ -884,12 +941,12 @@ export function ScreenVoiceDetail({ id = 0 }: { id?: number }) {
       <div className="absolute inset-x-0 bottom-0 z-20 px-5 pb-[max(10px,env(safe-area-inset-bottom))] pt-5">
         <div className="flex gap-3">
           <button onClick={() => setShareOpen(true)}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-full px-5 py-3.5 text-[13px] font-medium text-white active:scale-[0.97] active:brightness-[0.92] transition-all duration-150"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-full px-5 py-3.5 neko-text-button text-white active:scale-[0.97] active:brightness-[0.92] transition-all duration-150"
             style={{ background: "linear-gradient(135deg, #B69AEF, #E6B8CF)", boxShadow: "0 14px 28px -14px oklch(0.70 0.14 305 / 0.55)" }}>
-            <span className="text-[14px]">↗</span> 分享
+            <span className="neko-text-support">↗</span> 分享
           </button>
           <button onClick={() => setConfirmDel(true)}
-            className="flex items-center justify-center gap-1.5 rounded-full px-5 py-3.5 text-[13px] font-medium text-white active:scale-[0.97] active:brightness-[0.92] transition-all duration-150"
+            className="flex items-center justify-center gap-1.5 rounded-full px-5 py-3.5 neko-text-button text-white active:scale-[0.97] active:brightness-[0.92] transition-all duration-150"
             style={{ background: "linear-gradient(135deg, oklch(0.7 0.16 25), oklch(0.66 0.18 15))", boxShadow: "0 14px 28px -14px oklch(0.70 0.14 25 / 0.55)" }}>
             <Trash2 size={16} /> 删除
           </button>
@@ -920,7 +977,7 @@ export function ScreenVoiceDetail({ id = 0 }: { id?: number }) {
                     <path d="M16 17l3 3 3-3" />
                   </svg>
                 </span>
-                <span className="text-[12.5px]" style={{ color: "#3E315E" }}>{generating ? "生成中…" : "保存长图"}</span>
+                <span className="neko-text-micro" style={{ color: "#3E315E" }}>{generating ? "生成中…" : "保存长图"}</span>
               </button>
             </div>
           </div>
@@ -1015,14 +1072,14 @@ export function ScreenPublish1() {
         {/* top bar */}
         <div className="flex items-center justify-between px-6">
           <AppBackButton to="/app" />
-          <div className="text-[10px] tracking-[0.4em] text-[oklch(0.55_0.06_300)]">STEP 01 / 03</div>
+          <div className="neko-text-tiny text-[oklch(0.55_0.06_300)]">STEP 01 / 03</div>
           <div className="h-9 w-9" />
         </div>
 
         {/* title */}
         <div className="px-7 pt-6">
-          <h1 className="text-[24px] font-light leading-tight text-foreground">记录一个瞬间</h1>
-          <p className="mt-1.5 text-[12.5px] leading-relaxed text-[oklch(0.58_0.04_300)]">上传一张照片，AI 帮你读懂它的小心思 · 不超过 {NEKO_MAX_UPLOAD_LABEL}</p>
+          <h1 className="neko-text-module-title text-foreground">记录一个瞬间</h1>
+          <p className="mt-1.5 neko-text-micro text-[oklch(0.58_0.04_300)]">上传一张照片，AI 帮你读懂它的小心思 · 不超过 {NEKO_MAX_UPLOAD_LABEL}</p>
         </div>
 
         {/* main upload card */}
@@ -1052,7 +1109,7 @@ export function ScreenPublish1() {
                 <div className="overflow-hidden rounded-[18px] bg-white" style={{ aspectRatio: "4 / 3" }}>
                   <img src={photoDataUrl} alt="预览" className="h-full w-full object-cover" />
                 </div>
-                <div className="mt-3 flex items-center justify-center gap-1.5 text-[12px] text-[oklch(0.5_0.1_320)]">
+                <div className="mt-3 flex items-center justify-center gap-1.5 neko-text-micro text-[oklch(0.5_0.1_320)]">
                   <span>✓ 已上传</span>
                   <span className="text-[oklch(0.58_0.04_300)]">· 点击可重新选择</span>
                 </div>
@@ -1072,15 +1129,15 @@ export function ScreenPublish1() {
               </div>
               {/* photo icon + text */}
               <div className="flex flex-col items-center gap-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/85 text-[18px]" style={{ boxShadow: "var(--shadow-soft)" }}>
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/85 neko-text-card-title" style={{ boxShadow: "var(--shadow-soft)" }}>
                   <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <rect x="2" y="4" width="16" height="12" rx="3" stroke="oklch(0.5 0.1 320)" strokeWidth="1.5" />
                     <circle cx="10" cy="10" r="3" stroke="oklch(0.5 0.1 320)" strokeWidth="1.5" />
                     <path d="M4 14L7 10L10 12L14 8L16 10" stroke="oklch(0.5 0.1 320)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </div>
-                <div className="text-[14px] font-medium text-foreground">点击上传照片</div>
-                <div className="text-[11px] text-[oklch(0.58_0.04_300)]">支持 JPG / PNG</div>
+                <div className="neko-text-support text-foreground">点击上传照片</div>
+                <div className="neko-text-tiny text-[oklch(0.58_0.04_300)]">支持 JPG / PNG</div>
               </div>
             </div>
               </>
@@ -1090,7 +1147,7 @@ export function ScreenPublish1() {
 
         {/* 推荐照片 */}
         <div className="mx-5 mt-4 rounded-[20px] bg-white/65 p-4 backdrop-blur" style={{ border: "1px solid oklch(1 0 0 / 0.7)" }}>
-          <div className="text-[10px] tracking-[0.35em] text-[oklch(0.55_0.06_300)]">推荐照片</div>
+          <div className="neko-text-tiny text-[oklch(0.55_0.06_300)]">推荐照片</div>
           <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5">
             {[
               { icon: "😺", text: "猫咪正脸" },
@@ -1098,21 +1155,21 @@ export function ScreenPublish1() {
               { icon: "👀", text: "明显表情" },
               { icon: "💗", text: "与主人互动" },
             ].map((t) => (
-              <div key={t.text} className="flex items-center gap-1.5 text-[11.5px] text-foreground">
-                <span className="text-[13px]">{t.icon}</span>
+              <div key={t.text} className="flex items-center gap-1.5 neko-text-tiny text-foreground">
+                <span className="neko-text-caption">{t.icon}</span>
                 <span>{t.text}</span>
               </div>
             ))}
           </div>
-          <p className="mt-2.5 text-[11px] leading-relaxed text-[oklch(0.55_0.06_300)]">
+          <p className="mt-2.5 neko-text-tiny text-[oklch(0.55_0.06_300)]">
             自然的瞬间，往往最能体现它当时的小心思
           </p>
         </div>
 
         {/* AI 会做什么？ */}
         <div className="mx-5 mt-4 rounded-[20px] bg-white/65 p-4 backdrop-blur" style={{ border: "1px solid oklch(1 0 0 / 0.7)" }}>
-          <div className="text-[10px] tracking-[0.35em] text-[oklch(0.55_0.06_300)]">AI 会做什么？</div>
-          <p className="mt-2 text-[11.5px] leading-relaxed text-foreground/85">
+          <div className="neko-text-tiny text-[oklch(0.55_0.06_300)]">AI 会做什么？</div>
+          <p className="mt-2 neko-text-tiny text-foreground/85">
             AI 将结合这张照片与猫咪人格档案，来生成一条专属于它的猫咪心声。
           </p>
         </div>
@@ -1124,7 +1181,7 @@ export function ScreenPublish1() {
         <button
           onClick={handleNext}
           disabled={!photoUploaded || checking}
-          className="pointer-events-auto flex w-full items-center justify-center rounded-full px-6 py-4 text-[14px] font-medium text-white active:scale-[0.97] active:brightness-[0.92] transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
+          className="pointer-events-auto flex w-full items-center justify-center rounded-full px-6 py-4 neko-text-button text-white active:scale-[0.97] active:brightness-[0.92] transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
           style={{
             background: "var(--gradient-cta)",
             boxShadow: photoUploaded ? "0 16px 32px -14px oklch(0.70 0.14 305 / 0.6)" : "none",
@@ -1183,29 +1240,29 @@ export function ScreenPublish2() {
       <div className="absolute inset-0 overflow-y-auto scrollbar-none pt-[52px] pb-[118px]">
         <div className="flex items-center justify-between px-6">
           <AppBackButton to="/app/publish" />
-          <div className="text-[10px] tracking-[0.4em] text-[oklch(0.55_0.06_300)]">STEP 02 / 03</div>
-          <button disabled={analyzing} onClick={startAnalyze} className="flex h-9 items-center justify-center rounded-full bg-white/70 px-3.5 text-[11px] tracking-[0.2em] text-[oklch(0.55_0.06_300)] backdrop-blur active:bg-white/90 active:scale-[0.98] transition-all duration-150 disabled:opacity-50" style={{ boxShadow: "var(--shadow-soft)" }}>跳过</button>
+          <div className="neko-text-tiny text-[oklch(0.55_0.06_300)]">STEP 02 / 03</div>
+          <button disabled={analyzing} onClick={startAnalyze} className="flex h-9 items-center justify-center rounded-full bg-white/70 px-3.5 neko-text-button text-[oklch(0.55_0.06_300)] backdrop-blur active:bg-white/90 active:scale-[0.98] transition-all duration-150 disabled:opacity-50" style={{ boxShadow: "var(--shadow-soft)" }}>跳过</button>
         </div>
 
         <div className="px-7 pt-6">
-          <h1 className="text-[22px] font-light leading-tight text-foreground">发生了什么呢？</h1>
-          <p className="mt-1.5 text-[12px] text-[oklch(0.58_0.04_300)]">补充背景信息，可以让 AI 更懂它哦 <span className="text-[oklch(0.65_0.04_300)]">（可选）</span></p>
+          <h1 className="neko-text-module-title text-foreground">发生了什么呢？</h1>
+          <p className="mt-1.5 neko-text-micro text-[oklch(0.58_0.04_300)]">补充背景信息，可以让 AI 更懂它哦 <span className="text-[oklch(0.65_0.04_300)]">（可选）</span></p>
         </div>
 
         <div className="mx-5 mt-5 rounded-[22px] bg-white/85 p-4 backdrop-blur" style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}>
-          <div className="text-[10px] tracking-[0.35em] text-[oklch(0.55_0.06_300)]">文字描述</div>
+          <div className="neko-text-tiny text-[oklch(0.55_0.06_300)]">文字描述</div>
           <textarea
             value={desc}
             onChange={(e) => setDesc(e.target.value)}
             placeholder="例如：我刚打开猫条，它就跑过来了"
-            className="mt-2 block w-full min-h-[110px] resize-none rounded-2xl bg-[oklch(0.98_0.012_320)] p-3 text-[12.5px] leading-relaxed text-foreground placeholder:text-[oklch(0.7_0.03_300)] outline-none focus:ring-2 focus:ring-[oklch(0.85_0.08_320_/_0.5)] transition-all"
+            className="mt-2 block w-full min-h-[110px] resize-none rounded-2xl bg-[oklch(0.98_0.012_320)] p-3 neko-text-micro text-foreground placeholder:text-[oklch(0.7_0.03_300)] outline-none focus:ring-2 focus:ring-[oklch(0.85_0.08_320_/_0.5)] transition-all"
           />
-          <div className="mt-1.5 text-right text-[9.5px] text-[oklch(0.6_0.04_300)]">{desc.length} / 120</div>
+          <div className="mt-1.5 text-right neko-text-tiny text-[oklch(0.6_0.04_300)]">{desc.length} / 120</div>
         </div>
 
       </div>
       <div className="absolute inset-x-0 bottom-0 z-20 px-5 pt-5 pb-[max(10px,env(safe-area-inset-bottom))]">
-        <button disabled={analyzing} onClick={startAnalyze} className="flex w-full items-center justify-center rounded-full px-6 py-4 text-[14px] font-medium text-white active:scale-[0.97] active:brightness-[0.92] transition-all duration-150 disabled:opacity-70"
+        <button disabled={analyzing} onClick={startAnalyze} className="flex w-full items-center justify-center rounded-full px-6 py-4 neko-text-button text-white active:scale-[0.97] active:brightness-[0.92] transition-all duration-150 disabled:opacity-70"
           style={{ background: "linear-gradient(135deg, oklch(0.70 0.14 305), oklch(0.76 0.11 0))", boxShadow: "0 16px 32px -14px oklch(0.70 0.14 305 / 0.6)" }}>
           {analyzing ? "识别中…" : "下一步"}
         </button>
@@ -1227,6 +1284,10 @@ export function ScreenPublish3() {
   const uploadedPhoto = usePublishPhoto();
   const photoSrc = draftVoice?.media ?? stablePhoto ?? uploadedPhoto ?? getPublishPhoto() ?? "";
   const runGenerateVoice = useServerFn(generateCatVoice);
+  const isVoiceGenerating = reanalyzing || !cleanVoiceText(draftVoice?.text);
+  const statusText = isVoiceGenerating ? "AI 正在读懂它的心声" : "AI 已读懂它的心声";
+  const bubbleText = isVoiceGenerating ? "正在读懂它这一刻的心声…" : draftVoice?.text ?? "识别结果还没有回来，请重新识别。";
+  const canPublish = !isVoiceGenerating;
   useEffect(() => {
     const latest = getPublishVoice();
     if (latest) setDraftVoice(latest);
@@ -1246,6 +1307,7 @@ export function ScreenPublish3() {
     analysis: `${catName}不太会大声叫你，更习惯待在你看得见的地方。`,
   });
   const startPublish = () => {
+    if (!canPublish) return;
     if (publishLockRef.current) return;
     publishLockRef.current = true;
     try {
@@ -1292,10 +1354,8 @@ export function ScreenPublish3() {
       setDraftVoice(normalized);
       if (normalized.media) setStablePhoto(normalized.media);
       setReanalyzing(false);
-      toast.success("已重新识别 ✨");
     } catch {
       setReanalyzing(false);
-      toast("这次没读懂，我先保留当前心声喵～");
     }
   };
   return (
@@ -1304,15 +1364,15 @@ export function ScreenPublish3() {
       <div className="absolute inset-0 overflow-y-auto scrollbar-none pt-[52px] pb-8">
         <div className="flex items-center justify-between px-6">
           <AppBackButton to="/app/publish/background" />
-          <div className="text-[10px] tracking-[0.4em] text-[oklch(0.55_0.06_300)]">STEP 03 / 03</div>
+          <div className="neko-text-tiny text-[oklch(0.55_0.06_300)]">STEP 03 / 03</div>
           <div className="h-9 w-9" />
         </div>
 
         <div className="px-7 pt-5">
-          <div className="inline-flex items-center gap-2 rounded-full bg-white/75 px-3 py-1 text-[9.5px] tracking-[0.3em] text-[oklch(0.5_0.1_320)] backdrop-blur">
-            <span className="text-soul">✦</span> AI 已 读 懂 它 的 心 声
+          <div className="inline-flex items-center gap-2 rounded-full bg-white/75 px-3 py-1 neko-text-tiny text-[oklch(0.5_0.1_320)] backdrop-blur">
+            <span className="text-soul">✦</span> {statusText}
           </div>
-          <h1 className="mt-2.5 text-[20px] font-light leading-tight text-foreground">这是它想对你说的话</h1>
+          <h1 className="mt-2.5 neko-text-module-title text-foreground">这是它想对你说的话</h1>
         </div>
 
         <div className="mx-5 mt-4 relative overflow-hidden rounded-[26px]" style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)", background: "linear-gradient(180deg, oklch(0.96 0.035 70) 0%, oklch(0.93 0.05 55) 55%, oklch(0.9 0.06 50) 100%)" }}>
@@ -1328,15 +1388,21 @@ export function ScreenPublish3() {
                 height={1024}
               />
             ) : (
-              <div className="absolute inset-0 flex items-center justify-center bg-[oklch(0.97_0.025_320)] text-[12px] tracking-[0.2em] text-[oklch(0.56_0.06_300)]">
+              <div className="absolute inset-0 flex items-center justify-center bg-[oklch(0.97_0.025_320)] neko-text-micro text-[oklch(0.56_0.06_300)]">
                 等待照片
               </div>
             )}
-            {/* Speech bubble — close above cat head, tail touches forehead */}
             <div className="absolute left-1/2 top-3 z-10 w-[78%] max-w-[280px] -translate-x-1/2">
-              <div className="relative rounded-[22px] rounded-bl-[6px] bg-white/95 px-4 py-3 backdrop-blur" style={{ boxShadow: "0 14px 32px -14px oklch(0.3 0.05 300 / 0.4)" }}>
-                <div className="mb-1 text-[8px] tracking-[0.35em] text-[oklch(0.55_0.06_300)]">{catName}</div>
-                <p className="whitespace-pre-line text-[12.5px] leading-[1.55] text-foreground">{draftVoice?.text ?? "识别结果还没有回来，请重新识别。"}</p>
+              <div className="relative rounded-[22px] rounded-bl-[6px] bg-white/92 px-4 py-3 backdrop-blur" style={{ boxShadow: "0 14px 32px -14px oklch(0.3 0.05 300 / 0.4)" }}>
+                <div className="mb-1 neko-text-tiny text-[oklch(0.55_0.06_300)]">{catName}</div>
+                <div className="flex items-start gap-2">
+                  {isVoiceGenerating && (
+                    <span className="mt-1 h-3.5 w-3.5 shrink-0 animate-spin rounded-full border border-[oklch(0.78_0.11_305_/_0.24)] border-t-[oklch(0.62_0.12_305)]" />
+                  )}
+                  <p className="whitespace-pre-line neko-text-body text-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden">
+                    {bubbleText}
+                  </p>
+                </div>
                 <svg className="absolute -bottom-[10px] left-1/2 -translate-x-1/2" width="16" height="12" viewBox="0 0 16 12">
                   <path d="M0 0 L16 0 L8 12 Z" fill="white" opacity="0.97" />
                 </svg>
@@ -1350,17 +1416,17 @@ export function ScreenPublish3() {
           catName={catName}
           className="mx-5 mt-5"
           analysisFallback="暂未获得 AI 心声解析，请点击重新识别。"
+          isLoading={isVoiceGenerating}
         />
 
         <div className="mx-5 mt-6 grid grid-cols-[1fr_1.4fr] gap-2.5">
-          <button onClick={startReanalyze} className="rounded-full bg-white/85 px-4 py-3.5 text-[12.5px] text-foreground backdrop-blur active:bg-white/95 active:scale-[0.98] transition-all duration-150" style={{ boxShadow: "var(--shadow-soft)" }}>重新识别</button>
-          <button type="button" onClick={startPublish} className="flex items-center justify-center rounded-full px-5 py-3.5 text-[13px] font-medium text-white active:scale-[0.97] active:brightness-[0.92] transition-all duration-150"
+          <button onClick={startReanalyze} className="rounded-full bg-white/85 px-4 py-3.5 neko-text-button text-foreground backdrop-blur active:bg-white/95 active:scale-[0.98] transition-all duration-150" style={{ boxShadow: "var(--shadow-soft)" }}>重新识别</button>
+          <button type="button" onClick={startPublish} disabled={!canPublish} className="flex items-center justify-center rounded-full px-5 py-3.5 neko-text-button text-white active:scale-[0.97] active:brightness-[0.92] transition-all duration-150 disabled:opacity-60"
             style={{ background: "linear-gradient(135deg, oklch(0.70 0.14 305), oklch(0.76 0.11 0))", boxShadow: "0 14px 28px -14px oklch(0.70 0.14 305 / 0.6)" }}>
             发布心声
           </button>
         </div>
       </div>
-      {reanalyzing && <LoadingOverlay title="AI 正在重新识别…" hint="RE · ANALYZING" />}
     </ScreenShell>
   );
 }
@@ -1397,11 +1463,11 @@ export function ScreenSuccess() {
         {/* ── SECTION 1 · Success Title ───────────── */}
         <div className="flex flex-col items-center">
           <div className="px-4 text-center">
-            <div className="text-[10px] tracking-[0.45em] text-[oklch(0.58_0.08_320)]">A VOICE IS BORN</div>
-            <h1 className="mt-2.5 text-[22px] font-medium leading-snug text-foreground">
+            <div className="neko-text-tiny text-[oklch(0.58_0.08_320)]">A VOICE IS BORN</div>
+            <h1 className="mt-2.5 neko-text-module-title text-foreground">
               它，第一次开口了
             </h1>
-            <p className="mt-2 text-[12.5px] leading-[1.7] text-[oklch(0.5_0.06_300)]">
+            <p className="mt-2 neko-text-micro text-[oklch(0.5_0.06_300)]">
               {catName}的声音，<br />刚刚从猫咪世界传了过来
             </p>
           </div>
@@ -1416,7 +1482,7 @@ export function ScreenSuccess() {
               {photoSrc ? (
                 <img src={photoSrc} alt={catName} className="block h-auto w-full max-h-[420px] object-contain" />
               ) : (
-                <div className="flex aspect-[4/5] w-full items-center justify-center text-[12px] tracking-[0.2em] text-[oklch(0.56_0.06_300)]">
+                <div className="flex aspect-[4/5] w-full items-center justify-center neko-text-micro text-[oklch(0.56_0.06_300)]">
                   等待照片
                 </div>
               )}
@@ -1427,16 +1493,16 @@ export function ScreenSuccess() {
               <div className="absolute left-3.5 right-10 top-3.5 z-10">
                 <div className="relative inline-block max-w-full rounded-[20px] rounded-bl-[6px] bg-white/95 px-3.5 py-2.5 backdrop-blur-md"
                   style={{ boxShadow: "0 14px 28px -14px oklch(0.3 0.05 300 / 0.45)" }}>
-                  <div className="mb-0.5 text-[8px] tracking-[0.35em] text-[oklch(0.55_0.06_300)]">{catName}</div>
-              <p className="text-[12.5px] leading-[1.55] text-foreground">
+                  <div className="mb-0.5 neko-text-tiny text-[oklch(0.55_0.06_300)]">{catName}</div>
+              <p className="neko-text-micro text-foreground">
                     <span className="mr-1">💭</span>{draftVoice?.text ?? "这条心声没有生成成功，请返回重新识别。"}
                   </p>
                 </div>
               </div>
 
               {/* tiny sparkles around bubble */}
-              <span className="pointer-events-none absolute right-4 top-2 animate-pulse-soft text-[12px] text-[oklch(0.85_0.1_320)]" style={{ textShadow: "0 0 10px oklch(1 0 0 / 0.8)" }}>✦</span>
-              <span className="pointer-events-none absolute right-10 top-16 animate-pulse-soft text-[10px] text-[oklch(0.82_0.1_285)]" style={{ animationDelay: "0.5s" }}>✺</span>
+              <span className="pointer-events-none absolute right-4 top-2 animate-pulse-soft neko-text-micro text-[oklch(0.85_0.1_320)]" style={{ textShadow: "0 0 10px oklch(1 0 0 / 0.8)" }}>✦</span>
+              <span className="pointer-events-none absolute right-10 top-16 animate-pulse-soft neko-text-tiny text-[oklch(0.82_0.1_285)]" style={{ animationDelay: "0.5s" }}>✺</span>
             </div>
 
           </div>
@@ -1446,7 +1512,7 @@ export function ScreenSuccess() {
 
         {/* ── SECTION 4 · Share Incentive ─────────────── */}
         <div className="mt-7 px-2 text-center">
-          <p className="text-[11.5px] leading-[1.7] text-[oklch(0.55_0.06_300)]">
+          <p className="neko-text-tiny text-[oklch(0.55_0.06_300)]">
             把这个来自猫咪世界的故事<br />分享给你在乎的人
           </p>
         </div>
@@ -1455,7 +1521,7 @@ export function ScreenSuccess() {
       {/* ── Bottom Actions (floating) ──────────────── */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30">
         <div className="pointer-events-auto px-5 pb-[max(10px,env(safe-area-inset-bottom))] pt-3">
-          <Link to="/app" className="flex w-full items-center justify-center rounded-full px-6 py-3.5 text-[14px] font-medium text-white active:scale-[0.97] active:brightness-[0.92] transition-all duration-150"
+          <Link to="/app" className="flex w-full items-center justify-center rounded-full px-6 py-3.5 neko-text-button text-white active:scale-[0.97] active:brightness-[0.92] transition-all duration-150"
             style={{ background: "linear-gradient(135deg, #B69AEF, #E6B8CF)", boxShadow: "0 16px 32px -14px oklch(0.72 0.14 320 / 0.65)" }}>
             返回首页
           </Link>
@@ -1484,7 +1550,7 @@ function CloudSyncPanel() {
 
   if (auth.status === "unconfigured") {
     return (
-      <div className="mx-5 mt-4 rounded-[22px] bg-white/75 p-4 text-[11.5px] leading-relaxed text-[oklch(0.55_0.06_300)] backdrop-blur"
+      <div className="mx-5 mt-4 rounded-[22px] bg-white/75 p-4 neko-text-tiny text-[oklch(0.55_0.06_300)] backdrop-blur"
         style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}>
         账号登录暂不可用，请稍后再试。
       </div>
@@ -1493,7 +1559,7 @@ function CloudSyncPanel() {
 
   if (auth.status === "loading") {
     return (
-      <div className="mx-5 mt-4 rounded-[22px] bg-white/75 p-4 text-[12px] text-[oklch(0.55_0.06_300)] backdrop-blur"
+      <div className="mx-5 mt-4 rounded-[22px] bg-white/75 p-4 neko-text-micro text-[oklch(0.55_0.06_300)] backdrop-blur"
         style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}>
         正在检查登录状态…
       </div>
@@ -1505,13 +1571,13 @@ function CloudSyncPanel() {
       <div className="mx-5 mt-4 rounded-[22px] bg-white/80 p-4 backdrop-blur"
         style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}>
         <div className="flex items-center gap-2">
-          <span className="text-soul text-[13px]">✦</span>
-          <div className="text-[10px] tracking-[0.35em] text-[oklch(0.55_0.06_300)]">账 号 同 步</div>
+          <span className="text-soul neko-text-caption">✦</span>
+          <div className="neko-text-tiny text-[oklch(0.55_0.06_300)]">账 号 同 步</div>
         </div>
-        <p className="mt-2 text-[11.5px] leading-relaxed text-foreground/75">
+        <p className="mt-2 neko-text-tiny text-foreground/75">
           登录后，猫咪档案、人格和心声会自动绑定到你的账号。现在支持验证码登录。
         </p>
-        <Link to="/auth/login" className="mt-3 flex w-full items-center justify-center rounded-full px-4 py-2.5 text-[12px] font-medium text-white"
+        <Link to="/auth/login" className="mt-3 flex w-full items-center justify-center rounded-full px-4 py-2.5 neko-text-button text-white"
           style={{ background: "var(--gradient-cta)" }}>
           邮箱验证码登录
         </Link>
@@ -1525,10 +1591,10 @@ function CloudSyncPanel() {
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-soul text-[13px]">✦</span>
-            <div className="text-[10px] tracking-[0.35em] text-[oklch(0.55_0.06_300)]">账 号 同 步</div>
+            <span className="text-soul neko-text-caption">✦</span>
+            <div className="neko-text-tiny text-[oklch(0.55_0.06_300)]">账 号 同 步</div>
           </div>
-          <div className="mt-1 truncate text-[12px] text-foreground/80">{auth.user.email}</div>
+          <div className="mt-1 truncate neko-text-micro text-foreground/80">{auth.user.email}</div>
         </div>
         <button
           disabled={busy === "signout"}
@@ -1536,12 +1602,12 @@ function CloudSyncPanel() {
             await signOutNekoCloud();
             toast.success("已退出登录");
           })}
-          className="shrink-0 rounded-full bg-white/90 px-3 py-1.5 text-[11px] text-[oklch(0.55_0.06_300)] disabled:opacity-60"
+          className="shrink-0 rounded-full bg-white/90 px-3 py-1.5 neko-text-button text-[oklch(0.55_0.06_300)] disabled:opacity-60"
         >
           退出
         </button>
       </div>
-      <Link to="/app/account" className="mt-3 flex w-full items-center justify-center rounded-full bg-white/90 px-4 py-2.5 text-[12px] text-foreground">
+      <Link to="/app/account" className="mt-3 flex w-full items-center justify-center rounded-full bg-white/90 px-4 py-2.5 neko-text-button text-foreground">
         账号中心
       </Link>
     </div>
@@ -1556,7 +1622,7 @@ export function ScreenMe() {
     <ScreenShell>
       <StatusBar />
       <div className="absolute inset-0 overflow-y-auto scrollbar-none pt-[52px] pb-[110px]">
-        <div className="px-6 text-[22px] font-light tracking-wide text-foreground">我的</div>
+        <div className="px-6 neko-text-module-title text-foreground">我的</div>
 
         <div className="mx-5 mt-4 overflow-hidden rounded-[26px] p-5"
           style={{ background: "linear-gradient(135deg, oklch(0.96 0.035 320), oklch(0.95 0.04 280))", boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}>
@@ -1566,19 +1632,19 @@ export function ScreenMe() {
               <div className="relative"><CatAvatar size={72} usePhoto /></div>
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-[18px] font-medium text-foreground">{catName}</div>
-              <div className="mt-1 text-[11px] font-medium tracking-[0.12em] text-[oklch(0.5_0.1_320)]">{persona?.mbti ?? "INTJ-A"}</div>
-              <div className="mt-0.5 truncate text-[12px] text-foreground/80">{persona?.type ?? "高冷观察者"}</div>
+              <div className="neko-text-card-title text-foreground">{catName}</div>
+              <div className="mt-1 neko-text-badge text-[oklch(0.5_0.1_320)]">{persona?.mbti ?? "INTJ-A"}</div>
+              <div className="mt-0.5 truncate neko-text-micro text-foreground/80">{persona?.type ?? "高冷观察者"}</div>
             </div>
           </div>
-          <div className="mt-3 line-clamp-2 text-[11.5px] leading-relaxed text-foreground/75">
+          <div className="mt-3 line-clamp-2 neko-text-tiny text-foreground/75">
             {persona?.analysis ?? "安静观察，也一直留意着你的一举一动。"}
           </div>
-          <Link to="/app/profile" className="mt-3 flex justify-end text-[11.5px] font-medium text-[oklch(0.5_0.1_320)]">查看人格&nbsp; ›</Link>
+          <Link to="/app/profile" className="mt-3 flex justify-end neko-text-button text-[oklch(0.5_0.1_320)]">查看人格&nbsp; ›</Link>
         </div>
 
         <section className="mx-5 mt-6">
-          <h2 className="mb-2 px-1 text-[11px] font-medium tracking-[0.2em] text-[oklch(0.55_0.06_300)]">我的猫咪</h2>
+          <h2 className="mb-2 px-1 neko-text-tiny text-[oklch(0.55_0.06_300)]">我的猫咪</h2>
           <div className="overflow-hidden rounded-[22px] bg-white/78 backdrop-blur" style={{ border: "1px solid oklch(1 0 0 / 0.75)" }}>
             <SettingsRow to="/app/me/edit" icon="✎" title="猫咪档案" subtitle="基本信息与人格" />
             <SettingsRow to="/app/me/voices" icon="♡" title="猫咪心声" subtitle="查看和管理所有心声" border />
@@ -1586,7 +1652,7 @@ export function ScreenMe() {
         </section>
 
         <section className="mx-5 mt-6">
-          <h2 className="mb-2 px-1 text-[11px] font-medium tracking-[0.2em] text-[oklch(0.55_0.06_300)]">账号与设置</h2>
+          <h2 className="mb-2 px-1 neko-text-tiny text-[oklch(0.55_0.06_300)]">账号与设置</h2>
           <div className="overflow-hidden rounded-[22px] bg-white/78 backdrop-blur" style={{ border: "1px solid oklch(1 0 0 / 0.75)" }}>
             <SettingsRow to="/app/account" icon="◎" title="账号与数据" subtitle="邮箱登录、昵称和账号管理" />
             <SettingsRow to="/app/settings" icon="⚙" title="设置" subtitle="隐私、协议与 App 设置" border />
@@ -1600,13 +1666,13 @@ export function ScreenMe() {
 function SettingsRow({ icon, title, subtitle, to, border = false }: { icon: string; title: string; subtitle: string; to: "/app/account" | "/app/me/edit" | "/app/me/voices" | "/app/settings"; border?: boolean }) {
   return (
     <Link to={to} className={`flex min-h-[68px] items-center gap-3 px-4 py-3 text-left transition-colors active:bg-white/75 ${border ? "border-t border-[oklch(0.9_0.02_300)]" : ""}`}>
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[15px] text-[oklch(0.5_0.1_320)]"
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl neko-text-support text-[oklch(0.5_0.1_320)]"
         style={{ background: "linear-gradient(135deg, oklch(0.96 0.04 320), oklch(0.95 0.04 280))" }}>{icon}</div>
       <div className="flex-1">
-        <div className="text-[13.5px] font-medium text-foreground">{title}</div>
-        <div className="mt-0.5 text-[10.5px] text-[oklch(0.55_0.05_300)]">{subtitle}</div>
+        <div className="neko-text-caption text-foreground">{title}</div>
+        <div className="mt-0.5 neko-text-tiny text-[oklch(0.55_0.05_300)]">{subtitle}</div>
       </div>
-      <span className="text-[14px] text-[oklch(0.65_0.04_300)]">›</span>
+      <span className="neko-text-support text-[oklch(0.65_0.04_300)]">›</span>
     </Link>
   );
 }
@@ -1657,7 +1723,7 @@ export function ScreenEditProfile() {
       <div className="absolute inset-0 overflow-y-auto scrollbar-none pt-[52px] pb-8">
         <div className="flex items-center justify-between px-6">
           <AppBackButton to="/app/me" />
-          <div className="text-[13px] font-medium text-foreground">猫咪档案</div>
+          <div className="neko-text-caption text-foreground">猫咪档案</div>
           <div className="h-9 w-9" />
         </div>
 
@@ -1671,9 +1737,9 @@ export function ScreenEditProfile() {
             ) : (
               <CatAvatar size={92} usePhoto />
             )}
-            <button onClick={() => fileRef.current?.click()} className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-white text-[11px] text-[oklch(0.5_0.1_320)]" style={{ boxShadow: "var(--shadow-soft)" }}>✎</button>
+            <button onClick={() => fileRef.current?.click()} className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-white neko-text-tiny text-[oklch(0.5_0.1_320)]" style={{ boxShadow: "var(--shadow-soft)" }}>✎</button>
           </div>
-          <button onClick={() => fileRef.current?.click()} className="mt-3 text-[11.5px] tracking-[0.2em] text-[oklch(0.5_0.1_320)] active:text-[oklch(0.4_0.12_320)] active:scale-[0.98] transition-all duration-150">更换照片 · ≤ {NEKO_MAX_UPLOAD_LABEL}</button>
+          <button onClick={() => fileRef.current?.click()} className="mt-3 neko-text-button text-[oklch(0.5_0.1_320)] active:text-[oklch(0.4_0.12_320)] active:scale-[0.98] transition-all duration-150">更换照片 · ≤ {NEKO_MAX_UPLOAD_LABEL}</button>
         </div>
 
         <div className="mx-5 mt-5 flex flex-col gap-2.5">
@@ -1682,20 +1748,20 @@ export function ScreenEditProfile() {
           <FieldChoice label="年龄阶段" options={["幼猫", "青年猫", "成熟猫", "资深猫"]} value={ageStage} onChange={(v) => setAgeStage(v as "幼猫" | "青年猫" | "成熟猫" | "资深猫")} compact />
           <div className="rounded-[20px] bg-white/75 p-4 backdrop-blur" style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}>
             <div className="flex items-center justify-between">
-              <div className="text-[11px] tracking-[0.2em] text-[oklch(0.55_0.06_300)]">人格类型</div>
-              <span className="rounded-full bg-[oklch(0.97_0.025_320)] px-2 py-0.5 text-[10px] tracking-[0.15em] text-[oklch(0.55_0.06_300)]">不可编辑</span>
+              <div className="neko-text-tiny text-[oklch(0.55_0.06_300)]">人格类型</div>
+              <span className="rounded-full bg-[oklch(0.97_0.025_320)] px-2 py-0.5 neko-text-badge text-[oklch(0.55_0.06_300)]">不可编辑</span>
             </div>
             <div className="mt-2 flex items-center gap-2.5">
-              <div className="text-[15px] font-medium text-foreground">{persona?.type ?? "高冷观察者"}</div>
-              <span className="rounded-full px-2 py-0.5 text-[10px] font-medium tracking-[0.15em] text-white" style={{ background: "linear-gradient(135deg, oklch(0.70 0.14 305), oklch(0.76 0.11 0))" }}>{persona?.mbti ?? "INTJ-A"}</span>
+              <div className="neko-text-support text-foreground">{persona?.type ?? "高冷观察者"}</div>
+              <span className="rounded-full px-2 py-0.5 neko-text-badge text-white" style={{ background: "linear-gradient(135deg, oklch(0.70 0.14 305), oklch(0.76 0.11 0))" }}>{persona?.mbti ?? "INTJ-A"}</span>
             </div>
-            <p className="mt-1.5 text-[11px] leading-relaxed text-[oklch(0.55_0.05_300)]">基于上传的资料生成 · 重新测试可更新</p>
+            <p className="mt-1.5 neko-text-tiny text-[oklch(0.55_0.05_300)]">基于上传的资料生成 · 重新测试可更新</p>
           </div>
         </div>
 
         <div className="mx-5 mt-6 grid grid-cols-2 gap-2.5">
-          <button onClick={saveProfile} className="rounded-full bg-white/85 px-4 py-3.5 text-[12.5px] text-foreground backdrop-blur active:bg-white/95 active:scale-[0.98] transition-all duration-150" style={{ boxShadow: "var(--shadow-soft)" }}>保存修改</button>
-          <button onClick={() => { updateCatProfile({ name: name.trim(), gender, ageStage, avatar: avatar ?? undefined }); clearCatPersona(); toast.success("已保存，正在重新测试…"); navigate({ to: "/", search: { restart: true } }); }} className="rounded-full px-4 py-3.5 text-[12.5px] font-medium text-white active:scale-[0.97] active:brightness-[0.92] transition-all duration-150"
+          <button onClick={saveProfile} className="rounded-full bg-white/85 px-4 py-3.5 neko-text-button text-foreground backdrop-blur active:bg-white/95 active:scale-[0.98] transition-all duration-150" style={{ boxShadow: "var(--shadow-soft)" }}>保存修改</button>
+          <button onClick={() => { updateCatProfile({ name: name.trim(), gender, ageStage, avatar: avatar ?? undefined }); clearCatPersona(); toast.success("已保存，正在重新测试…"); navigate({ to: "/", search: { restart: true } }); }} className="rounded-full px-4 py-3.5 neko-text-button text-white active:scale-[0.97] active:brightness-[0.92] transition-all duration-150"
             style={{ background: "linear-gradient(135deg, oklch(0.70 0.14 305), oklch(0.76 0.11 0))", boxShadow: "0 14px 28px -14px oklch(0.70 0.14 305 / 0.6)" }}>
             保存并重新测试
           </button>
@@ -1707,10 +1773,10 @@ export function ScreenEditProfile() {
 function FieldRow({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   return (
     <div className="rounded-[20px] bg-white/75 p-4 backdrop-blur" style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}>
-      <div className="text-[11px] tracking-[0.2em] text-[oklch(0.55_0.06_300)]">{label}</div>
+      <div className="neko-text-tiny text-[oklch(0.55_0.06_300)]">{label}</div>
       <div className="mt-1.5 flex items-center justify-between">
-        <input value={value} onChange={(e) => onChange(e.target.value.slice(0, 12))} className="min-w-0 flex-1 bg-transparent text-[13px] text-foreground outline-none" />
-        <span className="text-[12px] text-[oklch(0.55_0.06_300)]">✎</span>
+        <input value={value} onChange={(e) => onChange(e.target.value.slice(0, 12))} className="min-w-0 flex-1 bg-transparent neko-text-caption text-foreground outline-none" />
+        <span className="neko-text-micro text-[oklch(0.55_0.06_300)]">✎</span>
       </div>
     </div>
   );
@@ -1718,10 +1784,10 @@ function FieldRow({ label, value, onChange }: { label: string; value: string; on
 function FieldChoice({ label, options, value, onChange, compact }: { label: string; options: string[]; value: string; onChange: (value: string) => void; compact?: boolean }) {
   return (
     <div className="rounded-[20px] bg-white/75 p-4 backdrop-blur" style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}>
-      <div className="text-[11px] tracking-[0.2em] text-[oklch(0.55_0.06_300)]">{label}</div>
+      <div className="neko-text-tiny text-[oklch(0.55_0.06_300)]">{label}</div>
       <div className={"mt-2.5 grid gap-1.5 " + (compact ? "grid-cols-4" : "grid-cols-2")}>
         {options.map((o, i) => (
-          <button key={o} onClick={() => onChange(o)} className={"rounded-full py-2 text-[12px] " + (o === value
+          <button key={o} onClick={() => onChange(o)} className={"rounded-full py-2 neko-text-badge " + (o === value
             ? "text-white"
             : "bg-[oklch(0.97_0.025_320)] text-[oklch(0.5_0.06_300)]")}
             style={o === value ? { background: "var(--gradient-cta)" } : undefined}>
@@ -1769,13 +1835,13 @@ export function ScreenManageVoices() {
       <div className="absolute inset-0 flex flex-col pt-[52px]" style={{ paddingBottom: editMode ? 96 : 16 }}>
         <div className="flex items-center justify-between px-6">
           {editMode ? (
-            <button onClick={exitEdit} className="rounded-full bg-white/80 px-3 py-1.5 text-[11.5px] text-[oklch(0.5_0.1_320)] backdrop-blur active:bg-white/95 active:scale-[0.98] transition-all duration-150" style={{ boxShadow: "var(--shadow-soft)" }}>取消</button>
+            <button onClick={exitEdit} className="rounded-full bg-white/80 px-3 py-1.5 neko-text-button text-[oklch(0.5_0.1_320)] backdrop-blur active:bg-white/95 active:scale-[0.98] transition-all duration-150" style={{ boxShadow: "var(--shadow-soft)" }}>取消</button>
           ) : (
             <AppBackButton onClick={() => router.history.back()} />
           )}
-          <div className="text-[13px] font-medium text-foreground">{editMode ? `已选 ${selected.size} 条` : "猫咪心声"}</div>
+          <div className="neko-text-caption text-foreground">{editMode ? `已选 ${selected.size} 条` : "猫咪心声"}</div>
           {allVoices.length > 0 && !editMode ? (
-            <button onClick={() => setEditMode(true)} className="rounded-full bg-white/80 px-3 py-1.5 text-[11.5px] text-[oklch(0.5_0.1_320)] backdrop-blur active:bg-white/95 active:scale-[0.98] transition-all duration-150" style={{ boxShadow: "var(--shadow-soft)" }}>编辑</button>
+            <button onClick={() => setEditMode(true)} className="rounded-full bg-white/80 px-3 py-1.5 neko-text-button text-[oklch(0.5_0.1_320)] backdrop-blur active:bg-white/95 active:scale-[0.98] transition-all duration-150" style={{ boxShadow: "var(--shadow-soft)" }}>编辑</button>
           ) : (
             <div className="h-9 w-[52px]" />
           )}
@@ -1785,11 +1851,11 @@ export function ScreenManageVoices() {
           <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
             <div className="relative flex h-[120px] w-[120px] items-center justify-center rounded-full" style={{ background: "linear-gradient(135deg, oklch(0.96 0.03 320), oklch(0.94 0.04 280))", boxShadow: "var(--shadow-soft)" }}>
               <CatAvatar size={72} grad={CAT_GRADIENTS[0]} usePhoto />
-              <div className="absolute -right-1 -top-1 rounded-full bg-white/90 px-2 py-0.5 text-[10px] text-[oklch(0.55_0.08_300)] backdrop-blur" style={{ boxShadow: "var(--shadow-soft)" }}>zzz</div>
+              <div className="absolute -right-1 -top-1 rounded-full bg-white/90 px-2 py-0.5 neko-text-tiny text-[oklch(0.55_0.08_300)] backdrop-blur" style={{ boxShadow: "var(--shadow-soft)" }}>zzz</div>
             </div>
-            <div className="mt-6 text-[15px] font-medium text-foreground">还没有猫咪心声哦</div>
-            <p className="mt-2 text-[12px] leading-[1.7] text-[oklch(0.55_0.06_300)]">记录一个瞬间，<br/>让 AI 听懂它的小心思 ✦</p>
-            <Link to="/app/publish" className="mt-6 rounded-full px-6 py-3 text-[12.5px] font-medium text-white active:scale-[0.97] active:brightness-[0.92] transition-all duration-150"
+            <div className="mt-6 neko-text-support text-foreground">还没有猫咪心声哦</div>
+            <p className="mt-2 neko-text-micro text-[oklch(0.55_0.06_300)]">记录一个瞬间，<br/>让 AI 听懂它的小心思 ✦</p>
+            <Link to="/app/publish" className="mt-6 rounded-full px-6 py-3 neko-text-button text-white active:scale-[0.97] active:brightness-[0.92] transition-all duration-150"
               style={{ background: "linear-gradient(135deg, oklch(0.70 0.14 305), oklch(0.76 0.11 0))", boxShadow: "0 14px 28px -14px oklch(0.70 0.14 305 / 0.6)" }}>
               发布第一条心声
             </Link>
@@ -1825,7 +1891,7 @@ export function ScreenManageVoices() {
                         <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[55%]"
                           style={{ background: "linear-gradient(to top, rgba(0,0,0,0.42), rgba(0,0,0,0.15) 55%, rgba(0,0,0,0))" }} />
                         <div className="absolute inset-x-0 bottom-0 p-3">
-                          <p className="text-[12px] leading-[1.5] text-white" style={{
+                          <p className="neko-text-micro text-white" style={{
                             display: "-webkit-box",
                             WebkitLineClamp: 2,
                             WebkitBoxOrient: "vertical",
@@ -1837,14 +1903,14 @@ export function ScreenManageVoices() {
                         </div>
                         {editMode && (
                           <div className="absolute left-2.5 top-2.5">
-                            <div className={"flex h-6 w-6 items-center justify-center rounded-full text-[11px] text-white " + (isSel ? "" : "border border-white/70 bg-black/15 backdrop-blur text-transparent")}
+                            <div className={"flex h-6 w-6 items-center justify-center rounded-full neko-text-tiny text-white " + (isSel ? "" : "border border-white/70 bg-black/15 backdrop-blur text-transparent")}
                               style={isSel ? { background: "linear-gradient(135deg, #B69AEF, #E6B8CF)", boxShadow: "0 4px 10px -4px rgba(182,154,239,0.6)" } : undefined}>
                               ✓
                             </div>
                           </div>
                         )}
                       </div>
-                      <div className="px-3 py-2 text-[10.5px]" style={{ color: "#9A91AE" }}>{v.time}</div>
+                      <div className="px-3 py-2 neko-text-tiny" style={{ color: "#9A91AE" }}>{v.time}</div>
                     </div>
                   );
                   return editMode ? (
@@ -1865,7 +1931,7 @@ export function ScreenManageVoices() {
               <button
                 onClick={() => selected.size > 0 ? setConfirmDel(true) : toast("先选择要删除的心声哦")}
                 disabled={selected.size === 0}
-                className="w-full rounded-full px-5 py-3 text-[13px] font-medium text-white transition-all duration-150 active:scale-[0.98] active:brightness-[0.92] disabled:opacity-50"
+                className="w-full rounded-full px-5 py-3 neko-text-button text-white transition-all duration-150 active:scale-[0.98] active:brightness-[0.92] disabled:opacity-50"
                 style={{ background: "linear-gradient(135deg, oklch(0.70 0.16 25), oklch(0.74 0.14 0))", boxShadow: "0 10px 22px -12px oklch(0.70 0.14 25 / 0.55)" }}>
                 删除所选 ({selected.size})
               </button>
@@ -1905,12 +1971,12 @@ export function AppShowcase() {
             <div className="absolute inset-[3px] rounded-full bg-white" />
             <div className="absolute inset-[8px] rounded-full bg-gradient-to-br from-[oklch(0.82_0.11_320)] to-[oklch(0.84_0.09_0)] animate-breathe" />
           </div>
-          <div className="leading-tight">
-            <div className="text-[15px] font-medium tracking-[0.32em] text-foreground">喵一下</div>
-            <div className="text-[10px] tracking-[0.4em] text-muted-foreground">PRODUCT DEMO · 9 SCREENS</div>
+          <div className="">
+            <div className="neko-text-support text-foreground">喵一下</div>
+            <div className="neko-text-tiny text-muted-foreground">PRODUCT DEMO · 9 SCREENS</div>
           </div>
         </div>
-        <div className="hidden items-center gap-6 text-[11px] tracking-[0.3em] text-muted-foreground md:flex">
+        <div className="hidden items-center gap-6 neko-text-tiny text-muted-foreground md:flex">
           <span>MVP · v 1.0</span>
           <span className="text-foreground/70">— 听懂它的小心声</span>
         </div>
@@ -1918,16 +1984,16 @@ export function AppShowcase() {
 
       <section className="relative z-10 mx-auto max-w-[1600px] px-8 pb-12 md:px-14">
         <div className="max-w-3xl">
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-[10px] tracking-[0.32em] text-[oklch(0.55_0.08_320)] backdrop-blur">
+          <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 neko-text-tiny text-[oklch(0.55_0.08_320)] backdrop-blur">
             <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-[oklch(0.78_0.11_305)]" />
             APP DEMO · iPhone 16 Pro
           </div>
-          <h1 className="text-balance text-[40px] font-light leading-[1.08] tracking-tight text-foreground md:text-[60px]">
+          <h1 className="text-balance neko-text-showcase-hero text-foreground">
             一只猫的，
             <br />
-            <span className="text-soul font-normal italic">小心声</span> 被听见了。
+            <span className="text-soul italic">小心声</span> 被听见了。
           </h1>
-          <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-muted-foreground">
+          <p className="mt-5 max-w-xl neko-text-support text-muted-foreground">
             上传一张照片、一段视频，AI 帮你听懂它正在想什么 —— 一个温柔的 AI 伙伴，陪你走进猫咪的小世界。
           </p>
         </div>
@@ -1939,8 +2005,8 @@ export function AppShowcase() {
             <figure key={s.id} className="snap-center shrink-0">
               <div className="mb-5 flex items-end justify-between px-1">
                 <div>
-                  <div className="text-[10px] tracking-[0.4em] text-muted-foreground">{s.index} · {s.subtitle}</div>
-                  <div className="mt-1 text-[15px] tracking-wide text-foreground">{s.title}</div>
+                  <div className="neko-text-tiny text-muted-foreground">{s.index} · {s.subtitle}</div>
+                  <div className="mt-1 neko-text-support text-foreground">{s.title}</div>
                 </div>
                 <div className="h-px w-16 bg-gradient-to-r from-transparent to-border" />
               </div>
@@ -1956,7 +2022,7 @@ export function AppShowcase() {
       </section>
 
       <footer className="relative z-10 border-t border-border/40">
-        <div className="mx-auto flex max-w-[1600px] items-center justify-between px-8 py-8 text-[11px] tracking-[0.3em] text-muted-foreground md:px-14">
+        <div className="mx-auto flex max-w-[1600px] items-center justify-between px-8 py-8 neko-text-tiny text-muted-foreground md:px-14">
           <span>喵一下 · 读懂它的小世界</span>
           <span>PRODUCT DEMO · 9 / 9</span>
         </div>

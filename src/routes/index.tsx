@@ -88,8 +88,8 @@ function StartupLoading() {
       />
       <div className="relative z-10 mx-auto flex h-[100dvh] w-full max-w-[480px] items-center justify-center px-7 text-center">
         <div className="rounded-[28px] bg-white/80 px-6 py-5 backdrop-blur" style={{ boxShadow: "var(--shadow-soft)" }}>
-          <div className="text-[12px] tracking-[0.32em] text-[oklch(0.58_0.08_320)]">喵一下</div>
-          <div className="mt-2 text-[14px] text-foreground">正在寻找你的猫咪档案…</div>
+          <div className="neko-text-micro text-[oklch(0.58_0.08_320)]">喵一下</div>
+          <div className="mt-2 neko-text-support text-foreground">正在寻找你的猫咪档案…</div>
         </div>
       </div>
     </div>

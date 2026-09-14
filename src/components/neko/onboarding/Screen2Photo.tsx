@@ -184,8 +184,8 @@ export function Screen2Photo({ onNext, onPrev }: { onNext?: () => void; onPrev?:
           onChange={onFile}
         />
         <div className="relative z-10 px-7 mt-2">
-          <h1 className="text-[22px] font-light leading-tight text-foreground">上传猫咪正脸照片</h1>
-          <p className="mt-1.5 text-[12px] text-[oklch(0.58_0.04_300)]">头像会用于生成人格档案 · 图片不超过 {NEKO_MAX_UPLOAD_LABEL}</p>
+          <h1 className="neko-text-module-title text-foreground">上传猫咪正脸照片</h1>
+          <p className="mt-1.5 neko-text-micro text-[oklch(0.58_0.04_300)]">头像会用于生成人格档案 · 图片不超过 {NEKO_MAX_UPLOAD_LABEL}</p>
         </div>
         <div className="relative z-10 mt-6 flex justify-center">
           <button type="button" onClick={pickPhoto} className="relative h-[170px] w-[170px] outline-none">
@@ -218,21 +218,21 @@ export function Screen2Photo({ onNext, onPrev }: { onNext?: () => void; onPrev?:
                   <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/80 shadow-[0_10px_24px_-16px_oklch(0.7_0.12_305/0.5)]">
                     <ImagePlus className="h-5 w-5" strokeWidth={1.8} />
                   </span>
-                  <span className="mt-2 text-[11px] tracking-[0.22em]">上传正脸</span>
-                  <span className="mt-1 text-[9px] tracking-[0.18em] text-[oklch(0.68_0.04_300)]">JPG / PNG</span>
+                  <span className="mt-2 neko-text-tiny">上传正脸</span>
+                  <span className="mt-1 neko-text-tiny text-[oklch(0.68_0.04_300)]">JPG / PNG</span>
                 </div>
               )}
             </div>
-            <span className="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full text-white text-[16px] shadow-[0_8px_20px_-6px_oklch(0.78_0.11_305/0.6)]"
+            <span className="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full text-white neko-text-body shadow-[0_8px_20px_-6px_oklch(0.78_0.11_305/0.6)]"
               style={{ background: "linear-gradient(135deg, oklch(0.70 0.14 305), oklch(0.76 0.11 0))" }}>＋</span>
           </button>
         </div>
-        <p className="relative z-10 mt-3 text-center text-[10px] tracking-[0.3em] text-[oklch(0.6_0.06_300)]">点击上传 · JPG / PNG</p>
+        <p className="relative z-10 mt-3 text-center neko-text-tiny text-[oklch(0.6_0.06_300)]">点击上传 · JPG / PNG</p>
         <div className="relative z-10 mx-5 mt-6 rounded-[24px] glass p-5">
           <Label>猫咪名称</Label>
           <div
             onClick={() => nameRef.current?.focus()}
-            className="mt-2 flex w-full items-center justify-between rounded-2xl bg-white/70 px-4 py-3 text-left text-[14px] text-foreground"
+            className="mt-2 flex w-full items-center justify-between rounded-2xl bg-white/70 px-4 py-3 text-left neko-text-support text-foreground"
           >
             <input
               ref={nameRef}
@@ -243,9 +243,9 @@ export function Screen2Photo({ onNext, onPrev }: { onNext?: () => void; onPrev?:
               onChange={(e) => setName(e.target.value)}
               placeholder="它叫什么名字呀～"
               maxLength={12}
-              className="flex-1 bg-transparent font-medium outline-none placeholder:text-[oklch(0.7_0.04_300)]"
+              className="flex-1 bg-transparent outline-none placeholder:text-[oklch(0.7_0.04_300)]"
             />
-            <span className="ml-2 shrink-0 text-[11px] text-[oklch(0.6_0.05_300)]">{[...name].length} / 12</span>
+            <span className="ml-2 shrink-0 neko-text-tiny text-[oklch(0.6_0.05_300)]">{[...name].length} / 12</span>
           </div>
         </div>
         <div className="relative z-10 mx-5 mt-3 rounded-[24px] glass p-5">
@@ -270,7 +270,7 @@ export function Screen2Photo({ onNext, onPrev }: { onNext?: () => void; onPrev?:
           type="button"
           disabled={checking}
           onPointerDown={(e) => { e.preventDefault(); if (!checking) onContinue(); }}
-          className="flex w-full touch-manipulation select-none items-center justify-center rounded-full px-6 py-4 text-[14px] font-medium text-white shadow-[0_16px_32px_-14px_oklch(0.78_0.11_305/0.55)] active:scale-[0.98] transition-transform duration-75 disabled:opacity-70"
+          className="flex w-full touch-manipulation select-none items-center justify-center rounded-full px-6 py-4 neko-text-button text-white shadow-[0_16px_32px_-14px_oklch(0.78_0.11_305/0.55)] active:scale-[0.98] transition-transform duration-75 disabled:opacity-70"
           style={{ background: "var(--gradient-cta)" }}
         >
           {checking ? "识别中…" : "继续"}
@@ -281,18 +281,18 @@ export function Screen2Photo({ onNext, onPrev }: { onNext?: () => void; onPrev?:
 }
 
 function Label({ children }: { children: React.ReactNode }) {
-  return <div className="text-[10px] tracking-[0.4em] text-[oklch(0.55_0.06_300)]">{children}</div>;
+  return <div className="neko-text-tiny text-[oklch(0.55_0.06_300)]">{children}</div>;
 }
 function Pill({ text, sub, active, onClick }: { text: string; sub?: string; active?: boolean; onClick?: () => void }) {
   return (
     <button type="button" onClick={onClick} className={
-      "flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[13px] border transition active:scale-[0.98] duration-150 " +
+      "flex items-center justify-center gap-2 rounded-2xl px-4 py-3 neko-text-badge border transition active:scale-[0.98] duration-150 " +
       (active
         ? "text-white border-transparent shadow-[0_8px_20px_-10px_oklch(0.78_0.11_305/0.5)]"
         : "bg-white/70 text-foreground border-[oklch(0.9_0.02_310/0.6)]")
     } style={active ? { background: "var(--gradient-selected)" } : undefined}>
-      <span className="font-medium leading-none">{text}</span>
-      {sub && <span className={"ml-1 text-[10px] leading-none " + (active ? "text-white/85" : "text-[oklch(0.6_0.05_300)]")}>{sub}</span>}
+      <span >{text}</span>
+      {sub && <span className={"ml-1 neko-text-tiny " + (active ? "text-white/85" : "text-[oklch(0.6_0.05_300)]")}>{sub}</span>}
     </button>
   );
 }

@@ -21,11 +21,11 @@ export function Screen1Welcome({ onNext }: { onNext?: () => void; onPrev?: () =>
         ))}
       </div>
       <div className="relative z-10 mt-10 flex flex-col items-center px-7">
-        <div className="text-[11px] tracking-[0.55em] text-[oklch(0.55_0.08_320)]">N E K O . I D</div>
-        <div className="mt-3 text-[28px] font-light leading-tight text-foreground">
-          读懂它的<span className="text-soul font-normal italic">小世界</span>
+        <div className="neko-text-tiny text-[oklch(0.55_0.08_320)]">N E K O . I D</div>
+        <div className="mt-3 neko-text-page-title text-foreground">
+          读懂它的<span className="text-soul italic">小世界</span>
         </div>
-        <p className="mt-3 max-w-[280px] text-center text-[12px] leading-relaxed text-[oklch(0.55_0.05_300)]">
+        <p className="mt-3 max-w-[280px] text-center neko-text-micro text-[oklch(0.55_0.05_300)]">
           AI 将通过照片、视频和行为分析<br />生成专属于它的人格档案
         </p>
       </div>
@@ -33,10 +33,10 @@ export function Screen1Welcome({ onNext }: { onNext?: () => void; onPrev?: () =>
         <button
           type="button"
           onPointerDown={(e) => { e.preventDefault(); onNext?.(); }}
-          className="flex w-full touch-manipulation select-none items-center justify-center gap-2 rounded-full px-6 py-4 text-[14px] font-medium text-white shadow-[0_18px_36px_-14px_oklch(0.78_0.11_305/0.6)] active:scale-[0.98] transition-transform duration-75"
+          className="flex w-full touch-manipulation select-none items-center justify-center gap-2 rounded-full px-6 py-4 neko-text-button text-white shadow-[0_18px_36px_-14px_oklch(0.78_0.11_305/0.6)] active:scale-[0.98] transition-transform duration-75"
           style={{ background: "var(--gradient-cta)" }}
         >
-          <span className="tracking-wider">开始创建猫咪人格档案</span>
+          <span>开始创建猫咪人格档案</span>
           <span>✨</span>
         </button>
       </div>

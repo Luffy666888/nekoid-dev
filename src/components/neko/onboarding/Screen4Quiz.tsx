@@ -92,18 +92,18 @@ export function Screen4Quiz({ onNext, onPrev }: { onNext?: () => void; onPrev?: 
         </div>
         <div className="relative z-10 px-7">
           <div className="flex items-center justify-between">
-            <h1 className="text-[22px] font-light leading-tight text-foreground">行为小测试</h1>
+            <h1 className="neko-text-module-title text-foreground">行为小测试</h1>
             <button
               onClick={() => {
                 updateCatProfile({ quiz: answers });
                 onNext?.();
               }}
-              className="text-[10px] tracking-[0.3em] text-[oklch(0.6_0.06_300)]"
+              className="neko-text-button text-[oklch(0.6_0.06_300)]"
             >
               跳过 ›
             </button>
           </div>
-          <p className="mt-1.5 text-[12px] text-[oklch(0.58_0.04_300)]">
+          <p className="mt-1.5 neko-text-micro text-[oklch(0.58_0.04_300)]">
             帮助 AI 更准确理解它（可跳过）
           </p>
         </div>
@@ -111,10 +111,10 @@ export function Screen4Quiz({ onNext, onPrev }: { onNext?: () => void; onPrev?: 
           {QUESTIONS.map((q, i) => (
             <div key={i} className="rounded-[22px] glass p-4">
               <div className="flex items-center gap-2">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[oklch(0.95_0.04_320)] text-[10px] font-medium text-[oklch(0.5_0.1_320)]">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[oklch(0.95_0.04_320)] neko-text-tiny text-[oklch(0.5_0.1_320)]">
                   {i + 1}
                 </span>
-                <span className="text-[12.5px] font-medium text-foreground">{q.q}</span>
+                <span className="neko-text-micro text-foreground">{q.q}</span>
               </div>
               <div className="mt-3 grid gap-2">
                 <Opt
@@ -147,13 +147,13 @@ export function Screen4Quiz({ onNext, onPrev }: { onNext?: () => void; onPrev?: 
             e.preventDefault();
             handleSubmit();
           }}
-          className="flex w-full touch-manipulation select-none items-center justify-center gap-2 rounded-full px-6 py-4 text-[14px] font-medium text-white shadow-[0_16px_32px_-14px_oklch(0.78_0.11_305/0.55)] active:scale-[0.98] transition-transform duration-75"
+          className="flex w-full touch-manipulation select-none items-center justify-center gap-2 rounded-full px-6 py-4 neko-text-button text-white shadow-[0_16px_32px_-14px_oklch(0.78_0.11_305/0.55)] active:scale-[0.98] transition-transform duration-75"
           style={{ background: "var(--gradient-cta)" }}
         >
           <span>好了，开始解析</span>
           <span>✨</span>
         </button>
-        <p className="mt-3 text-center text-[10.5px] leading-relaxed text-[oklch(0.58_0.05_300)]">
+        <p className="mt-3 text-center neko-text-tiny text-[oklch(0.58_0.05_300)]">
           AI 将结合测试结果，
           <br />
           生成更准确的人格分析
@@ -179,7 +179,7 @@ function Opt({
       type="button"
       onClick={onClick}
       className={
-        "flex items-center gap-2 rounded-2xl px-3 py-2.5 text-[12px] text-left transition active:scale-[0.98] duration-150 " +
+        "flex items-center gap-2 rounded-2xl px-3 py-2.5 neko-text-micro text-left transition active:scale-[0.98] duration-150 " +
         (active
           ? "text-white shadow-[0_8px_18px_-10px_oklch(0.78_0.11_305/0.45)]"
           : "bg-white/70 text-[oklch(0.45_0.04_300)] border border-[oklch(0.9_0.02_310/0.5)]")
@@ -188,7 +188,7 @@ function Opt({
     >
       <span
         className={
-          "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-medium " +
+          "flex h-5 w-5 shrink-0 items-center justify-center rounded-full neko-text-tiny " +
           (active
             ? "bg-white/25 text-white"
             : "bg-[oklch(0.95_0.025_320)] text-[oklch(0.5_0.1_320)]")
@@ -196,7 +196,7 @@ function Opt({
       >
         {label}
       </span>
-      <span className={active ? "font-medium" : ""}>{text}</span>
+      <span >{text}</span>
     </button>
   );
 }

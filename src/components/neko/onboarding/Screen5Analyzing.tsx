@@ -114,13 +114,13 @@ export function Screen5Analyzing({
     >
       <Sparkles count={34} />
       <BackButton onPrev={onPrev} />
-      <div className="relative z-10 text-[10px] tracking-[0.45em] text-[oklch(0.55_0.08_320)]">
+      <div className="relative z-10 neko-text-tiny text-[oklch(0.55_0.08_320)]">
         A I · A N A L Y Z I N G
       </div>
-      <div className="relative z-10 mt-2 text-[22px] font-light text-foreground">
+      <div className="relative z-10 mt-2 neko-text-module-title text-foreground">
         {status === "failed" ? "识别失败" : "AI 分析中"}
       </div>
-      <div className="relative z-10 mt-0.5 text-[12px] text-[oklch(0.58_0.05_300)]">
+      <div className="relative z-10 mt-0.5 neko-text-micro text-[oklch(0.58_0.05_300)]">
         {status === "failed" ? "没有使用 demo 结果，请重试真实识别" : "正在构建属于它的人格画像"}
       </div>
 
@@ -171,7 +171,7 @@ export function Screen5Analyzing({
                 height={1024}
               />
             ) : (
-              <div className="flex h-full w-full items-center justify-center rounded-full bg-[oklch(0.985_0.018_320)] text-[11px] tracking-[0.22em] text-[oklch(0.58_0.06_300)]">
+              <div className="flex h-full w-full items-center justify-center rounded-full bg-[oklch(0.985_0.018_320)] neko-text-tiny text-[oklch(0.58_0.06_300)]">
                 等待头像
               </div>
             )}
@@ -184,7 +184,7 @@ export function Screen5Analyzing({
             />
           </div>
         </div>
-        <div className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full bg-white/92 px-3 py-1 text-[11px] tracking-[0.25em] text-[oklch(0.5_0.1_320)] shadow-[0_8px_20px_-12px_oklch(0.78_0.11_305/0.42)]">
+        <div className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full bg-white/92 px-3 py-1 neko-text-tiny text-[oklch(0.5_0.1_320)] shadow-[0_8px_20px_-12px_oklch(0.78_0.11_305/0.42)]">
           {displayPct}%
         </div>
       </div>
@@ -196,11 +196,7 @@ export function Screen5Analyzing({
           return (
             <div
               key={i}
-              className={`relative flex items-center gap-3 overflow-hidden rounded-2xl px-4 py-2.5 text-[12px] backdrop-blur transition-all duration-500 ${
-                active
-                  ? "bg-white/85 shadow-[0_8px_20px_-12px_oklch(0.78_0.11_305/0.45)] scale-[1.01]"
-                  : "bg-white/65"
-              }`}
+              className={`relative flex items-center gap-3 overflow-hidden rounded-2xl px-4 py-2.5 neko-text-micro backdrop-blur transition-all duration-500 ${ active ? "bg-white/85 shadow-[0_8px_20px_-12px_oklch(0.78_0.11_305/0.45)] scale-[1.01]" : "bg-white/65" }`}
               style={{ opacity: done || active ? 1 : 0.55 }}
             >
               {active && (
@@ -229,7 +225,7 @@ export function Screen5Analyzing({
                 {!active && "..."}
               </span>
               {done && (
-                <span className="relative ml-auto text-[11px] text-[oklch(0.55_0.1_305)]">✓</span>
+                <span className="relative ml-auto neko-text-tiny text-[oklch(0.55_0.1_305)]">✓</span>
               )}
               {active && (
                 <span className="relative ml-auto flex gap-1">
@@ -256,7 +252,7 @@ export function Screen5Analyzing({
           <button
             type="button"
             onClick={onPrev}
-            className="flex-1 rounded-full bg-white/80 px-5 py-3 text-[13px] font-medium text-[oklch(0.5_0.1_305)] backdrop-blur active:scale-[0.98]"
+            className="flex-1 rounded-full bg-white/80 px-5 py-3 neko-text-button text-[oklch(0.5_0.1_305)] backdrop-blur active:scale-[0.98]"
             style={{ boxShadow: "var(--shadow-soft)" }}
           >
             返回修改
@@ -264,7 +260,7 @@ export function Screen5Analyzing({
           <button
             type="button"
             onClick={retry}
-            className="flex-1 rounded-full px-5 py-3 text-[13px] font-medium text-white active:scale-[0.98]"
+            className="flex-1 rounded-full px-5 py-3 neko-text-button text-white active:scale-[0.98]"
             style={{
               background: "var(--gradient-cta)",
               boxShadow: "0 14px 28px -14px oklch(0.78 0.11 305 / 0.55)",
@@ -274,10 +270,10 @@ export function Screen5Analyzing({
           </button>
         </div>
       )}
-      <p className="relative z-10 mt-auto mb-7 text-center text-[12px] leading-relaxed text-[oklch(0.55_0.06_300)]">
+      <p className="relative z-10 mt-auto mb-7 text-center neko-text-micro text-[oklch(0.55_0.06_300)]">
         每只猫，
         <br />
-        <span className="text-foreground font-medium">都有独一无二的灵魂</span>
+        <span className="text-foreground">都有独一无二的灵魂</span>
       </p>
     </div>
   );

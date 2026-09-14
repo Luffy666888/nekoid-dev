@@ -137,13 +137,13 @@ export function AuthLoginScreen() {
               className="w-full rounded-[28px] bg-white/85 p-5 text-center backdrop-blur"
               style={{ boxShadow: "var(--shadow-soft)" }}
             >
-              <div className="text-[18px] font-medium text-foreground">云端登录暂不可用</div>
-              <p className="mt-2 text-[12px] leading-relaxed text-[oklch(0.55_0.06_300)]">
+              <div className="neko-text-card-title text-foreground">云端登录暂不可用</div>
+              <p className="mt-2 neko-text-micro text-[oklch(0.55_0.06_300)]">
                 登录服务正在配置中，请稍后再试。
               </p>
               <Link
                 to="/app/me"
-                className="mt-5 inline-flex rounded-full px-5 py-2.5 text-[12px] font-medium text-white"
+                className="mt-5 inline-flex rounded-full px-5 py-2.5 neko-text-button text-white"
                 style={{ background: "var(--gradient-cta)" }}
               >
                 返回我的
@@ -168,20 +168,20 @@ export function AuthLoginScreen() {
               <div className="mx-auto mb-4 w-fit">
                 <CatAvatar size={68} usePhoto />
               </div>
-              <div className="text-[18px] font-medium text-foreground">已经登录啦</div>
-              <p className="mt-2 truncate text-[12px] text-[oklch(0.55_0.06_300)]">
+              <div className="neko-text-card-title text-foreground">已经登录啦</div>
+              <p className="mt-2 truncate neko-text-micro text-[oklch(0.55_0.06_300)]">
                 {auth.user.email}
               </p>
               <div className="mt-5 grid grid-cols-2 gap-2">
                 <Link
                   to="/app/account"
-                  className="rounded-full bg-white px-4 py-2.5 text-[12px] text-foreground"
+                  className="rounded-full bg-white px-4 py-2.5 neko-text-button text-foreground"
                 >
                   账号与数据
                 </Link>
                 <Link
                   to="/app/me"
-                  className="rounded-full px-4 py-2.5 text-[12px] font-medium text-white"
+                  className="rounded-full px-4 py-2.5 neko-text-button text-white"
                   style={{ background: "var(--gradient-cta)" }}
                 >
                   返回我的
@@ -208,13 +208,13 @@ export function AuthLoginScreen() {
           </Link>
 
           <div className="mt-8">
-            <div className="text-[10px] tracking-[0.45em] text-[oklch(0.58_0.08_320)]">
+            <div className="neko-text-tiny text-[oklch(0.58_0.08_320)]">
               喵一下账号
             </div>
-            <h1 className="mt-3 text-[28px] font-light leading-tight text-foreground">
+            <h1 className="mt-3 neko-text-page-title text-foreground">
               邮箱验证码登录
             </h1>
-            <p className="mt-2 text-[12.5px] leading-relaxed text-[oklch(0.55_0.06_300)]">
+            <p className="mt-2 neko-text-micro text-[oklch(0.55_0.06_300)]">
               输入邮箱，我们会给你发送 6 位验证码。
             </p>
           </div>
@@ -223,7 +223,7 @@ export function AuthLoginScreen() {
             className="mt-8 rounded-[28px] bg-white/85 p-4 backdrop-blur"
             style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.72)" }}
           >
-            <label className="text-[10px] tracking-[0.32em] text-[oklch(0.55_0.06_300)]">
+            <label className="neko-text-tiny text-[oklch(0.55_0.06_300)]">
               邮箱
             </label>
             <input
@@ -233,12 +233,12 @@ export function AuthLoginScreen() {
               inputMode="email"
               autoComplete="email"
               placeholder="you@example.com"
-              className="mt-2 block w-full rounded-2xl bg-[oklch(0.98_0.012_320)] px-4 py-3 text-[14px] text-foreground outline-none focus:ring-2 focus:ring-[oklch(0.85_0.08_320_/_0.5)]"
+              className="mt-2 block w-full rounded-2xl bg-[oklch(0.98_0.012_320)] px-4 py-3 neko-text-support text-foreground outline-none focus:ring-2 focus:ring-[oklch(0.85_0.08_320_/_0.5)]"
             />
             <button
               disabled={busy !== null || cooldown > 0}
               onClick={sendCode}
-              className="mt-3 w-full rounded-full px-5 py-3 text-[13px] font-medium text-white disabled:opacity-60"
+              className="mt-3 w-full rounded-full px-5 py-3 neko-text-button text-white disabled:opacity-60"
               style={{ background: "var(--gradient-cta)" }}
             >
               {busy === "send"
@@ -252,7 +252,7 @@ export function AuthLoginScreen() {
 
             {sentEmail && (
               <div className="mt-5">
-                <label className="text-[10px] tracking-[0.32em] text-[oklch(0.55_0.06_300)]">
+                <label className="neko-text-tiny text-[oklch(0.55_0.06_300)]">
                   6 位验证码
                 </label>
                 <input
@@ -265,26 +265,26 @@ export function AuthLoginScreen() {
                   inputMode="numeric"
                   autoComplete="one-time-code"
                   placeholder="123456"
-                  className="mt-2 block w-full rounded-2xl bg-[oklch(0.98_0.012_320)] px-4 py-3 text-center text-[22px] tracking-[0.28em] text-foreground outline-none focus:ring-2 focus:ring-[oklch(0.85_0.08_320_/_0.5)]"
+                  className="mt-2 block w-full rounded-2xl bg-[oklch(0.98_0.012_320)] px-4 py-3 text-center neko-text-module-title text-foreground outline-none focus:ring-2 focus:ring-[oklch(0.85_0.08_320_/_0.5)]"
                 />
                 <button
                   disabled={busy !== null || code.length !== 6}
                   onClick={verifyCode}
-                  className="mt-3 w-full rounded-full px-5 py-3 text-[13px] font-medium text-white disabled:opacity-60"
+                  className="mt-3 w-full rounded-full px-5 py-3 neko-text-button text-white disabled:opacity-60"
                   style={{
                     background: "linear-gradient(135deg, oklch(0.70 0.14 305), oklch(0.76 0.11 0))",
                   }}
                 >
                   {busy === "verify" ? "验证中…" : "完成登录"}
                 </button>
-                <p className="mt-3 text-center text-[11px] leading-relaxed text-[oklch(0.58_0.05_300)]">
+                <p className="mt-3 text-center neko-text-tiny text-[oklch(0.58_0.05_300)]">
                   验证码已发送至 {sentEmail}。如果看不到，先检查垃圾邮件。
                 </p>
               </div>
             )}
           </div>
 
-          <div className="mt-5 rounded-[22px] bg-white/60 p-4 text-[11.5px] leading-relaxed text-[oklch(0.55_0.06_300)] backdrop-blur">
+          <div className="mt-5 rounded-[22px] bg-white/60 p-4 neko-text-tiny text-[oklch(0.55_0.06_300)] backdrop-blur">
             邮箱会作为账号唯一标识。登录后，你的猫咪档案、人格和心声会通过 RLS 只绑定到当前用户。
           </div>
         </div>
@@ -339,7 +339,7 @@ export function AccountScreen() {
     return (
       <ScreenShell>
         <StatusBar />
-        <div className="absolute inset-0 flex items-center justify-center text-[13px] text-[oklch(0.55_0.06_300)]">
+        <div className="absolute inset-0 flex items-center justify-center neko-text-caption text-[oklch(0.55_0.06_300)]">
           正在读取账号信息…
         </div>
       </ScreenShell>
@@ -355,13 +355,13 @@ export function AccountScreen() {
             className="w-full rounded-[28px] bg-white/85 p-5 text-center backdrop-blur"
             style={{ boxShadow: "var(--shadow-soft)" }}
           >
-            <div className="text-[18px] font-medium text-foreground">需要先登录</div>
-            <p className="mt-2 text-[12px] leading-relaxed text-[oklch(0.55_0.06_300)]">
+            <div className="neko-text-card-title text-foreground">需要先登录</div>
+            <p className="mt-2 neko-text-micro text-[oklch(0.55_0.06_300)]">
               登录后才能管理账号数据。
             </p>
             <Link
               to="/auth/login"
-              className="mt-5 inline-flex rounded-full px-5 py-2.5 text-[12px] font-medium text-white"
+              className="mt-5 inline-flex rounded-full px-5 py-2.5 neko-text-button text-white"
               style={{ background: "var(--gradient-cta)" }}
             >
               去邮箱登录
@@ -384,7 +384,7 @@ export function AccountScreen() {
           >
             ‹
           </button>
-          <div className="text-[13px] font-medium text-foreground">账号与数据</div>
+          <div className="neko-text-caption text-foreground">账号与数据</div>
           <div className="h-9 w-9" />
         </div>
 
@@ -399,10 +399,10 @@ export function AccountScreen() {
           <div className="flex items-center gap-4">
             <CatAvatar size={68} usePhoto />
             <div className="min-w-0 flex-1">
-              <div className="truncate text-[17px] font-medium text-foreground">
+              <div className="truncate neko-text-button text-foreground">
                 {accountDisplayName}
               </div>
-              <div className="mt-1 truncate text-[11px] text-[oklch(0.55_0.06_300)]">
+              <div className="mt-1 truncate neko-text-tiny text-[oklch(0.55_0.06_300)]">
                 {auth.user.email}
               </div>
             </div>
@@ -417,12 +417,12 @@ export function AccountScreen() {
           className="mt-4 rounded-[22px] bg-white/80 p-4 backdrop-blur"
           style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}
         >
-          <label className="text-[10px] tracking-[0.32em] text-[oklch(0.55_0.06_300)]">昵称</label>
+          <label className="neko-text-tiny text-[oklch(0.55_0.06_300)]">昵称</label>
           <input
             value={displayName}
             onChange={(event) => setDisplayName(event.target.value.slice(0, 40))}
             placeholder={accountDisplayPlaceholder}
-            className="mt-2 block w-full rounded-2xl bg-[oklch(0.98_0.012_320)] px-4 py-3 text-[13px] text-foreground outline-none focus:ring-2 focus:ring-[oklch(0.85_0.08_320_/_0.5)]"
+            className="mt-2 block w-full rounded-2xl bg-[oklch(0.98_0.012_320)] px-4 py-3 neko-text-caption text-foreground outline-none focus:ring-2 focus:ring-[oklch(0.85_0.08_320_/_0.5)]"
           />
           <button
             disabled={busy === "saveName"}
@@ -434,7 +434,7 @@ export function AccountScreen() {
                 toast.success("昵称已更新");
               })
             }
-            className="mt-3 w-full rounded-full px-5 py-3 text-[12.5px] font-medium text-white disabled:opacity-60"
+            className="mt-3 w-full rounded-full px-5 py-3 neko-text-button text-white disabled:opacity-60"
             style={{ background: "var(--gradient-cta)" }}
           >
             {busy === "saveName" ? "保存中…" : "保存昵称"}
@@ -445,8 +445,8 @@ export function AccountScreen() {
           className="mt-4 rounded-[22px] bg-white/80 p-4 backdrop-blur"
           style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}
         >
-          <div className="text-[10px] tracking-[0.32em] text-[oklch(0.55_0.06_300)]">自动同步</div>
-          <p className="mt-2 text-[11.5px] leading-relaxed text-foreground/75">
+          <div className="neko-text-tiny text-[oklch(0.55_0.06_300)]">自动同步</div>
+          <p className="mt-2 neko-text-tiny text-foreground/75">
             登录后，猫咪档案、人格和心声会自动绑定到当前账号。换设备登录时，会优先读取账号里的历史档案。
           </p>
         </div>
@@ -460,7 +460,7 @@ export function AccountScreen() {
               await navigate({ to: "/app/me", replace: true });
             })
           }
-          className="mt-5 w-full rounded-full bg-white/85 px-5 py-3.5 text-[13px] text-[oklch(0.55_0.06_300)] disabled:opacity-60"
+          className="mt-5 w-full rounded-full bg-white/85 px-5 py-3.5 neko-text-button text-[oklch(0.55_0.06_300)] disabled:opacity-60"
           style={{ boxShadow: "var(--shadow-soft)" }}
         >
           退出登录
@@ -473,8 +473,8 @@ export function AccountScreen() {
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-[18px] bg-white/70 px-3 py-3 text-center">
-      <div className="text-[18px] font-medium text-foreground">{value}</div>
-      <div className="mt-0.5 text-[10px] tracking-[0.2em] text-[oklch(0.55_0.06_300)]">{label}</div>
+      <div className="neko-text-card-title text-foreground">{value}</div>
+      <div className="mt-0.5 neko-text-tiny text-[oklch(0.55_0.06_300)]">{label}</div>
     </div>
   );
 }

@@ -15,7 +15,7 @@ export function ScreenGenerating() {
       style={{ background: "linear-gradient(180deg, oklch(0.97 0.025 320) 0%, oklch(0.95 0.04 0) 55%, oklch(0.96 0.03 260) 100%)" }}>
       <Sparkles count={32} />
 
-      <div className="relative z-10 mt-3 text-[10px] tracking-[0.45em] text-[oklch(0.55_0.08_320)]">
+      <div className="relative z-10 mt-3 neko-text-tiny text-[oklch(0.55_0.08_320)]">
         AWAKENING · 03 / 05
       </div>
 
@@ -40,27 +40,27 @@ export function ScreenGenerating() {
       </div>
 
       <div className="relative z-10 mt-8 text-center">
-        <div className="text-[10px] tracking-[0.4em] text-[oklch(0.55_0.07_320)]">SOUL · 糯米团</div>
-        <div className="mt-2 text-[20px] font-light text-foreground">正在唤醒一个灵魂</div>
+        <div className="neko-text-tiny text-[oklch(0.55_0.07_320)]">SOUL · 糯米团</div>
+        <div className="mt-2 neko-text-module-title text-foreground">正在唤醒一个灵魂</div>
       </div>
 
       {/* steps */}
       <div className="relative z-10 mt-6 w-full px-7">
         <div className="space-y-2.5">
           {steps.map((s, i) => (
-            <div key={i} className="flex items-center gap-3 rounded-2xl bg-white/55 px-4 py-2.5 backdrop-blur text-[12px]">
+            <div key={i} className="flex items-center gap-3 rounded-2xl bg-white/55 px-4 py-2.5 backdrop-blur neko-text-micro">
               <span className={
                 s.done ? "h-2 w-2 rounded-full bg-[oklch(0.78_0.11_305)]" :
                 s.active ? "h-2 w-2 rounded-full bg-[oklch(0.84_0.09_0)] animate-pulse-soft" :
                 "h-2 w-2 rounded-full bg-[oklch(0.9_0.02_300)]"
               } />
               <span className={s.done || s.active ? "text-foreground" : "text-[oklch(0.65_0.04_300)]"}>{s.label}</span>
-              {s.active && <span className="ml-auto text-[10px] tracking-[0.3em] text-[oklch(0.6_0.1_320)]">62%</span>}
-              {s.done && <span className="ml-auto text-[10px] tracking-[0.3em] text-[oklch(0.55_0.06_300)]">✓</span>}
+              {s.active && <span className="ml-auto neko-text-tiny text-[oklch(0.6_0.1_320)]">62%</span>}
+              {s.done && <span className="ml-auto neko-text-tiny text-[oklch(0.55_0.06_300)]">✓</span>}
             </div>
           ))}
         </div>
-        <p className="mt-5 text-center text-[11px] leading-relaxed text-[oklch(0.55_0.05_300)]">
+        <p className="mt-5 text-center neko-text-tiny text-[oklch(0.55_0.05_300)]">
           请保持安静 ·<br />一个数字灵魂正在被温柔地唤醒
         </p>
       </div>

@@ -177,8 +177,8 @@ export function Screen3Video({
           </div>
         </div>
         <div className="relative z-10 px-7">
-          <h1 className="text-[22px] font-light leading-tight text-foreground">上传猫咪视频</h1>
-          <p className="mt-1.5 text-[12px] text-[oklch(0.58_0.04_300)]">
+          <h1 className="neko-text-module-title text-foreground">上传猫咪视频</h1>
+          <p className="mt-1.5 neko-text-micro text-[oklch(0.58_0.04_300)]">
             上传 1～3 个视频展示猫咪日常，单个不超过 {NEKO_MAX_ONBOARDING_VIDEO_LABEL}
           </p>
         </div>
@@ -192,17 +192,17 @@ export function Screen3Video({
             <div className="pointer-events-none absolute -left-10 -top-10 h-40 w-40 rounded-full bg-[oklch(0.9_0.08_320/0.45)] blur-3xl animate-breathe" />
             <div className="pointer-events-none absolute -right-10 -bottom-10 h-40 w-40 rounded-full bg-[oklch(0.9_0.07_260/0.45)] blur-3xl animate-breathe" />
             <div
-              className="relative mx-auto mt-1 flex h-16 w-16 items-center justify-center rounded-full text-white text-[22px] shadow-[0_18px_40px_-16px_oklch(0.78_0.11_305/0.55)]"
+              className="relative mx-auto mt-1 flex h-16 w-16 items-center justify-center rounded-full text-white neko-text-module-title shadow-[0_18px_40px_-16px_oklch(0.78_0.11_305/0.55)]"
               style={{
                 background: "linear-gradient(135deg, oklch(0.82 0.1 320), oklch(0.84 0.08 0))",
               }}
             >
               ▶
             </div>
-            <div className="relative mt-3 text-[14px] font-medium text-foreground">
+            <div className="relative mt-3 neko-text-support text-foreground">
               轻触上传视频
             </div>
-            <div className="relative mt-1 text-[11px] text-[oklch(0.58_0.05_300)]">
+            <div className="relative mt-1 neko-text-tiny text-[oklch(0.58_0.05_300)]">
               每次 1 个 · 可添加 3 次 · ≤ {NEKO_MAX_ONBOARDING_VIDEO_LABEL}
             </div>
           </button>
@@ -210,11 +210,11 @@ export function Screen3Video({
         {clips.length > 0 && (
           <div ref={clipsRef} className="relative z-10 mt-4">
             <div className="mb-2 flex items-center justify-between px-6">
-              <div className="text-[10px] tracking-[0.4em] text-[oklch(0.55_0.06_300)]">
+              <div className="neko-text-tiny text-[oklch(0.55_0.06_300)]">
                 已上传 · {clips.length} / 3
               </div>
               {canAdd && (
-                <div className="text-[10px] text-[oklch(0.6_0.05_300)]">
+                <div className="neko-text-tiny text-[oklch(0.6_0.05_300)]">
                   可继续添加 {3 - clips.length} 个
                 </div>
               )}
@@ -237,13 +237,13 @@ export function Screen3Video({
           </div>
         )}
         <div className="relative z-10 mx-5 mt-5 rounded-[20px] glass p-4 select-none">
-          <div className="text-[10px] tracking-[0.4em] text-[oklch(0.55_0.06_300)]">建议捕捉</div>
+          <div className="neko-text-tiny text-[oklch(0.55_0.06_300)]">建议捕捉</div>
           <div className="mt-2.5 grid grid-cols-3 gap-2">
             <Tip emoji="🐾" label="走动" />
             <Tip emoji="🔊" label="叫声" />
             <Tip emoji="🎾" label="玩耍" />
           </div>
-          <div className="mt-2.5 flex items-center gap-2 rounded-xl bg-[oklch(0.97_0.025_320/0.8)] px-3 py-2 text-[10px] text-[oklch(0.5_0.06_300)]">
+          <div className="mt-2.5 flex items-center gap-2 rounded-xl bg-[oklch(0.97_0.025_320/0.8)] px-3 py-2 neko-text-tiny text-[oklch(0.5_0.06_300)]">
             <span>💡</span>
             <span>越自然的日常画面，AI 越能感受到它的性格</span>
           </div>
@@ -257,7 +257,7 @@ export function Screen3Video({
             e.preventDefault();
             if (!checking) handleContinue();
           }}
-          className="flex w-full touch-manipulation select-none items-center justify-center rounded-full px-6 py-4 text-[14px] font-medium text-white shadow-[0_16px_32px_-14px_oklch(0.78_0.11_305/0.55)] active:scale-[0.98] transition-transform duration-75 disabled:opacity-70"
+          className="flex w-full touch-manipulation select-none items-center justify-center rounded-full px-6 py-4 neko-text-button text-white shadow-[0_16px_32px_-14px_oklch(0.78_0.11_305/0.55)] active:scale-[0.98] transition-transform duration-75 disabled:opacity-70"
           style={{ background: "var(--gradient-cta)" }}
         >
           {checking ? "识别中…" : "继续"}
@@ -270,8 +270,8 @@ export function Screen3Video({
 function Tip({ emoji, label }: { emoji: string; label: string }) {
   return (
     <div className="flex flex-col items-center justify-center rounded-2xl bg-white/75 py-3 shadow-[0_4px_14px_-8px_oklch(0.78_0.11_305/0.3)]">
-      <span className="text-[20px]">{emoji}</span>
-      <span className="mt-1 text-[11px] text-[oklch(0.5_0.05_300)]">{label}</span>
+      <span className="neko-text-module-title">{emoji}</span>
+      <span className="mt-1 neko-text-tiny text-[oklch(0.5_0.05_300)]">{label}</span>
     </div>
   );
 }
@@ -321,35 +321,35 @@ function UploadedClip({
       {loading ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/10 backdrop-blur-[1px]">
           <span className="h-7 w-7 rounded-full border-2 border-white/55 border-t-white animate-spin" />
-          <span className="mt-2 rounded-full bg-white/85 px-2.5 py-1 text-[9px] font-medium text-[oklch(0.48_0.08_305)] shadow-[0_6px_14px_-8px_oklch(0_0_0/0.35)]">
+          <span className="mt-2 rounded-full bg-white/85 px-2.5 py-1 neko-text-tiny text-[oklch(0.48_0.08_305)] shadow-[0_6px_14px_-8px_oklch(0_0_0/0.35)]">
             {thumb ? "AI观察中" : "抽帧中"}
           </span>
         </div>
       ) : failed ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/20 text-white backdrop-blur-[1px]">
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/85 text-[16px] font-medium text-[oklch(0.5_0.1_320)]">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/85 neko-text-body text-[oklch(0.5_0.1_320)]">
             !
           </span>
-          <span className="mt-2 max-w-[80%] rounded-full bg-white/90 px-2.5 py-1 text-center text-[9px] font-medium text-[oklch(0.48_0.08_305)] shadow-[0_6px_14px_-8px_oklch(0_0_0/0.35)]">
+          <span className="mt-2 max-w-[80%] rounded-full bg-white/90 px-2.5 py-1 text-center neko-text-tiny text-[oklch(0.48_0.08_305)] shadow-[0_6px_14px_-8px_oklch(0_0_0/0.35)]">
             {error ?? "分析失败"}
           </span>
         </div>
       ) : (
-        <div className="absolute left-1/2 top-1/2 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-[10px] text-[oklch(0.5_0.1_320)] backdrop-blur">
+        <div className="absolute left-1/2 top-1/2 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 neko-text-tiny text-[oklch(0.5_0.1_320)] backdrop-blur">
           ▶
         </div>
       )}
-      <span className="absolute right-1.5 top-1.5 rounded-full bg-black/35 px-1.5 py-0.5 text-[9px] font-medium text-white backdrop-blur">
+      <span className="absolute right-1.5 top-1.5 rounded-full bg-black/35 px-1.5 py-0.5 neko-text-tiny text-white backdrop-blur">
         {badge}
       </span>
       <button
         aria-label="remove"
         onClick={onRemove}
-        className="absolute left-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-[12px] leading-none text-[oklch(0.4_0.05_300)] backdrop-blur shadow-[0_2px_8px_-2px_oklch(0_0_0/0.25)] active:scale-90 active:bg-white transition-all duration-150"
+        className="absolute left-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-white/90 neko-text-micro text-[oklch(0.4_0.05_300)] backdrop-blur shadow-[0_2px_8px_-2px_oklch(0_0_0/0.25)] active:scale-90 active:bg-white transition-all duration-150"
       >
         ×
       </button>
-      <div className="absolute inset-x-1.5 bottom-1.5 truncate text-center text-[10px] font-medium text-white drop-shadow">
+      <div className="absolute inset-x-1.5 bottom-1.5 truncate text-center neko-text-tiny text-white drop-shadow">
         {label}
       </div>
     </div>

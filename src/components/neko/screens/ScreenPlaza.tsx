@@ -16,16 +16,16 @@ export function ScreenPlaza() {
 
       <div className="relative z-10 flex items-center justify-between px-6">
         <div>
-          <div className="text-[10px] tracking-[0.4em] text-[oklch(0.6_0.08_320)]">SOUL PLAZA</div>
-          <div className="mt-1 text-[22px] font-light">人格宇宙 <span className="text-[14px]">·</span> <span className="text-[14px] text-[oklch(0.55_0.05_300)]">广场</span></div>
+          <div className="neko-text-tiny text-[oklch(0.6_0.08_320)]">SOUL PLAZA</div>
+          <div className="mt-1 neko-text-module-title">人格宇宙 <span className="neko-text-support">·</span> <span className="neko-text-support text-[oklch(0.55_0.05_300)]">广场</span></div>
         </div>
-        <div className="grid h-9 w-9 place-items-center rounded-full bg-white/85 text-[13px] shadow-[0_4px_12px_-4px_oklch(0.78_0.11_305/0.3)]">⌕</div>
+        <div className="grid h-9 w-9 place-items-center rounded-full bg-white/85 neko-text-caption shadow-[0_4px_12px_-4px_oklch(0.78_0.11_305/0.3)]">⌕</div>
       </div>
 
-      <div className="relative z-10 mt-4 flex gap-5 px-6 text-[13px]">
+      <div className="relative z-10 mt-4 flex gap-5 px-6 neko-text-caption">
         {tabs.map((t, i) => (
           <span key={t} className={
-            "relative pb-2 " + (i === 0 ? "font-medium text-foreground" : "text-[oklch(0.6_0.04_300)]")
+            "relative pb-2 " + (i === 0 ? "text-foreground" : "text-[oklch(0.6_0.04_300)]")
           }>
             {t}
             {i === 0 && (
@@ -38,8 +38,8 @@ export function ScreenPlaza() {
 
       {/* trending row */}
       <div className="relative z-10 mt-4 px-6 flex items-center justify-between">
-        <span className="text-[10px] tracking-[0.4em] text-[oklch(0.55_0.08_320)]">✦ 今日热门灵魂</span>
-        <span className="text-[10px] tracking-[0.2em] text-[oklch(0.58_0.04_300)]">查看全部</span>
+        <span className="neko-text-tiny text-[oklch(0.55_0.08_320)]">✦ 今日热门灵魂</span>
+        <span className="neko-text-tiny text-[oklch(0.58_0.04_300)]">查看全部</span>
       </div>
       <div className="relative z-10 mt-3 flex gap-3 overflow-x-auto px-6 pb-1 scrollbar-none">
         {[hero, magic, noble, pink, cyber, mafia].map((img, i) => (
@@ -50,7 +50,7 @@ export function ScreenPlaza() {
                 <img src={img} alt="" className="h-full w-full rounded-full object-cover" loading="lazy" width={768} height={1024} />
               </div>
             </div>
-            <div className="mt-1.5 text-center text-[9px] text-[oklch(0.55_0.05_300)]">@soul0{i + 1}</div>
+            <div className="mt-1.5 text-center neko-text-tiny text-[oklch(0.55_0.05_300)]">@soul0{i + 1}</div>
           </div>
         ))}
       </div>
@@ -73,7 +73,7 @@ export function ScreenPlaza() {
           { l: "宇宙" },
           { l: "广场", a: true },
         ].map((t) => (
-          <span key={t.l} className={"text-[11px] tracking-[0.2em] " + (t.a ? "rounded-full px-4 py-1.5 text-white" : "text-[oklch(0.6_0.04_300)]")} style={t.a ? { background: "var(--gradient-selected)" } : undefined}>{t.l}</span>
+          <span key={t.l} className={"neko-text-tiny " + (t.a ? "rounded-full px-4 py-1.5 text-white" : "text-[oklch(0.6_0.04_300)]")} style={t.a ? { background: "var(--gradient-selected)" } : undefined}>{t.l}</span>
         ))}
       </div>
     </div>
@@ -85,15 +85,15 @@ function FeedCard({ img, title, sub, quote, likes, tall, mbti }: { img: string; 
     <div className="mb-3 break-inside-avoid overflow-hidden rounded-[22px] bg-white shadow-[0_10px_24px_-14px_oklch(0.78_0.11_305/0.3)]">
       <div className={"relative w-full " + (tall ? "h-[200px]" : "h-[140px]")}>
         <img src={img} alt="" className="h-full w-full object-cover" loading="lazy" width={768} height={1024} />
-        <span className="absolute left-2 top-2 rounded-full bg-white/85 px-2 py-0.5 text-[8px] tracking-[0.3em] text-[oklch(0.55_0.1_320)] backdrop-blur">
+        <span className="absolute left-2 top-2 rounded-full bg-white/85 px-2 py-0.5 neko-text-badge text-[oklch(0.55_0.1_320)] backdrop-blur">
           ✦ {mbti}
         </span>
       </div>
       <div className="p-3">
-        <div className="text-[12px] font-medium text-foreground">{title}</div>
-        <div className="mt-0.5 text-[9px] tracking-[0.25em] text-[oklch(0.6_0.1_320)]">{sub}</div>
-        <div className="mt-1.5 text-[11px] leading-snug text-[oklch(0.45_0.05_300)]">{quote}</div>
-        <div className="mt-2 flex items-center justify-between text-[10px] text-[oklch(0.6_0.04_300)]">
+        <div className="neko-text-micro text-foreground">{title}</div>
+        <div className="mt-0.5 neko-text-tiny text-[oklch(0.6_0.1_320)]">{sub}</div>
+        <div className="mt-1.5 neko-text-tiny text-[oklch(0.45_0.05_300)]">{quote}</div>
+        <div className="mt-2 flex items-center justify-between neko-text-tiny text-[oklch(0.6_0.04_300)]">
           <span>♡ {likes}</span>
           <span className="text-[oklch(0.65_0.1_320)]">+ 关注</span>
         </div>

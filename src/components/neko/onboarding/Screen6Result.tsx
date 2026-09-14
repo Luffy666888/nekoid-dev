@@ -11,11 +11,9 @@ import { persistCatResult, useCatPersona, useCatProfile } from "../catProfileSto
 import { voicesStore } from "../app/voicesStore";
 import { saveLocalNekoToCloud } from "@/lib/neko-cloud";
 import { getPhotoDraft } from "./onboardingDraftStore";
+import { nekoText, nekoTitleForLength } from "../typography";
 
 const KEYWORDS = ["先观察再靠近", "喜欢待在附近", "边界感强", "会用眼神表达"];
-const TITLE_FONT = '"Songti SC", "Songti SC Bold", "STSong", "Noto Serif CJK SC", serif';
-const EDITORIAL_FONT = '"Didot", "Bodoni 72", "Baskerville", "Times New Roman", serif';
-const UI_FONT = '"PingFang SC", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif';
 
 export function Screen6Result({
   onRestart,
@@ -47,7 +45,7 @@ export function Screen6Result({
   const personaMbti = persona?.mbti ?? "ISFJ-A";
   const personaKeywords = buildPersonaKeywords(persona?.tags);
   const titleLines = useMemo(() => splitPersonaTitle(personaType), [personaType]);
-  const titleSize = personaTitleSize(personaType);
+  const titleClass = nekoTitleForLength(personaType);
   const heroImagePosition = useHeroImagePosition(avatarSrc);
   const goBack = onBack ?? onPrev;
   const heroDescription = shortenCopy(
@@ -143,7 +141,6 @@ export function Screen6Result({
       ref={cardRef}
       className="absolute inset-0 overflow-y-auto scrollbar-none"
       style={{
-        fontFamily: UI_FONT,
         background:
           "linear-gradient(180deg, oklch(0.985 0.012 82) 0%, oklch(0.978 0.022 320) 54%, oklch(0.965 0.026 292) 100%)",
       }}
@@ -205,16 +202,15 @@ export function Screen6Result({
           />
 
           <div
-            className="absolute left-6 top-[calc(env(safe-area-inset-top,0px)+92px)] z-20 text-[#5F5674]/78"
-            style={{ fontFamily: EDITORIAL_FONT }}
+            className={`absolute left-6 top-[calc(env(safe-area-inset-top,0px)+92px)] z-20 ${nekoText.personaEditorial} text-[#5F5674]/78`}
           >
-            <div className="text-[24px] font-medium leading-[1.02] tracking-[0.02em]">
+            <div className={nekoText.personaEditorial}>
               CAT
               <br />
               PROFILE
             </div>
             <div className="mt-4 h-px w-8 bg-[#786C91]/55" />
-            <div className="mt-4 max-w-[94px] text-[13px] font-medium leading-[1.15] tracking-[0.02em]">
+            <div className={`mt-4 max-w-[94px] ${nekoText.personaEditorialSmall}`}>
               A Kinder
               <br />
               World
@@ -225,17 +221,15 @@ export function Screen6Result({
 
           <div className="absolute bottom-6 left-6 right-6 z-20 max-w-[360px]">
             <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 text-[#2E2741]">
-              <span className="text-[21px] font-semibold leading-none">{catName}</span>
-              <span className="text-[17px] font-medium leading-none tracking-[0.03em]">
+              <span className="neko-text-module-title">{catName}</span>
+              <span className="neko-text-badge">
                 {personaMbti}
               </span>
             </div>
             <div className="mt-4 h-px w-8 bg-[#75668E]/60" />
             <h1
-              className="mt-3 font-semibold leading-[1.08] text-[#2E225D]"
+              className={`mt-3 ${titleClass} text-[#2E225D]`}
               style={{
-                fontFamily: TITLE_FONT,
-                fontSize: titleSize,
                 textShadow: "0 1px 16px rgb(255 255 255 / 0.72)",
               }}
             >
@@ -245,14 +239,14 @@ export function Screen6Result({
                 </span>
               ))}
             </h1>
-            <p className="mt-4 max-w-[330px] text-[16px] font-normal leading-[25px] text-[#5A5370]">
+            <p className="mt-4 max-w-[330px] neko-text-body text-[#5A5370]">
               {heroDescription}
             </p>
             <div className="mt-5 flex max-w-[340px] flex-wrap gap-x-[11px] gap-y-[10px]">
               {personaKeywords.map((k) => (
                 <span
                   key={k}
-                  className="flex min-h-8 items-center justify-center rounded-full bg-white/78 px-3 text-center text-[14px] font-medium leading-[18px] text-[#7259B5] shadow-[0_12px_26px_-22px_rgba(93,64,139,0.65)] backdrop-blur-md"
+                  className="flex min-h-8 items-center justify-center rounded-full bg-white/78 px-3 text-center neko-text-badge text-[#7259B5] shadow-[0_12px_26px_-22px_rgba(93,64,139,0.65)] backdrop-blur-md"
                 >
                   {k}
                 </span>
@@ -264,10 +258,10 @@ export function Screen6Result({
 
       <section className="relative z-10 px-5 pt-7">
         <h2 className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span className="text-[22px] font-semibold leading-tight text-[#2D2540]">
+          <span className="neko-text-module-title text-[#2D2540]">
             原来{catName}是这样的猫
           </span>
-          <span className="text-[12px] font-medium tracking-[0.28em] text-[#A69AB7]">
+          <span className="neko-text-micro text-[#A69AB7]">
             CAT · INSIGHT
           </span>
         </h2>
@@ -280,14 +274,14 @@ export function Screen6Result({
                 border: "1px solid rgb(255 255 255 / 0.78)",
               }}
             >
-              <span className="mt-[2px] shrink-0 text-[16px] font-semibold leading-[24px] tracking-[0.12em] text-[#B197E0]">
+              <span className="mt-[2px] shrink-0 neko-text-body text-[#B197E0]">
                 {it.index}
               </span>
               <div className="min-w-0">
-                <h3 className="text-[19px] font-semibold leading-[25px] text-[#2F2942]">
+                <h3 className="neko-text-card-title text-[#2F2942]">
                   {it.title}
                 </h3>
-                <p className="mt-2.5 text-[16px] leading-[26px] text-[#6C647C]">{it.text}</p>
+                <p className="mt-2.5 neko-text-body text-[#6C647C]">{it.text}</p>
               </div>
             </article>
           ))}
@@ -308,17 +302,17 @@ export function Screen6Result({
           <button
             type="button"
             onClick={() => setDebugOpen(true)}
-            className="mb-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-full bg-[#211832]/88 px-4 text-[13px] font-semibold text-white shadow-[0_14px_30px_-18px_rgba(33,24,50,0.7)] active:scale-[0.98]"
+            className="mb-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-full bg-[#211832]/88 px-4 neko-text-button text-white shadow-[0_14px_30px_-18px_rgba(33,24,50,0.7)] active:scale-[0.98]"
           >
             <Bug className="h-4 w-4" strokeWidth={2.2} />
             Debug Persona
           </button>
         )}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2.5">
           <button
             type="button"
             onClick={() => onRestart?.()}
-            className="min-h-[52px] touch-manipulation rounded-full bg-white/82 px-4 text-[17px] font-semibold text-[#7459B5] transition-transform duration-75 active:scale-[0.98]"
+            className="flex min-h-[52px] w-full min-w-0 touch-manipulation items-center justify-center whitespace-nowrap rounded-full bg-white/82 px-3 neko-text-button text-[#7459B5] transition-transform duration-75 active:scale-[0.98]"
             style={{
               border: "1.5px solid #C5A6F0",
               boxShadow: "0 12px 24px -20px rgba(93, 64, 139, 0.48)",
@@ -329,7 +323,7 @@ export function Screen6Result({
           <button
             type="button"
             onClick={handleSave}
-            className="flex min-h-[52px] touch-manipulation items-center justify-center rounded-full px-4 text-[17px] font-semibold text-white transition-transform duration-75 active:scale-[0.98]"
+            className="flex min-h-[52px] w-full min-w-0 touch-manipulation items-center justify-center whitespace-nowrap rounded-full px-3 neko-text-button text-white transition-transform duration-75 active:scale-[0.98]"
             style={{
               background: "linear-gradient(90deg, #AA8BE8 0%, #E9ABC9 100%)",
               boxShadow: "0 16px 30px -16px rgba(148, 100, 203, 0.58)",
@@ -398,13 +392,6 @@ function splitPersonaTitle(title: string) {
 function buildPersonaKeywords(tags: string[] | undefined) {
   const merged = [...(tags ?? []), ...KEYWORDS].map(normalizePersonaTag).filter(Boolean);
   return Array.from(new Set(merged)).slice(0, 4);
-}
-
-function personaTitleSize(title: string) {
-  const length = Array.from(title).length;
-  if (length <= 6) return "42px";
-  if (length <= 10) return "38px";
-  return "34px";
 }
 
 const titleReplacements: Record<string, string> = {
@@ -525,10 +512,10 @@ function PersonaDebugPanel({
       <div className="mx-auto flex h-full max-w-[460px] flex-col overflow-hidden rounded-[22px] bg-[#fbf8ff] shadow-[0_24px_70px_-34px_rgba(25,18,37,0.8)]">
         <div className="flex min-h-[58px] items-center justify-between border-b border-[#E7DDF4] px-4">
           <div>
-            <div className="text-[12px] font-semibold tracking-[0.18em] text-[#7B63B5]">
+            <div className="neko-text-micro text-[#7B63B5]">
               PERSONA DEBUG
             </div>
-            <div className="mt-0.5 text-[11px] text-[#7A7188]">
+            <div className="mt-0.5 neko-text-tiny text-[#7A7188]">
               {generation.generationId} · {generation.inputHash}
             </div>
           </div>
@@ -548,8 +535,8 @@ function PersonaDebugPanel({
                 key={title}
                 className="rounded-[14px] border border-[#E9DFF5] bg-white/78 p-3"
               >
-                <h3 className="text-[12px] font-semibold text-[#342C48]">{title}</h3>
-                <pre className="mt-2 max-h-[260px] overflow-auto whitespace-pre-wrap break-words rounded-[10px] bg-[#201832] p-3 text-[11px] leading-[1.55] text-[#F6EFFA]">
+                <h3 className="neko-text-micro text-[#342C48]">{title}</h3>
+                <pre className="mt-2 max-h-[260px] overflow-auto whitespace-pre-wrap break-words rounded-[10px] bg-[#201832] p-3 neko-text-tiny text-[#F6EFFA]">
                   {JSON.stringify(value ?? null, null, 2)}
                 </pre>
               </section>
@@ -608,7 +595,7 @@ function ShareSheet({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mx-auto h-1 w-10 rounded-full bg-[oklch(0.9_0.03_320)]" />
-        <div className="mt-4 text-center text-[15px] font-medium text-foreground">
+        <div className="mt-4 text-center neko-text-support text-foreground">
           分享我的猫人格
         </div>
         <div className="mt-5 grid grid-cols-3 gap-2">
@@ -621,19 +608,19 @@ function ShareSheet({
               className="flex flex-col items-center gap-2 rounded-2xl py-3 transition-transform duration-75 active:scale-95 disabled:opacity-60"
             >
               <span
-                className="flex h-12 w-12 items-center justify-center rounded-full text-[22px] text-white shadow-[0_10px_22px_-10px_oklch(0.4_0.1_305/0.45)]"
+                className="flex h-12 w-12 items-center justify-center rounded-full neko-text-module-title text-white shadow-[0_10px_22px_-10px_oklch(0.4_0.1_305/0.45)]"
                 style={{ background: it.bg }}
               >
                 {it.emoji}
               </span>
-              <span className="text-[13px] text-foreground/80">{it.label}</span>
+              <span className="neko-text-button text-foreground/80">{it.label}</span>
             </button>
           ))}
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="mt-5 w-full rounded-full bg-[oklch(0.96_0.02_320)] py-3.5 text-[15px] font-medium text-[oklch(0.45_0.08_305)] active:scale-[0.99] transition-transform duration-75"
+          className="mt-5 w-full rounded-full bg-[oklch(0.96_0.02_320)] py-3.5 neko-text-button text-[oklch(0.45_0.08_305)] active:scale-[0.99] transition-transform duration-75"
         >
           取消
         </button>
