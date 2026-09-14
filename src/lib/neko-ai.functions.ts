@@ -732,14 +732,39 @@ const genericPersonaTypePatterns = [
   /^(?:温柔|安静|优雅|梦幻|治愈)(?:观察家|守护者|陪伴者|探索家)$/,
 ];
 
+const forbiddenPersonaLanguage = [
+  /[\u4e00-\u9fff]{1,8}(?:控|王|机)$/,
+  /营业/,
+  /控场/,
+  /发令/,
+  /施压/,
+  /稳态/,
+  /高质互动/,
+  /策略性靠近/,
+];
+
+function usesForbiddenPersonaLanguage(value: unknown) {
+  if (typeof value !== "string") return true;
+  const text = value.trim();
+  return !text || forbiddenPersonaLanguage.some((pattern) => pattern.test(text));
+}
+
+function isNaturalPersonaTag(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const tag = value.replace(/^#+/, "").trim();
+  const length = Array.from(tag).length;
+  return length >= 4 && length <= 8 && !usesForbiddenPersonaLanguage(tag);
+}
+
 function isSpecificPersonaType(value: unknown): value is string {
   if (typeof value !== "string") return false;
   const type = cleanLabelText(simplifyNekoCopy(value));
   const length = charLength(type);
   return (
     length >= 4 &&
-    length <= 10 &&
+    length <= 14 &&
     !hasJargonLabel(type) &&
+    !usesForbiddenPersonaLanguage(type) &&
     !genericPersonaTypePatterns.some((pattern) => pattern.test(type))
   );
 }
@@ -783,7 +808,7 @@ function buildStablePersona(profile: CatProfile): CatPersona {
       type: "先冲再研究",
       mbti: "ENFP-A",
       mood: "今天也想探索新角落",
-      tags: ["看到新东西想去看", "喜欢找你玩", "累了会撒娇", "边玩边观察"],
+      tags: ["主动探索", "喜欢追着玩", "需要多陪玩", "累了就靠近"],
       traits: [
         { label: "粘人度", value: 82 },
         { label: "探索欲", value: 90 },
@@ -795,7 +820,7 @@ function buildStablePersona(profile: CatProfile): CatPersona {
       type: "先看再行动",
       mbti: "INFP-A",
       mood: "安静又温暖，适合窝在你身边",
-      tags: ["先观察再靠近", "喜欢待在附近", "熟了会更黏", "有自己的边界"],
+      tags: ["先观察再靠近", "喜欢自己决定", "熟了会更黏", "边界感强"],
       traits: [
         { label: "粘人度", value: 72 },
         { label: "独立性", value: 84 },
@@ -804,10 +829,10 @@ function buildStablePersona(profile: CatProfile): CatPersona {
       ],
     },
     成熟猫: {
-      type: "有主意陪伴派",
+      type: "安静陪伴型",
       mbti: "ISFJ-A",
       mood: "今天想安稳地陪你一会",
-      tags: ["喜欢安静陪你", "不急着要抱", "会看你的反应", "熟人面前放松"],
+      tags: ["喜欢待在附近", "不爱强抱", "会用眼神表达", "亲近有分寸"],
       traits: [
         { label: "粘人度", value: 76 },
         { label: "观察欲", value: 82 },
@@ -816,10 +841,10 @@ function buildStablePersona(profile: CatProfile): CatPersona {
       ],
     },
     资深猫: {
-      type: "慢慢巡视派",
+      type: "慢节奏陪伴型",
       mbti: "INFJ-A",
       mood: "慢慢看着你，就是它的温柔",
-      tags: ["慢慢走过来看", "喜欢固定位置", "安静等你回应", "不爱被催着动"],
+      tags: ["喜欢熟悉位置", "慢慢靠近", "不爱被催", "安静待在身边"],
       traits: [
         { label: "粘人度", value: 70 },
         { label: "观察欲", value: 86 },
