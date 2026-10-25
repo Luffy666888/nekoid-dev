@@ -248,6 +248,13 @@ type PersonaPipelineDebug = NonNullable<CatPersona["generation"]>;
 
 type AIProvider = "openai" | "qwen" | "deepseek" | "bytecat";
 
+type AIValidationContext = {
+  provider: AIProvider;
+  model: string;
+  attempt: number;
+  durationMs: number;
+};
+
 let workerEnv: Record<string, string | undefined> | null = null;
 let envFileCache: Record<string, string> | null | undefined;
 
@@ -2211,23 +2218,6 @@ function sentenceCount(value: string) {
     .filter(Boolean).length;
 }
 
-function intentHasVisibleSupport(intent: VoiceCurrentIntent, observations: string[]) {
-  const joined = observations.join("；");
-  const evidenceTerms: Record<VoiceCurrentIntent, RegExp> = {
-    想靠近: /靠近|走向|贴近|蹭|伸向|面向/,
-    想观察: /看|盯|注视|视线|停留|观察|镜头/,
-    想玩: /玩具|球|羽毛|逗猫棒|追|扑|抓|拍/,
-    想抓: /抓|扑|伸爪|玩具|球|羽毛|逗猫棒/,
-    想等待: /停留|没有动作|没有扑|坐着|趴着|等待|静止/,
-    想让主人参与: /主人|人手|互动|看向人|靠近人|玩具/,
-    想自己处理: /独自|自己|没有靠近人|单独|玩具|物体/,
-    想保持距离: /躲|后退|远离|距离|缩起|回避|转开|挣脱|避开/,
-    想休息: /睡|闭眼|趴着|躺着|蜷缩|放松/,
-    想获得关注: /看向人|看向主人|看镜头|叫|蹭|靠近人|靠近主人|抬头/,
-  };
-  return evidenceTerms[intent].test(joined);
-}
-
 function voiceStyleConflictsWithPersona(
   voiceLine: string,
   intent: VoiceCurrentIntent,
@@ -2257,32 +2247,74 @@ function voiceStyleConflictsWithPersona(
   return false;
 }
 
-function validateVoiceGenerationOutput(parsed: VoiceGenerationOutput, persona: CatPersona | null) {
+function inspectVoiceGenerationOutput(parsed: VoiceGenerationOutput, persona: CatPersona | null) {
   const observations = normalizeVisibleObservations(parsed.visibleObservations);
   const currentIntent = asText(parsed.currentIntent) as VoiceCurrentIntent;
   const voiceLine = asText(parsed.voiceLine);
   const personaTitle = persona?.persona?.personaTitle || persona?.type || "";
   const mbti = persona?.persona?.mbti || persona?.mbti || "";
   const analysis = getObjectRecord(parsed.analysis);
+  const validIntent = VOICE_CURRENT_INTENTS.includes(currentIntent);
+  const voiceLineLength = charLength(voiceLine);
+  const voiceLineSentences = sentenceCount(voiceLine);
 
-  return Boolean(
-    observations.length > 0 &&
-      VOICE_CURRENT_INTENTS.includes(currentIntent) &&
-      intentHasVisibleSupport(currentIntent, observations) &&
-      charLength(voiceLine) >= 8 &&
-      charLength(voiceLine) <= 35 &&
-      sentenceCount(voiceLine) <= 2 &&
-      !voiceLineForbiddenTerms.some((term) => voiceLine.includes(term)) &&
-      !genericVoiceLines.some((line) => voiceLine.includes(line)) &&
-      (!mbti || !voiceLine.includes(mbti)) &&
-      (!personaTitle || !voiceLine.includes(personaTitle)) &&
-      !voiceStyleConflictsWithPersona(voiceLine, currentIntent, persona) &&
-      asText(parsed.subtext) &&
-      asText(analysis?.observation) &&
-      asText(analysis?.personalityInterpretation) &&
-      Array.isArray(parsed.tags) &&
-      parsed.tags.length === 3
-  );
+  // Report every applicable failure, without requiring literal intent keywords.
+  // Dependent checks are skipped when their prerequisites are already invalid.
+  const failedChecks = {
+    visible_observations_missing: observations.length === 0,
+    current_intent_invalid: !validIntent,
+    voice_line_too_short: voiceLineLength < 8,
+    voice_line_too_long: voiceLineLength > 35,
+    voice_line_too_many_sentences: voiceLineSentences > 2,
+    voice_line_forbidden_terms: voiceLineForbiddenTerms.some((term) => voiceLine.includes(term)),
+    voice_line_generic_template: genericVoiceLines.some((line) => voiceLine.includes(line)),
+    voice_line_contains_mbti: Boolean(mbti && voiceLine.includes(mbti)),
+    voice_line_contains_persona_title: Boolean(personaTitle && voiceLine.includes(personaTitle)),
+    voice_line_persona_conflict:
+      validIntent &&
+      observations.length > 0 &&
+      voiceStyleConflictsWithPersona(voiceLine, currentIntent, persona),
+    subtext_missing: !asText(parsed.subtext),
+    analysis_observation_missing: !asText(analysis?.observation),
+    analysis_personality_interpretation_missing: !asText(analysis?.personalityInterpretation),
+    tags_not_array: !Array.isArray(parsed.tags),
+    tag_count_not_three: Array.isArray(parsed.tags) && parsed.tags.length !== 3,
+  };
+  const reasons = Object.entries(failedChecks)
+    .filter(([, failed]) => failed)
+    .map(([reason]) => reason);
+
+  return {
+    valid: reasons.length === 0,
+    reasons,
+    // Only counts and an allowlisted enum are logged, never generated/user text.
+    metrics: {
+      observationInputCount: Array.isArray(parsed.visibleObservations)
+        ? parsed.visibleObservations.length
+        : 0,
+      observationAcceptedCount: observations.length,
+      currentIntent: validIntent ? currentIntent : null,
+      voiceLineLength,
+      voiceLineSentences,
+      tagCount: Array.isArray(parsed.tags) ? parsed.tags.length : null,
+      hasPersona: Boolean(persona),
+    },
+  };
+}
+
+function validateVoiceGenerationOutput(
+  parsed: VoiceGenerationOutput,
+  persona: CatPersona | null,
+  context?: AIValidationContext & { generationId: string; totalDurationMs: number },
+) {
+  const report = inspectVoiceGenerationOutput(parsed, persona);
+  if (context) {
+    console.info(
+      "NEKO voice validation",
+      JSON.stringify({ event: "voice_validation", ...context, ...report }),
+    );
+  }
+  return report.valid;
 }
 
 function normalizeVoiceForProfile(
@@ -2910,22 +2942,33 @@ async function callFirstAvailableJson<T>(
     temperature?: number;
     timeoutMs?: number;
     modelMode?: "text" | "vision";
-    validate?: (parsed: T) => boolean;
+    validate?: (parsed: T, context: AIValidationContext) => boolean;
     responseSchema?: Record<string, unknown>;
   },
 ): Promise<{ parsed: T; provider: AIProvider; model: string }> {
   const providers = await getAIProviderOrder();
   let lastError: unknown;
+  let attempt = 0;
   for (const provider of providers) {
     const models = await getProviderModels(provider, options.modelMode);
     for (const model of models) {
+      attempt++;
+      const startedAt = Date.now();
       try {
         const raw = await callChatCompletion(provider, buildMessages(provider), {
           ...options,
           model,
         });
         const parsed = extractJson<T>(raw);
-        if (!parsed || (options.validate && !options.validate(parsed))) {
+        if (
+          !parsed ||
+          (options.validate && !options.validate(parsed, {
+            provider,
+            model,
+            attempt,
+            durationMs: Date.now() - startedAt,
+          }))
+        ) {
           throw new Error(`${providerLabel(provider)} ${model} JSON missing required fields`);
         }
         return { parsed, provider, model };
@@ -3721,6 +3764,8 @@ export const generateCatPersona = createServerFn({ method: "POST" })
 
 export async function generateCatVoiceServer(input: VoiceInput): Promise<Voice> {
   const data = validateVoiceInput(input);
+  const generationId = createGenerationId();
+  const startedAt = Date.now();
   const personaContext = canonicalVoicePersona(data.persona);
   const profileContext = {
     name: data.profile.name,
@@ -3790,7 +3835,12 @@ ${data.scene || "无补充场景"}
         timeoutMs: data.imageDataUrl ? 22_000 : 14_000,
         modelMode: data.imageDataUrl ? "vision" : "text",
         responseSchema: VOICE_JSON_SCHEMA,
-        validate: (parsed) => validateVoiceGenerationOutput(parsed, data.persona),
+        validate: (parsed, context) =>
+          validateVoiceGenerationOutput(parsed, data.persona, {
+            ...context,
+            generationId,
+            totalDurationMs: Date.now() - startedAt,
+          }),
       },
     );
     const parsed = result.parsed;

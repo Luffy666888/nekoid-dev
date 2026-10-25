@@ -1096,11 +1096,108 @@ test("same cat voice candidates keep a stable independent tone across five gener
   }
 });
 
-test("invalid voice semantics retry before returning a valid grounded result", async () => {
+test("voice diagnostics identify each rule without changing acceptance or exposing text", () => {
+  const api = loadAIServer("neko-ai", {
+    internals: ["inspectVoiceGenerationOutput", "validateVoiceGenerationOutput"],
+  });
+  const valid = {
+    visibleObservations: ["猫坐着看向镜头"],
+    currentIntent: "想观察",
+    voiceLine: "这个箱子先放着，我要再看清楚一点。",
+    subtext: "它先留意眼前的东西，没有急着行动。",
+    analysis: { observation: "猫坐着看向镜头。", personalityInterpretation: "以当前画面为准。" },
+    mood: "观察中",
+    tags: ["看着眼前", "先看再动", "还没着急"],
+  };
+  const cases = [
+    ["visible_observations_missing", { visibleObservations: ["猫很谨慎"] }],
+    ["current_intent_invalid", { currentIntent: "private-invalid-intent" }],
+    ["voice_line_too_short", { voiceLine: "看看" }],
+    ["voice_line_too_long", { voiceLine: "看".repeat(36) }],
+    ["voice_line_too_many_sentences", { voiceLine: "先看看。再等等。等你过来。" }],
+    ["voice_line_forbidden_terms", { voiceLine: "让我先控制一下营业的节奏。" }],
+    ["voice_line_generic_template", { voiceLine: "有你在我就安心，继续坐这里吧。" }],
+    ["voice_line_contains_mbti", { voiceLine: "我是ISTP-A，先把箱子放着吧。" }, voicePersonaFixture],
+    ["voice_line_contains_persona_title", { voiceLine: "我是独立探索型，先把箱子放着吧。" }, voicePersonaFixture],
+    ["voice_line_persona_conflict", { voiceLine: "你别走，我先看清楚这个箱子。" }, voicePersonaFixture],
+    ["subtext_missing", { subtext: "" }],
+    ["analysis_observation_missing", { analysis: { ...valid.analysis, observation: "" } }],
+    ["analysis_personality_interpretation_missing", { analysis: { ...valid.analysis, personalityInterpretation: "" } }],
+    ["tags_not_array", { tags: "private-tags" }],
+    ["tag_count_not_three", { tags: ["一个标签"] }],
+  ];
+
+  assert.equal(api.inspectVoiceGenerationOutput(valid, null).valid, true);
+  assert.deepEqual(Array.from(api.inspectVoiceGenerationOutput(valid, null).reasons), []);
+  for (const [reason, patch, persona = null] of cases) {
+    const candidate = { ...valid, ...patch };
+    const report = api.inspectVoiceGenerationOutput(candidate, persona);
+    assert.equal(report.valid, false, reason);
+    assert.equal(api.validateVoiceGenerationOutput(candidate, persona), false, reason);
+    assert.deepEqual(Array.from(report.reasons), [reason], reason);
+    assert.doesNotMatch(JSON.stringify(report), /private-invalid-intent|private-tags|这个箱子|猫很谨慎/);
+  }
+  const multiple = api.inspectVoiceGenerationOutput({
+    ...valid,
+    visibleObservations: ["猫很谨慎"],
+    voiceLine: "我很开心。",
+    tags: [],
+  }, null);
+  assert.deepEqual(Array.from(multiple.reasons), [
+    "visible_observations_missing",
+    "voice_line_too_short",
+    "voice_line_generic_template",
+    "tag_count_not_three",
+  ]);
+  assert.equal(multiple.metrics.observationInputCount, 1);
+  assert.equal(multiple.metrics.observationAcceptedCount, 0);
+  assert.equal(multiple.metrics.tagCount, 0);
+});
+
+test("voice generation accepts intent without literal evidence keywords on the first model", async () => {
   let calls = 0;
+  const logs = [];
+  const output = {
+    visibleObservations: ["前肢抬起朝向前方", "身体略微前倾"],
+    currentIntent: "想抓",
+    voiceLine: "先别动，我已经瞄准了，等我够到你。",
+    subtext: "它还没有碰到目标，身体已经向前探了。",
+    analysis: { observation: "前肢抬起，身体向前倾。", personalityInterpretation: "以当前画面为准。" },
+    mood: "准备行动",
+    tags: ["抬起前肢", "先瞄准再动", "就差一点"],
+  };
+  const api = loadAIServer("neko-ai", {
+    env: { ...env, BYTECAT_VISION_MODEL: "gemini-3.7-flash" },
+    logger: { info: (...args) => logs.push(args), error() {} },
+    fetch: async () => {
+      calls++;
+      assert.equal(calls, 1, "Missing literal keywords must not trigger another model request");
+      return geminiResponse(JSON.stringify(output));
+    },
+  });
+  const result = await api.generateCatVoiceServer({
+    profile: mergedProfile,
+    persona: null,
+    imageDataUrl,
+  });
+  assert.equal(calls, 1);
+  assert.equal(result.text, output.voiceLine);
+  const events = logs
+    .filter(([label]) => label === "NEKO voice validation")
+    .map(([, json]) => JSON.parse(json));
+  assert.equal(events.length, 1);
+  assert.equal(events[0].valid, true);
+  assert.equal(events[0].attempt, 1);
+  assert.equal(events[0].model, "gemini-3.7-flash");
+  assert.deepEqual(events[0].reasons, []);
+});
+
+test("invalid voice semantics retry with correlated privacy-safe validation logs", async () => {
+  let calls = 0;
+  const logs = [];
   const api = loadAIServer("neko-ai", {
     env,
-    logger,
+    logger: { info: (...args) => logs.push(args), error() {} },
     fetch: async () => {
       calls++;
       const content =
@@ -1138,6 +1235,25 @@ test("invalid voice semantics retry before returning a valid grounded result", a
   });
   assert.equal(calls, 2);
   assert.equal(result.text, "那根羽毛先别停，我还在找最好下爪的位置。");
+  const events = logs
+    .filter(([label]) => label === "NEKO voice validation")
+    .map(([, json]) => JSON.parse(json));
+  assert.equal(events.length, 2);
+  assert.equal(events[0].event, "voice_validation");
+  assert.ok(events[0].generationId);
+  assert.equal(events[0].generationId, events[1].generationId);
+  assert.deepEqual(events.map(({ attempt }) => attempt), [1, 2]);
+  assert.deepEqual(events.map(({ valid }) => valid), [false, true]);
+  assert.deepEqual(events.map(({ model }) => model), ["gpt-5.6-terra", "gemini-3.7-flash"]);
+  assert.deepEqual(events[0].reasons, ["visible_observations_missing", "voice_line_generic_template"]);
+  assert.deepEqual(events[1].reasons, []);
+  assert.equal(events[0].metrics.observationAcceptedCount, 0);
+  for (const event of events) {
+    assert.equal(event.provider, "bytecat");
+    assert.ok(event.durationMs >= 0);
+    assert.ok(event.totalDurationMs >= event.durationMs);
+  }
+  assert.doesNotMatch(JSON.stringify(events), /data:image|test-gpt-key|test-gemini-key|猫很谨慎|我今天也要开心|那根羽毛/);
 });
 
 test("voice fallback stays conservative when image evidence is unavailable", () => {

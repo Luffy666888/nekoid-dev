@@ -431,6 +431,7 @@ function ConfirmSheet({
 
 // ---------- Screen 1: 首页 ----------
 export function ScreenHome() {
+  const catName = useCatName();
   const voices = useVoices();
   const groups = groupByDay(voices);
   const [moreIdx, setMoreIdx] = useState<number | null>(null);
