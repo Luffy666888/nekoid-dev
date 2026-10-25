@@ -1,5 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
-import type { CatPersona, CatProfile, JsonValue } from "@/components/neko/catProfileStore";
+import type {
+  CatPersona,
+  CatProfile,
+  JsonValue,
+  PersonaBondSummary,
+  PersonaDimension,
+  PersonaDimensionKey,
+  PersonaDirection,
+  PersonaInsights,
+  PersonaStrength,
+  PersonaSummary,
+} from "@/components/neko/catProfileStore";
 import type { Voice } from "@/components/neko/app/voicesStore";
 import { buildBehaviorProfile, buildCombinationInsights } from "@/lib/neko-behavior-profile";
 
@@ -16,6 +27,85 @@ export type VoiceInput = {
   imageDataUrl?: string | null;
   scene?: string;
 };
+
+type VoiceCurrentIntent =
+  | "想靠近"
+  | "想观察"
+  | "想玩"
+  | "想抓"
+  | "想等待"
+  | "想让主人参与"
+  | "想自己处理"
+  | "想保持距离"
+  | "想休息"
+  | "想获得关注";
+
+type VoiceGenerationOutput = {
+  visibleObservations: string[];
+  currentIntent: VoiceCurrentIntent;
+  voiceLine: string;
+  subtext: string;
+  analysis: {
+    observation: string;
+    personalityInterpretation: string;
+  };
+  mood: string;
+  tags: string[];
+};
+
+const VOICE_CURRENT_INTENTS: VoiceCurrentIntent[] = [
+  "想靠近",
+  "想观察",
+  "想玩",
+  "想抓",
+  "想等待",
+  "想让主人参与",
+  "想自己处理",
+  "想保持距离",
+  "想休息",
+  "想获得关注",
+];
+
+const VOICE_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "visibleObservations",
+    "currentIntent",
+    "voiceLine",
+    "subtext",
+    "analysis",
+    "mood",
+    "tags",
+  ],
+  properties: {
+    visibleObservations: {
+      type: "array",
+      minItems: 1,
+      maxItems: 6,
+      items: { type: "string" },
+    },
+    currentIntent: { type: "string", enum: VOICE_CURRENT_INTENTS },
+    voiceLine: { type: "string" },
+    subtext: { type: "string" },
+    analysis: {
+      type: "object",
+      additionalProperties: false,
+      required: ["observation", "personalityInterpretation"],
+      properties: {
+        observation: { type: "string" },
+        personalityInterpretation: { type: "string" },
+      },
+    },
+    mood: { type: "string" },
+    tags: {
+      type: "array",
+      minItems: 3,
+      maxItems: 3,
+      items: { type: "string" },
+    },
+  },
+} as const;
 
 export type CatVideoFrameInput = {
   imageDataUrl: string;
@@ -54,7 +144,7 @@ type PersonaAIResponse = Omit<CatPersona, "misunderstanding" | "loveLanguage" | 
 export const PERSONA_PROMPT_VERSIONS = {
   stage1: "persona_stage1_v2",
   stage2: "persona_stage2_v1",
-  stage3: "persona_stage3_v2",
+  stage3: "persona_stage3_protocol_v1",
 } as const;
 
 type PersonaPromptStage = keyof typeof PERSONA_PROMPT_VERSIONS;
@@ -103,18 +193,10 @@ export type PersonaStage2Output = {
 };
 
 export type PersonaStage3Output = {
-  personaTitle: string;
-  mbti: string;
-  summary: string;
-  monologue: string;
-  tags: string[];
-  insights: {
-    misunderstanding: string;
-    affection: string;
-    ownerRelationship: string;
-  };
-  matchScore?: number;
-  traits?: Array<{ label: string; value: number }>;
+  persona: PersonaSummary;
+  dimensions: PersonaDimension[];
+  insights: PersonaInsights;
+  bondSummary: PersonaBondSummary;
 };
 
 export type PersonaEvalResult = {
@@ -1142,21 +1224,63 @@ function tagsFromStage1(stage1: PersonaStage1Output, profile: CatProfile) {
       ).slice(0, 4);
 }
 
-function catPersonaTraits(stage1: PersonaStage1Output): CatPersona["traits"] {
-  const b = stage1.behaviorProfile;
-  return [
-    { label: "社交主动性", value: b.sociability },
-    { label: "好奇心", value: b.curiosity },
-    { label: "警觉度", value: b.caution },
-    { label: "亲近表达", value: b.attachmentExpression },
-    { label: "独立性", value: b.independence },
-    { label: "边界感", value: b.boundary },
-    { label: "环境敏感度", value: b.environmentalSensitivity },
-    { label: "互动偏好", value: b.interactionPreference },
-  ]
-    .sort((a, b) => Math.abs(b.value - 50) - Math.abs(a.value - 50))
-    .slice(0, 4)
-    .map((item) => ({ label: item.label, value: clampScore(item.value) }));
+const PERSONA_DIMENSION_DEFINITIONS: ReadonlyArray<
+  Pick<PersonaDimension, "key" | "name" | "leftLabel" | "rightLabel">
+> = [
+  { key: "social", name: "社交倾向", leftLabel: "主动亲近", rightLabel: "慢热谨慎" },
+  { key: "exploration", name: "探索倾向", leftLabel: "好奇探索", rightLabel: "稳定保守" },
+  { key: "companionship", name: "陪伴倾向", leftLabel: "喜欢陪伴", rightLabel: "独立自主" },
+  { key: "boundary", name: "边界倾向", leftLabel: "接受互动", rightLabel: "边界明确" },
+] as const;
+
+const PERSONA_DIRECTION_VALUES: Record<PersonaDirection, number> = {
+  left: 85,
+  center_left: 68,
+  center: 50,
+  center_right: 32,
+  right: 15,
+};
+
+function directionFromLeftAffinity(value: number): PersonaDirection {
+  const score = clampScore(value, 50);
+  if (score >= 80) return "left";
+  if (score >= 60) return "center_left";
+  if (score > 40) return "center";
+  if (score > 20) return "center_right";
+  return "right";
+}
+
+function strengthFromLeftAffinity(value: number): PersonaStrength {
+  const distance = Math.abs(clampScore(value, 50) - 50);
+  if (distance >= 30) return "strong";
+  if (distance >= 14) return "medium";
+  return "weak";
+}
+
+export function personaDimensionsFromBehavior(
+  behavior: PersonaBehaviorProfile,
+): PersonaDimension[] {
+  const leftAffinities: Record<PersonaDimensionKey, number> = {
+    social: behavior.sociability,
+    exploration: behavior.curiosity,
+    companionship: Math.round((behavior.attachmentExpression + (100 - behavior.independence)) / 2),
+    boundary: 100 - behavior.boundary,
+  };
+  return PERSONA_DIMENSION_DEFINITIONS.map((definition) => {
+    const value = leftAffinities[definition.key];
+    return {
+      ...definition,
+      direction: directionFromLeftAffinity(value),
+      strength: strengthFromLeftAffinity(value),
+    };
+  });
+}
+
+function legacyTraitsFromDimensions(dimensions: PersonaDimension[]): CatPersona["traits"] {
+  return dimensions.map((dimension) => ({
+    label: dimension.name,
+    value: PERSONA_DIRECTION_VALUES[dimension.direction],
+  }));
 }
 
 function buildStableStage3(
@@ -1164,28 +1288,38 @@ function buildStableStage3(
   stage2: PersonaStage2Output,
   profile: CatProfile,
 ): PersonaStage3Output {
+  const relationship = boundedCopy(stage2.ownerRelationship.explanation, "", 16, 60);
   return {
-    personaTitle: choosePersonaTitle(stage1),
-    mbti: mappedMbti(stage1.behaviorProfile),
-    summary: boundedCopy(
-      stage1.coreTraits[0]?.description ??
-        "现在的线索还不够多，先保守判断它更习惯按自己的节奏观察和靠近。",
-      "它更习惯按自己的节奏观察和靠近。",
-      10,
-      50,
-    ),
-    monologue:
-      stage1.behaviorProfile.caution >= 62
-        ? "让我先看清楚，再决定要不要靠近。"
-        : "我在附近啦，只是要按自己的节奏来。",
-    tags: tagsFromStage1(stage1, profile),
-    insights: {
-      misunderstanding: boundedCopy(stage2.misunderstanding.explanation, "", 16, 60),
-      affection: boundedCopy(stage2.affection.explanation, "", 16, 60),
-      ownerRelationship: boundedCopy(stage2.ownerRelationship.explanation, "", 16, 60),
+    persona: {
+      personaTitle: choosePersonaTitle(stage1),
+      mbti: mappedMbti(stage1.behaviorProfile),
+      summary: boundedCopy(
+        stage1.coreTraits[0]?.description ??
+          "现在的线索还不够多，先保守判断它更习惯按自己的节奏观察和靠近。",
+        "它更习惯按自己的节奏观察和靠近。",
+        10,
+        50,
+      ),
     },
-    matchScore: stage1.coreTraits.length >= 3 ? 88 : stage1.coreTraits.length ? 76 : 62,
-    traits: catPersonaTraits(stage1),
+    dimensions: personaDimensionsFromBehavior(stage1.behaviorProfile),
+    insights: {
+      misunderstanding: {
+        title: "你可能一直误会它的一件事",
+        conclusion: boundedCopy(stage2.misunderstanding.explanation, "", 16, 60),
+      },
+      affection: {
+        title: "它表达喜欢的方式",
+        conclusion: boundedCopy(stage2.affection.explanation, "", 16, 60),
+      },
+      relationship: {
+        title: "在它眼里，你的位置",
+        conclusion: relationship,
+      },
+    },
+    bondSummary: {
+      title: `${profile.name}和你的关系`,
+      quote: boundedCopy(stage2.ownerRelationship.claim || relationship, relationship, 10, 40),
+    },
   };
 }
 
@@ -1442,10 +1576,14 @@ function evaluatePersonaDrift(
     previousBehavior,
   );
   const strongNewEvidence = hasStrongNewBehaviorEvidence(data);
-  const previousTitle = normalizePersonaType(previous.type, data.profile, "");
-  const currentTitle = normalizePersonaType(finalCopy.personaTitle, data.profile, "");
+  const previousTitle = normalizePersonaType(
+    previous.persona?.personaTitle ?? previous.type,
+    data.profile,
+    "",
+  );
+  const currentTitle = normalizePersonaType(finalCopy.persona.personaTitle, data.profile, "");
   const previousTags = uniqueNaturalLabels(previous.tags ?? [], data.profile, 8);
-  const currentTags = uniqueNaturalLabels(finalCopy.tags, data.profile, 8);
+  const currentTags = tagsFromStage1(stage1, data.profile);
   const previousText = [
     previousTitle,
     previous.corePersonality,
@@ -1454,7 +1592,7 @@ function evaluatePersonaDrift(
   ].join("");
   const currentText = [
     currentTitle,
-    finalCopy.summary,
+    finalCopy.persona.summary,
     ...currentTags,
     ...stage1.coreTraits.map((trait) => `${trait.trait}${trait.description}`),
   ].join("");
@@ -1463,7 +1601,11 @@ function evaluatePersonaDrift(
     previous.loveLanguageInsight ?? previous.loveLanguage,
     previous.ownerRelationship ?? previous.ownerRole,
   ].filter(Boolean) as string[];
-  const currentInsights = Object.values(finalCopy.insights);
+  const currentInsights = [
+    finalCopy.insights.misunderstanding.conclusion,
+    finalCopy.insights.affection.conclusion,
+    finalCopy.insights.relationship.conclusion,
+  ];
   const insightConsistency = previousInsights.length
     ? Math.round(
         (previousInsights.reduce(
@@ -1477,7 +1619,7 @@ function evaluatePersonaDrift(
   const titleSimilarity = semanticSimilarity(previousTitle, currentTitle);
   const coreTraitSimilarity = semanticSimilarity(previousText, currentText);
   const tagOverlap = tagOverlapRatio(currentTags, previousTags);
-  const mbtiStable = !previous.mbti || previous.mbti === finalCopy.mbti;
+  const mbtiStable = !previous.mbti || previous.mbti === finalCopy.persona.mbti;
   const hasRaw = previousHasRawInputs(previous);
 
   const rawStable =
@@ -1537,39 +1679,55 @@ function applyPreviousPersonaAnchor(
   fallback: PersonaStage3Output,
   profile: CatProfile,
 ): PersonaStage3Output {
-  const previousTitle = normalizePersonaType(previous.type, profile, "");
-  const previousTags = uniqueNaturalLabels(previous.tags ?? [], profile, 8);
-  const tags = uniqueNaturalLabels(
-    [...previousTags.slice(0, 3), ...finalCopy.tags, ...fallback.tags],
+  const previousTitle = normalizePersonaType(
+    previous.persona?.personaTitle ?? previous.type,
     profile,
-    8,
-  ).slice(0, 4);
+    "",
+  );
   const previousMbti = /^[IE][NS][FT][JP]-[AT]$/.test(previous.mbti) ? previous.mbti : "";
   return {
     ...finalCopy,
-    personaTitle: previousTitle || finalCopy.personaTitle,
-    mbti: previousMbti || finalCopy.mbti,
-    summary: boundedCopy(
-      normalizeCatFacts(previous.corePersonality ?? previous.analysis ?? "", profile),
-      finalCopy.summary,
-      10,
-      50,
-    ),
-    tags: tags.length >= 4 ? tags : fallback.tags,
-    insights: {
-      misunderstanding: normalizeFinalInsight(
-        previous.misunderstanding,
-        finalCopy.insights.misunderstanding,
-      ),
-      affection: normalizeFinalInsight(
-        previous.loveLanguageInsight ?? previous.loveLanguage,
-        finalCopy.insights.affection,
-      ),
-      ownerRelationship: normalizeFinalInsight(
-        previous.ownerRelationship ?? previous.ownerRole,
-        finalCopy.insights.ownerRelationship,
+    persona: {
+      personaTitle: previousTitle || finalCopy.persona.personaTitle,
+      mbti: previousMbti || finalCopy.persona.mbti,
+      summary: boundedCopy(
+        normalizeCatFacts(
+          previous.persona?.summary ?? previous.corePersonality ?? previous.analysis ?? "",
+          profile,
+        ),
+        finalCopy.persona.summary,
+        10,
+        50,
       ),
     },
+    insights: {
+      misunderstanding: {
+        title: finalCopy.insights.misunderstanding.title,
+        conclusion: normalizeFinalInsight(
+          previous.insights?.misunderstanding.conclusion ?? previous.misunderstanding,
+          finalCopy.insights.misunderstanding.conclusion,
+        ),
+      },
+      affection: {
+        title: finalCopy.insights.affection.title,
+        conclusion: normalizeFinalInsight(
+          previous.insights?.affection.conclusion ??
+            previous.loveLanguageInsight ??
+            previous.loveLanguage,
+          finalCopy.insights.affection.conclusion,
+        ),
+      },
+      relationship: {
+        title: finalCopy.insights.relationship.title,
+        conclusion: normalizeFinalInsight(
+          previous.insights?.relationship.conclusion ??
+            previous.ownerRelationship ??
+            previous.ownerRole,
+          finalCopy.insights.relationship.conclusion,
+        ),
+      },
+    },
+    bondSummary: previous.bondSummary ?? fallback.bondSummary,
   };
 }
 
@@ -1612,54 +1770,132 @@ function normalizeStage3Output(
   profile: CatProfile,
 ): PersonaStage3Output {
   const raw = getObjectRecord(value) ?? {};
+  const rawPersona = getObjectRecord(raw.persona) ?? {};
   const rawInsights = getObjectRecord(raw.insights) ?? {};
-  const tags = Array.isArray(raw.tags) ? uniqueNaturalLabels(raw.tags, profile, 8).slice(0, 4) : [];
-  const rawTraits = Array.isArray(raw.traits)
-    ? raw.traits
-        .map((item) => {
-          const entry = getObjectRecord(item);
-          return entry
-            ? {
-                label: normalizeCatFacts(entry.label, profile, "特质"),
-                value: clampScore(entry.value, 50),
-              }
-            : null;
-        })
-        .filter((item): item is { label: string; value: number } => Boolean(item?.label))
-        .slice(0, 4)
-    : undefined;
+  const rawBond = getObjectRecord(raw.bondSummary) ?? {};
+  const insight = (key: keyof PersonaInsights) => {
+    const entry = getObjectRecord(rawInsights[key]) ?? {};
+    return {
+      title: asText(entry.title, fallback.insights[key].title),
+      conclusion: boundedCopy(
+        normalizeCatFacts(entry.conclusion, profile),
+        fallback.insights[key].conclusion,
+        16,
+        60,
+      ),
+    };
+  };
   return {
-    personaTitle: normalizePersonaType(
-      raw.personaTitle ?? raw.type,
-      profile,
-      fallback.personaTitle,
-    ),
-    mbti: /^[IE][NS][FT][JP]-[AT]$/.test(asText(raw.mbti)) ? asText(raw.mbti) : fallback.mbti,
-    summary: boundedCopy(
-      normalizeCatFacts(raw.summary ?? raw.corePersonality, profile),
-      fallback.summary,
-      10,
-      50,
-    ),
-    monologue: boundedCopy(normalizeCatFacts(raw.monologue, profile), fallback.monologue, 10, 36),
-    tags: tags.length >= 4 ? tags : fallback.tags,
-    insights: {
-      misunderstanding: normalizeFinalInsight(
-        rawInsights.misunderstanding ?? raw.misunderstanding,
-        fallback.insights.misunderstanding,
+    persona: {
+      personaTitle: normalizePersonaType(
+        rawPersona.personaTitle,
+        profile,
+        fallback.persona.personaTitle,
       ),
-      affection: normalizeFinalInsight(
-        rawInsights.affection ?? raw.loveLanguageInsight ?? raw.loveLanguage,
-        fallback.insights.affection,
-      ),
-      ownerRelationship: normalizeFinalInsight(
-        rawInsights.ownerRelationship ?? raw.ownerRelationship ?? raw.ownerRole,
-        fallback.insights.ownerRelationship,
+      mbti: /^[IE][NS][FT][JP]-[AT]$/.test(asText(rawPersona.mbti))
+        ? asText(rawPersona.mbti)
+        : fallback.persona.mbti,
+      summary: boundedCopy(
+        normalizeCatFacts(rawPersona.summary, profile),
+        fallback.persona.summary,
+        10,
+        50,
       ),
     },
-    matchScore: clampScore(raw.matchScore, fallback.matchScore ?? 80),
-    traits: rawTraits?.length === 4 ? rawTraits : fallback.traits,
+    dimensions: fallback.dimensions,
+    insights: {
+      misunderstanding: insight("misunderstanding"),
+      affection: insight("affection"),
+      relationship: insight("relationship"),
+    },
+    bondSummary: {
+      title: asText(rawBond.title, fallback.bondSummary.title),
+      quote: boundedCopy(
+        normalizeCatFacts(rawBond.quote, profile),
+        fallback.bondSummary.quote,
+        10,
+        40,
+      ),
+    },
   };
+}
+
+const PERSONA_DIRECTIONS = new Set<PersonaDirection>([
+  "left",
+  "center_left",
+  "center",
+  "center_right",
+  "right",
+]);
+const PERSONA_STRENGTHS = new Set<PersonaStrength>(["weak", "medium", "strong"]);
+const PERSONA_DIMENSION_KEYS = new Set<PersonaDimensionKey>([
+  "social",
+  "exploration",
+  "companionship",
+  "boundary",
+]);
+
+function hasExactKeys(record: Record<string, unknown>, keys: string[]) {
+  const actual = Object.keys(record).sort();
+  const expected = [...keys].sort();
+  return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
+}
+
+export function validatePersonaResultProtocol(value: unknown): boolean {
+  const raw = getObjectRecord(value);
+  if (!raw || !hasExactKeys(raw, ["persona", "dimensions", "insights", "bondSummary"]))
+    return false;
+  const persona = getObjectRecord(raw.persona);
+  const insights = getObjectRecord(raw.insights);
+  const bond = getObjectRecord(raw.bondSummary);
+  if (!persona || !insights || !bond) return false;
+  if (!hasExactKeys(persona, ["mbti", "personaTitle", "summary"])) return false;
+  if (!hasExactKeys(insights, ["misunderstanding", "affection", "relationship"])) return false;
+  if (!hasExactKeys(bond, ["title", "quote"])) return false;
+  if (!asText(persona.mbti) || !asText(persona.personaTitle) || !asText(persona.summary))
+    return false;
+  if (charLength(asText(persona.personaTitle)) > 14 || charLength(asText(persona.summary)) > 50)
+    return false;
+  if (!asText(bond.title) || !asText(bond.quote) || charLength(asText(bond.quote)) > 40)
+    return false;
+
+  for (const key of ["misunderstanding", "affection", "relationship"] as const) {
+    const item = getObjectRecord(insights[key]);
+    if (!item || !hasExactKeys(item, ["title", "conclusion"])) return false;
+    if (!asText(item.title) || !asText(item.conclusion) || charLength(asText(item.conclusion)) > 60)
+      return false;
+  }
+
+  if (!Array.isArray(raw.dimensions) || raw.dimensions.length !== 4) return false;
+  const seen = new Set<string>();
+  for (const value of raw.dimensions) {
+    const dimension = getObjectRecord(value);
+    if (
+      !dimension ||
+      !hasExactKeys(dimension, ["key", "name", "leftLabel", "rightLabel", "direction", "strength"])
+    )
+      return false;
+    const key = asText(dimension.key) as PersonaDimensionKey;
+    if (!PERSONA_DIMENSION_KEYS.has(key) || seen.has(key)) return false;
+    seen.add(key);
+    const expected = PERSONA_DIMENSION_DEFINITIONS.find((item) => item.key === key);
+    if (
+      !expected ||
+      dimension.name !== expected.name ||
+      dimension.leftLabel !== expected.leftLabel ||
+      dimension.rightLabel !== expected.rightLabel ||
+      !PERSONA_DIRECTIONS.has(dimension.direction as PersonaDirection) ||
+      !PERSONA_STRENGTHS.has(dimension.strength as PersonaStrength)
+    )
+      return false;
+  }
+  return seen.size === 4;
+}
+
+function validatePersonaStage3ModelOutput(value: unknown, dimensions: PersonaDimension[]) {
+  const raw = getObjectRecord(value);
+  if (!raw || !hasExactKeys(raw, ["persona", "insights", "bondSummary"])) return false;
+  return validatePersonaResultProtocol({ ...raw, dimensions });
 }
 
 function hasHighRiskCopy(value: string) {
@@ -1681,31 +1917,27 @@ function containsWrongFacts(text: string, profile: CatProfile) {
 
 function runFinalCopySelfCheck(stage3: PersonaStage3Output, profile: CatProfile) {
   const allText = [
-    stage3.personaTitle,
-    stage3.summary,
-    stage3.monologue,
-    ...stage3.tags,
-    stage3.insights.misunderstanding,
-    stage3.insights.affection,
-    stage3.insights.ownerRelationship,
+    stage3.persona.personaTitle,
+    stage3.persona.summary,
+    stage3.insights.misunderstanding.conclusion,
+    stage3.insights.affection.conclusion,
+    stage3.insights.relationship.conclusion,
+    stage3.bondSummary.quote,
   ].join("\n");
   const issues: string[] = [];
-  if (charLength(stage3.personaTitle) > 14 || charLength(stage3.personaTitle) < 4) {
+  if (charLength(stage3.persona.personaTitle) > 14 || charLength(stage3.persona.personaTitle) < 4) {
     issues.push("title_length");
   }
-  if (hasHighRiskCopy(allText) || hasHighRiskLabel(stage3.personaTitle)) {
+  if (hasHighRiskCopy(allText) || hasHighRiskLabel(stage3.persona.personaTitle)) {
     issues.push("high_risk_jargon");
   }
   if (fatalUnsupportedClaimPatterns.some((pattern) => pattern.test(allText))) {
     issues.push("unsupported_long_term_claim");
   }
-  if (stage3.tags.some((tag) => charLength(tag) > 10 || hasHighRiskLabel(tag))) {
-    issues.push("tag_readability");
-  }
   const facts = containsWrongFacts(allText, profile);
   if (facts.wrongGender) issues.push("wrong_gender");
   if (facts.wrongAge) issues.push("wrong_age");
-  const insightTexts = Object.values(stage3.insights);
+  const insightTexts = Object.values(stage3.insights).map((item) => item.conclusion);
   if (
     semanticSimilarity(insightTexts[0], insightTexts[1]) > 0.58 ||
     semanticSimilarity(insightTexts[0], insightTexts[2]) > 0.58 ||
@@ -1725,17 +1957,18 @@ function repairStage3Output(
   if (checked.passed) return stage3;
   return {
     ...stage3,
-    personaTitle:
-      checked.issues.includes("title_length") || checked.issues.includes("high_risk_jargon")
-        ? fallback.personaTitle
-        : stage3.personaTitle,
-    tags:
-      checked.issues.includes("tag_readability") || checked.issues.includes("high_risk_jargon")
-        ? fallback.tags
-        : stage3.tags,
+    persona: {
+      ...stage3.persona,
+      personaTitle:
+        checked.issues.includes("title_length") || checked.issues.includes("high_risk_jargon")
+          ? fallback.persona.personaTitle
+          : stage3.persona.personaTitle,
+      summary: normalizeCatFacts(stage3.persona.summary, profile, fallback.persona.summary),
+    },
     insights: checked.issues.includes("duplicate_insights") ? fallback.insights : stage3.insights,
-    summary: normalizeCatFacts(stage3.summary, profile, fallback.summary),
-    monologue: normalizeCatFacts(stage3.monologue, profile, fallback.monologue),
+    bondSummary: checked.issues.includes("unsupported_long_term_claim")
+      ? fallback.bondSummary
+      : stage3.bondSummary,
   };
 }
 
@@ -1752,11 +1985,10 @@ export function evaluatePersonaGeneration({
   consistency?: PersonaDriftCheckResult;
 }): PersonaEvalResult {
   const allText = [
-    finalCopy.personaTitle,
-    finalCopy.summary,
-    finalCopy.monologue,
-    ...finalCopy.tags,
-    ...Object.values(finalCopy.insights),
+    finalCopy.persona.personaTitle,
+    finalCopy.persona.summary,
+    ...Object.values(finalCopy.insights).map((item) => item.conclusion),
+    finalCopy.bondSummary.quote,
   ].join("\n");
   const selfCheck = runFinalCopySelfCheck(finalCopy, profile);
   const facts = containsWrongFacts(allText, profile);
@@ -1779,9 +2011,9 @@ export function evaluatePersonaGeneration({
     {
       id: "title_readability",
       passed:
-        charLength(finalCopy.personaTitle) >= 4 &&
-        charLength(finalCopy.personaTitle) <= 14 &&
-        !hasHighRiskLabel(finalCopy.personaTitle),
+        charLength(finalCopy.persona.personaTitle) >= 4 &&
+        charLength(finalCopy.persona.personaTitle) <= 14 &&
+        !hasHighRiskLabel(finalCopy.persona.personaTitle),
       detail: "标题不可自然理解或含高风险造词",
     },
     { id: "ai_jargon", passed: !hasHighRiskCopy(allText), detail: "出现明显 AI 造词或报告腔词汇" },
@@ -1799,9 +2031,7 @@ export function evaluatePersonaGeneration({
   const unsupportedPenalty = stage1.unsupportedClaims.length ? 6 : 0;
   const comprehensibility = Math.max(
     0,
-    20 -
-      (hasHighRiskLabel(finalCopy.personaTitle) ? 8 : 0) -
-      finalCopy.tags.filter((tag) => hasHighRiskLabel(tag) || charLength(tag) > 10).length * 3,
+    20 - (hasHighRiskLabel(finalCopy.persona.personaTitle) ? 8 : 0),
   );
   const factualAccuracy = Math.max(
     0,
@@ -1816,7 +2046,7 @@ export function evaluatePersonaGeneration({
     0,
     Math.min(20, stage1.coreTraits.length * 4 + 8 - genericCount * 2),
   );
-  const insightTexts = Object.values(finalCopy.insights);
+  const insightTexts = Object.values(finalCopy.insights).map((item) => item.conclusion);
   const insightValue = Math.max(
     0,
     20 -
@@ -1826,9 +2056,11 @@ export function evaluatePersonaGeneration({
   const shareability = Math.max(
     0,
     20 -
-      (charLength(finalCopy.monologue) < 10 || charLength(finalCopy.monologue) > 36 ? 5 : 0) -
-      (charLength(finalCopy.personaTitle) > 14 ? 5 : 0) -
-      (hasHighRiskCopy(finalCopy.monologue) ? 6 : 0),
+      (charLength(finalCopy.bondSummary.quote) < 10 || charLength(finalCopy.bondSummary.quote) > 40
+        ? 5
+        : 0) -
+      (charLength(finalCopy.persona.personaTitle) > 14 ? 5 : 0) -
+      (hasHighRiskCopy(finalCopy.bondSummary.quote) ? 6 : 0),
   );
   const scores = {
     comprehensibility,
@@ -1858,22 +2090,32 @@ function stage3ToPersona(
   stage1: PersonaStage1Output,
   profile: CatProfile,
 ): CatPersona {
+  const tags = tagsFromStage1(stage1, profile);
+  const matchScore = stage1.coreTraits.length >= 3 ? 88 : stage1.coreTraits.length ? 76 : 62;
+  const monologue =
+    stage1.behaviorProfile.caution >= 62
+      ? "让我先看清楚，再决定要不要靠近。"
+      : "我在附近啦，只是要按自己的节奏来。";
   return normalizePersonaForProfile(
     {
       name: profile.name,
-      type: stage3.personaTitle,
-      mbti: stage3.mbti,
-      matchScore: clampScore(stage3.matchScore, 82),
-      monologue: stage3.monologue,
-      analysis: stage3.insights.misunderstanding,
-      corePersonality: stage3.summary,
-      misunderstanding: stage3.insights.misunderstanding,
-      loveLanguage: stage3.insights.affection,
-      loveLanguageInsight: stage3.insights.affection,
-      ownerRole: stage3.insights.ownerRelationship,
-      ownerRelationship: stage3.insights.ownerRelationship,
-      tags: stage3.tags,
-      traits: stage3.traits?.length === 4 ? stage3.traits : catPersonaTraits(stage1),
+      persona: stage3.persona,
+      dimensions: stage3.dimensions,
+      insights: stage3.insights,
+      bondSummary: stage3.bondSummary,
+      type: stage3.persona.personaTitle,
+      mbti: stage3.persona.mbti,
+      matchScore,
+      monologue,
+      analysis: stage3.insights.misunderstanding.conclusion,
+      corePersonality: stage3.persona.summary,
+      misunderstanding: stage3.insights.misunderstanding.conclusion,
+      loveLanguage: stage3.insights.affection.conclusion,
+      loveLanguageInsight: stage3.insights.affection.conclusion,
+      ownerRole: stage3.insights.relationship.conclusion,
+      ownerRelationship: stage3.insights.relationship.conclusion,
+      tags,
+      traits: legacyTraitsFromDimensions(stage3.dimensions),
       observations: stage1.coreTraits.slice(0, 3).map((trait) => ({
         label: trait.trait,
         value: trait.description,
@@ -1889,9 +2131,164 @@ function stage3ToPersona(
   );
 }
 
+const visibleObservationInterpretationTerms = [
+  "谨慎",
+  "镇定",
+  "独立",
+  "策略",
+  "边界",
+  "人格",
+  "性格",
+  "喜欢",
+  "讨厌",
+  "想念",
+  "嫉妒",
+];
+
+const voiceLineForbiddenTerms = [
+  "稳态",
+  "控场",
+  "发令",
+  "营业",
+  "策略性靠近",
+  "仪式感极强",
+  "行为模式",
+  "人格倾向",
+  "探索欲",
+  "边界意识",
+  "作为一只",
+  "展现出了",
+  "用自己的方式理解这个世界",
+];
+
+const genericVoiceLines = [
+  "我喜欢你",
+  "我要陪着你",
+  "我很开心",
+  "有你在我就安心",
+  "今天也要开心",
+  "我把温柔藏在心里",
+];
+
+function canonicalVoicePersona(persona: CatPersona | null) {
+  if (!persona) return null;
+  const summary = persona.persona ?? {
+    mbti: persona.mbti,
+    personaTitle: persona.type,
+    summary: persona.corePersonality || persona.analysis,
+  };
+  const dimensions = Array.isArray(persona.dimensions)
+    ? persona.dimensions.map(({ key, direction, strength }) => ({ key, direction, strength }))
+    : PERSONA_DIMENSION_DEFINITIONS.map((definition, index) => {
+        const legacy = persona.traits?.find((trait) => trait.label === definition.name) ??
+          persona.traits?.[index];
+        const affinity = clampScore(legacy?.value, 50);
+        return {
+          key: definition.key,
+          direction: directionFromLeftAffinity(affinity),
+          strength: strengthFromLeftAffinity(affinity),
+        };
+      });
+  return { persona: summary, dimensions };
+}
+
+function normalizeVisibleObservations(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => asText(item))
+    .filter(Boolean)
+    .filter(
+      (item) => !visibleObservationInterpretationTerms.some((term) => item.includes(term)),
+    )
+    .map((item) => limitChars(item, 32))
+    .slice(0, 6);
+}
+
+function sentenceCount(value: string) {
+  return value
+    .split(/[。！？!?]+/)
+    .map((part) => part.trim())
+    .filter(Boolean).length;
+}
+
+function intentHasVisibleSupport(intent: VoiceCurrentIntent, observations: string[]) {
+  const joined = observations.join("；");
+  const evidenceTerms: Record<VoiceCurrentIntent, RegExp> = {
+    想靠近: /靠近|走向|贴近|蹭|伸向|面向/,
+    想观察: /看|盯|注视|视线|停留|观察|镜头/,
+    想玩: /玩具|球|羽毛|逗猫棒|追|扑|抓|拍/,
+    想抓: /抓|扑|伸爪|玩具|球|羽毛|逗猫棒/,
+    想等待: /停留|没有动作|没有扑|坐着|趴着|等待|静止/,
+    想让主人参与: /主人|人手|互动|看向人|靠近人|玩具/,
+    想自己处理: /独自|自己|没有靠近人|单独|玩具|物体/,
+    想保持距离: /躲|后退|远离|距离|缩起|回避|转开|挣脱|避开/,
+    想休息: /睡|闭眼|趴着|躺着|蜷缩|放松/,
+    想获得关注: /看向人|看向主人|看镜头|叫|蹭|靠近人|靠近主人|抬头/,
+  };
+  return evidenceTerms[intent].test(joined);
+}
+
+function voiceStyleConflictsWithPersona(
+  voiceLine: string,
+  intent: VoiceCurrentIntent,
+  persona: CatPersona | null,
+) {
+  const dimensions = persona?.dimensions ?? [];
+  const dimension = (key: PersonaDimensionKey) => dimensions.find((item) => item.key === key);
+  const companionship = dimension("companionship");
+  const boundary = dimension("boundary");
+  if (
+    companionship?.direction === "right" &&
+    companionship.strength === "strong" &&
+    /快抱我|一直陪我|你别走/.test(voiceLine) &&
+    intent !== "想靠近" &&
+    intent !== "想获得关注"
+  ) {
+    return true;
+  }
+  if (
+    boundary?.direction === "right" &&
+    boundary.strength === "strong" &&
+    /快抱我|快摸我/.test(voiceLine) &&
+    intent !== "想获得关注"
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function validateVoiceGenerationOutput(parsed: VoiceGenerationOutput, persona: CatPersona | null) {
+  const observations = normalizeVisibleObservations(parsed.visibleObservations);
+  const currentIntent = asText(parsed.currentIntent) as VoiceCurrentIntent;
+  const voiceLine = asText(parsed.voiceLine);
+  const personaTitle = persona?.persona?.personaTitle || persona?.type || "";
+  const mbti = persona?.persona?.mbti || persona?.mbti || "";
+  const analysis = getObjectRecord(parsed.analysis);
+
+  return Boolean(
+    observations.length > 0 &&
+      VOICE_CURRENT_INTENTS.includes(currentIntent) &&
+      intentHasVisibleSupport(currentIntent, observations) &&
+      charLength(voiceLine) >= 8 &&
+      charLength(voiceLine) <= 35 &&
+      sentenceCount(voiceLine) <= 2 &&
+      !voiceLineForbiddenTerms.some((term) => voiceLine.includes(term)) &&
+      !genericVoiceLines.some((line) => voiceLine.includes(line)) &&
+      (!mbti || !voiceLine.includes(mbti)) &&
+      (!personaTitle || !voiceLine.includes(personaTitle)) &&
+      !voiceStyleConflictsWithPersona(voiceLine, currentIntent, persona) &&
+      asText(parsed.subtext) &&
+      asText(analysis?.observation) &&
+      asText(analysis?.personalityInterpretation) &&
+      Array.isArray(parsed.tags) &&
+      parsed.tags.length === 3
+  );
+}
+
 function normalizeVoiceForProfile(
   input: {
     text?: unknown;
+    voiceLine?: unknown;
     subtext?: unknown;
     analysis?: unknown;
     share?: unknown;
@@ -1959,8 +2356,8 @@ function normalizeVoiceForProfile(
     tags: voiceTags,
     aspect: "3:4",
     text: boundedCopy(
-      normalizeCatFacts(input.text, profile, `靠近一点嘛，今天也想被你看见。`),
-      `靠近一点嘛，今天也想被你看见。`,
+      normalizeCatFacts(input.voiceLine ?? input.text, profile, `我先看看，再决定要不要靠近。`),
+      `我先看看，再决定要不要靠近。`,
       12,
       30,
     ),
@@ -1973,7 +2370,7 @@ function normalizeVoiceForProfile(
     },
     share: {
       headline: boundedCopy(
-        normalizeCatFacts(rawShare.headline, profile, asText(input.text)),
+        normalizeCatFacts(rawShare.headline, profile, asText(input.voiceLine ?? input.text)),
         `看似安静，其实一直有自己的小主意`,
         12,
         24,
@@ -1991,50 +2388,56 @@ function normalizeVoiceForProfile(
 
 function buildStableVoice(
   profile: CatProfile,
+  persona: CatPersona | null,
   imageDataUrl?: string | null,
   scene?: string,
 ): Voice {
   const sceneText = scene?.trim();
-  const ageMood: Record<CatProfile["ageStage"], string> = {
-    幼猫: "想玩一会",
-    青年猫: "想被关注",
-    成熟猫: "想安静陪伴",
-    资深猫: "想慢慢靠近",
-  };
-  const mood = ageMood[profile.ageStage] ?? "想被关注";
   const sceneLower = sceneText ?? "";
-  let text = `别只拍照呀，也过来陪我一会。`;
+  let text = `这个有点意思，我再看一会。`;
+  let mood = "想观察";
   if (/猫条|零食|吃|罐头|冻干/.test(sceneLower)) {
-    text = `我已经闻到啦，先给我一小口好不好。`;
+    text = `我已经闻到了，这个先别拿走。`;
+    mood = "想靠近";
   } else if (/逗猫棒|玩具|球|羽毛|玩/.test(sceneLower)) {
-    text = `这个小东西动得太可疑了，我要认真盯住它。`;
+    text = `你先别停，我还在看什么时候出爪。`;
+    mood = "想抓";
   } else if (/睡|窝|床|沙发|趴/.test(sceneLower)) {
-    text = `这里刚刚好，我想安静地陪你待一会。`;
+    text = `这里正合适，先让我安静躺一会。`;
+    mood = "想休息";
   } else if (/看|盯|拍照|镜头|照片/.test(sceneLower)) {
-    text = `我知道你在看我，所以我也认真看你一下。`;
+    text = `你先别动，我还要再看清楚一点。`;
+    mood = "想观察";
   } else if (/抱|摸|靠近|蹭|陪/.test(sceneLower)) {
-    text = `再靠近一点点，我今天允许你多陪我一会。`;
+    const boundary = persona?.dimensions?.find((item) => item.key === "boundary");
+    text =
+      boundary?.direction === "right"
+        ? `先别急着抱，让我自己靠近你。`
+        : `可以再靠近一点，我现在没有要躲。`;
+    mood = boundary?.direction === "right" ? "想保持距离" : "想靠近";
   } else if (sceneText) {
-    text = `我在认真感受这一刻，也在悄悄等你靠近。`;
+    text = `我听见了，先让我看看是怎么回事。`;
   }
   const analysisSummary = sceneText
-    ? `结合你补充的场景，${profile.name}的停留和注视更像是在回应当下互动，而不是单纯发呆。`
-    : `${profile.name}是${profile.ageStage}里的${profile.gender}，画面里的停留和注视适合解读为想被关注。`;
+    ? `结合你补充的场景，只能确认${profile.name}正在关注当前发生的事情。`
+    : `当前画面证据有限，只能确认${profile.name}正在留意周围。`;
   return normalizeVoiceForProfile(
     {
       text,
       analysis: {
         observation: analysisSummary,
-        personalityInterpretation: `它习惯先看看你的反应，再决定要不要靠近。`,
+        personalityInterpretation: persona
+          ? `它仍按自己熟悉的节奏回应，但这一刻更具体的想法还需要更多线索。`
+          : `这一刻更像是临时反应，现有线索不足以判断长期习惯。`,
       },
       share: {
         headline: text,
         insight: `它不是没反应，只是更习惯先看一会儿，等你注意到它。`,
-        tags: [mood, "先观察再回应", "有点小主意"],
+        tags: [mood, "先看清楚", "暂时不急"],
       },
       mood,
       location: "家里",
-      tags: [mood, "想靠近一点", "有点小主意"],
+      tags: [mood, "先看清楚", "暂时不急"],
     },
     profile,
     imageDataUrl,
@@ -2290,6 +2693,7 @@ function chatMessagesToGeminiPayload(
   options: {
     maxTokens?: number;
     temperature?: number;
+    responseSchema?: Record<string, unknown>;
   },
 ) {
   const systemParts: Array<{ text: string }> = [];
@@ -2324,6 +2728,7 @@ function chatMessagesToGeminiPayload(
       temperature: options.temperature ?? 0.82,
       ...(options.maxTokens ? { maxOutputTokens: options.maxTokens + 1024 } : {}),
       responseMimeType: "application/json",
+      ...(options.responseSchema ? { responseJsonSchema: options.responseSchema } : {}),
       thinkingConfig: { includeThoughts: false },
     },
   };
@@ -2358,6 +2763,7 @@ async function callChatCompletion(
     timeoutMs?: number;
     modelMode?: "text" | "vision";
     model?: string;
+    responseSchema?: Record<string, unknown>;
   } = {},
 ) {
   const isDeepSeek = provider === "deepseek";
@@ -2433,7 +2839,17 @@ async function callChatCompletion(
           model,
           temperature: options.temperature ?? 0.82,
           ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
-          response_format: { type: "json_object" },
+          response_format:
+            provider === "openai" && options.responseSchema
+              ? {
+                  type: "json_schema",
+                  json_schema: {
+                    name: "persona_result",
+                    strict: true,
+                    schema: options.responseSchema,
+                  },
+                }
+              : { type: "json_object" },
           messages,
         }),
       });
@@ -2495,6 +2911,7 @@ async function callFirstAvailableJson<T>(
     timeoutMs?: number;
     modelMode?: "text" | "vision";
     validate?: (parsed: T) => boolean;
+    responseSchema?: Record<string, unknown>;
   },
 ): Promise<{ parsed: T; provider: AIProvider; model: string }> {
   const providers = await getAIProviderOrder();
@@ -2836,6 +3253,52 @@ ${JSON.stringify(stage1)}
 }`;
 }
 
+const PERSONA_STAGE3_JSON_SCHEMA: Record<string, unknown> = {
+  type: "object",
+  additionalProperties: false,
+  required: ["persona", "insights", "bondSummary"],
+  properties: {
+    persona: {
+      type: "object",
+      additionalProperties: false,
+      required: ["mbti", "personaTitle", "summary"],
+      properties: {
+        mbti: { type: "string", minLength: 1 },
+        personaTitle: { type: "string", minLength: 1, maxLength: 14 },
+        summary: { type: "string", minLength: 1, maxLength: 50 },
+      },
+    },
+    insights: {
+      type: "object",
+      additionalProperties: false,
+      required: ["misunderstanding", "affection", "relationship"],
+      properties: Object.fromEntries(
+        ["misunderstanding", "affection", "relationship"].map((key) => [
+          key,
+          {
+            type: "object",
+            additionalProperties: false,
+            required: ["title", "conclusion"],
+            properties: {
+              title: { type: "string", minLength: 1 },
+              conclusion: { type: "string", minLength: 1, maxLength: 60 },
+            },
+          },
+        ]),
+      ),
+    },
+    bondSummary: {
+      type: "object",
+      additionalProperties: false,
+      required: ["title", "quote"],
+      properties: {
+        title: { type: "string", minLength: 1 },
+        quote: { type: "string", minLength: 1, maxLength: 40 },
+      },
+    },
+  },
+};
+
 function stage3Prompt(
   stage1: PersonaStage1Output,
   stage2: PersonaStage2Output,
@@ -2853,59 +3316,77 @@ function stage3Prompt(
   })}
 Grounded Traits：${JSON.stringify(stage1.coreTraits)}
 Insights：${JSON.stringify(stage2)}
+四维人格已由代码根据 Stage 1 固定映射，本阶段禁止输出或重新判断 dimensions。
 上一版人格 prior：${JSON.stringify(
     previousPersona
       ? {
-          type: previousPersona.type,
-          mbti: previousPersona.mbti,
-          tags: previousPersona.tags,
-          corePersonality: previousPersona.corePersonality,
-          misunderstanding: previousPersona.misunderstanding,
-          loveLanguageInsight: previousPersona.loveLanguageInsight ?? previousPersona.loveLanguage,
-          ownerRelationship: previousPersona.ownerRelationship ?? previousPersona.ownerRole,
+          personaTitle: previousPersona.persona?.personaTitle ?? previousPersona.type,
+          mbti: previousPersona.persona?.mbti ?? previousPersona.mbti,
+          summary: previousPersona.persona?.summary ?? previousPersona.corePersonality,
+          insights: previousPersona.insights ?? {
+            misunderstanding: previousPersona.misunderstanding,
+            affection: previousPersona.loveLanguageInsight ?? previousPersona.loveLanguage,
+            relationship: previousPersona.ownerRelationship ?? previousPersona.ownerRole,
+          },
+          bondSummary: previousPersona.bondSummary,
         }
       : null,
   )}
 
-人格标题规则：
+【人格结论】
+- persona 只包含 mbti、personaTitle、summary。
+- summary 只总结最重要的人格特征，30-50 个中文字符，不重复罗列 dimensions。
+- MBTI 和标题在相同输入下应保持稳定；没有强新证据时，不推翻上一版核心方向。
+
+personaTitle 规则：
 - 可理解性 > 准确 > 共鸣 > 创意。
 - 禁止造词，禁止 XX控、XX王、XX机、营业、控场、发令、施压、稳态、高质互动、策略性靠近、仪式感极强、端庄定点、克制讨关注。
 - 标题必须像一个人格名称，不要只是形容词短语。优先 “XX型/派/系”“XX的XX者”，或“主动亲近，但很有边界”这类轻句式。
 - 优先 4-10 个中文字符；句式标题最多 12-14 字；如果超过 14 字必须改短；普通养猫人第一次看到就懂。
 - 避免“亲近有边界”“按自己节奏营业的互动控”这类不自然标题；可改为“边界感亲近派”“慢热观察型”。
-- 如果上一版 prior 与当前 grounded traits 没有明显冲突，保持标题语义方向、MBTI 和前 3 个 tags 的大部分重合。
 
-Tags 规则：
-- 必须是自然行为语言，每个 2-6 个中文字为佳。
-- 好例：主动靠近、不爱强抱、先观察再靠近、喜欢待在附近、边界感强、会用眼神表达。
-- 坏例：互动控场王、眼神发令机、克制讨关注、稳态陪伴、精准互动。
+【三个洞察】
+- 必须完整输出 misunderstanding、affection、relationship。
+- title 固定使用给定语义，不创造第四种洞察。
+- conclusion 每条 25-50 个中文字符，最多 60 字，一句话讲清楚。
+- 三条必须提供不同信息，不允许把同一人格特点换三种说法重复。
 
-Insight 规则：
-- 三条 insight 每条 35-60 个中文字符，2-3 行即可，不要写成 80-100 字报告。
-- 只写用户能理解的相处观察，不要写心理学报告腔。
+【关系总结】
+- bondSummary 只负责情绪总结，不重复 dimensions 或 insights，也不继续分析人格。
+- quote 20-40 个中文字符，自然、温暖、不肉麻。
+
+【证据约束】
+- 所有结论只能基于输入。禁止根据单张照片推断长期习惯，禁止编造固定路线、固定时间、每天发生的行为。
+- 证据不足时仍返回完整字段，但表达更谨慎，不允许编造。
 
 Final Copy Self-check：
 输出前逐条检查：普通养猫人能否一眼看懂；有没有需要解释的词；有没有 AI 造词感；有没有把推测写成事实；有没有重复表达；有没有营销腔或心理学报告腔。任一不通过，自动改写。
 
-输出严格 JSON：
+只输出以下严格 JSON，不允许额外字段：
 {
-  "personaTitle": "...",
-  "mbti": "INFP-A",
-  "summary": "...",
-  "monologue": "...",
-  "tags": ["...", "...", "...", "..."],
-  "insights": {
-    "misunderstanding": "...",
-    "affection": "...",
-    "ownerRelationship": "..."
+  "persona": {
+    "mbti": "INFP-A",
+    "personaTitle": "...",
+    "summary": "..."
   },
-  "matchScore": 88,
-  "traits": [
-    {"label": "好奇心", "value": 70},
-    {"label": "边界感", "value": 70},
-    {"label": "亲近表达", "value": 70},
-    {"label": "警觉度", "value": 70}
-  ]
+  "insights": {
+    "misunderstanding": {
+      "title": "你可能一直误会它的一件事",
+      "conclusion": "..."
+    },
+    "affection": {
+      "title": "它表达喜欢的方式",
+      "conclusion": "..."
+    },
+    "relationship": {
+      "title": "在它眼里，你的位置",
+      "conclusion": "..."
+    }
+  },
+  "bondSummary": {
+    "title": "${profile.name}和你的关系",
+    "quote": "..."
+  }
 }`;
 }
 
@@ -2926,6 +3407,7 @@ async function runPersonaAIStage<T>({
     timeoutMs?: number;
     modelMode?: "text" | "vision";
     validate: (parsed: unknown) => boolean;
+    responseSchema?: Record<string, unknown>;
   };
 }): Promise<{ output: T; log: PersonaStageLog }> {
   const startedAt = Date.now();
@@ -3080,19 +3562,8 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
         temperature: 0.5,
         timeoutMs: 16_000,
         modelMode: "text",
-        validate: (parsed) => {
-          const raw = getObjectRecord(parsed);
-          const insights = getObjectRecord(raw?.insights);
-          return Boolean(
-            raw?.personaTitle &&
-            raw.mbti &&
-            raw.summary &&
-            Array.isArray(raw.tags) &&
-            insights?.misunderstanding &&
-            insights.affection &&
-            insights.ownerRelationship,
-          );
-        },
+        responseSchema: PERSONA_STAGE3_JSON_SCHEMA,
+        validate: (parsed) => validatePersonaStage3ModelOutput(parsed, stableStage3.dimensions),
       },
     });
     let finalCopy = stage3Run.output;
@@ -3250,90 +3721,66 @@ export const generateCatPersona = createServerFn({ method: "POST" })
 
 export async function generateCatVoiceServer(input: VoiceInput): Promise<Voice> {
   const data = validateVoiceInput(input);
-  const prompt = `你是「喵一下」的猫咪心声观察者。你不是在描述照片，也不是给照片配一句通用的可爱宠物文案。
+  const personaContext = canonicalVoicePersona(data.persona);
+  const profileContext = {
+    name: data.profile.name,
+    gender: data.profile.gender,
+    ageStage: data.profile.ageStage,
+  };
+  const prompt = `你是「喵一下」的猫咪心声观察者。请按固定链路工作：
+当前画面事实 → 当前意图 → 既有人格只调整表达口吻 → 一句猫咪心声。
 
-你要从猫咪当前真实可见的动作、表情、视线和环境互动中，找出这一刻最有意思、最有辨识度的一个行为细节，再结合已有的人格档案，推测它正在关注什么、可能想做什么、为什么还没有行动，以及它会如何评价眼前发生的事。
+【猫咪基础资料】
+${JSON.stringify(profileContext)}
 
-【猫咪资料】
-${JSON.stringify(data.profile)}
-
-【已有猫咪人格】
-${JSON.stringify(data.persona)}
+【稳定人格档案】
+${JSON.stringify(personaContext ?? "暂无稳定人格档案")}
 
 【用户补充场景】
 ${data.scene || "无补充场景"}
 
-语言总原则：
-1. 第一优先级是人话。普通养猫人第一次看到，就应该马上懂。
-2. 禁止创造新概念。不要把简单行为包装成自造术语。
-3. 不要写成心理学报告、品牌广告、MBTI 博主或学术分析。
-4. 先描述主人能观察到的真实行为，再给一层轻度解释。
+事实优先级必须固定为：当前图片真实可见信息 > 用户补充场景 > 稳定人格档案 > 文风创意。
+如果人格与画面冲突，以画面为准；人格不能改变事实，也不能强迫当前行为符合长期标签。
 
-禁止在 tags、analysis、subtext 和分享 insight 中使用这类抽象包装词：
-仪式感、施压、掌控节奏、节奏掌控、秩序感、克制讨关注、高度敏锐、策略性靠近、精准表达、端庄定点、稳态陪伴、低频高质互动、眼神施压、眼神催促。
-坏例：眼神施压、端庄定点、克制讨关注、稳态陪伴、低频高质互动。
-好例：会用眼神表达、喜欢待在附近、先观察再靠近、不爱大声催促、有自己的边界、熟了会更黏。
+第一步 visibleObservations：
+- 输出 1–6 条只靠图片可以直接确认的事实，例如视线方向、姿势、动作、与人或物体的距离。
+- 禁止出现“喜欢、讨厌、谨慎、独立、想念、嫉妒、性格、人格”等解释或心理结论。
+- 看不清就少写，不能补全不存在的人、物体、动作或长期习惯。
 
-请先在内部判断，不输出推理过程：
-1. 猫正在看什么？身体是在放松、准备行动、观察还是回避？
-2. 哪个物体、人或动作最吸引它？
-3. 是否存在“想靠近但没靠近、想行动但还在等、表面不在意却一直盯着”等有证据的反差？
-4. 当前行为与已有的人格有哪些一致或反差？
-优先选择其中最有戏的一个点，不要试图一次解释整张照片。
+第二步 currentIntent：
+- 只能从以下值选一个：${VOICE_CURRENT_INTENTS.join("、")}。
+- 必须能由 visibleObservations 或用户场景直接支持。
+- 证据不足时优先选“想观察”或“想等待”，不要编造强烈情绪。
 
-人格档案只影响它说话的口吻、反应方式、靠近方式和表达亲近的方式。不要机械重复 persona 中“温柔、观察型、慢热”等标签，也不要先套人格再改写照片事实。同样的对象，应让冲动型、观察型、傲娇型猫表现出不同态度。
+第三步人格调味：
+- personaTitle、MBTI 和 summary 只影响语气，不得直接写进 voiceLine。
+- dimensions 只用于细调：social 影响靠近方式，exploration 影响探索口吻，companionship 影响是否邀请主人参与，boundary 影响互动距离。
+- 人格影响约占表达的 20%，画面与场景事实至少占 70%，其余才是轻幽默。
+- 没有人格档案时照常生成，不得凭空补人格。
 
-字段要求：
-- text：最重要字段。第一人称猫咪口吻，优先 12–30 个中文字，最多 2 句；必须针对照片中的一个具体对象或行为，口语化，有一点猫的脾气、幽默或反差。写它对眼前事情的态度，不写“我喜欢你、我要陪你、我很开心”等泛泛情感。
-- subtext：15–30 个中文字，第三人称或旁白，比 text 安静一点；揭示表面行为之下的小反差，让主人觉得“它确实经常这样”，不能换句话重复 text。
-- analysis：拆成 observation 和 personalityInterpretation，两段合计优先 40–60 个中文字。observation 只保留一个具体可见行为及其可能含义；personalityInterpretation 用一句话联系既有人格。先写真实能看到的行为，再做轻度解释。不要重复罗列前爪、仰头、注视、没有扑等同一组事实，不罗列与行为无关的花、家具或装饰。
-- mood：2–6 个中文字，描述当前行为状态，例如观察中、跃跃欲试、假装淡定、正在评估、想玩但端着、警觉围观；禁止只写开心、温柔、治愈、平静等抽象情绪。
-- tags：严格生成 3 个自然口语标签，每个优先 4–10 个中文字，依次表达“当前行为、行为模式、反差或趣味”。必须一眼能懂，不造抽象新词，不只写人格形容词，不带 #；不要使用可爱猫咪、萌宠、治愈等泛标签。
+第四步 voiceLine：
+- 第一人称猫咪口吻，优先 15–35 个中文字，最多 2 句。
+- 必须回应画面中的具体对象或动作；自然、口语、轻幽默、有一点猫自己的脾气。
+- 不要复述 MBTI 或人格名称，不要写分析报告。
+- 禁止泛泛的“我喜欢你、我要陪着你、我很开心、有你在我就安心”。
+- 禁止“稳态、控场、发令、营业、策略性靠近、仪式感极强、行为模式、人格倾向、探索欲、边界意识”等 AI 术语。
+- 避免“赏脸、本喵、勉强、人类、铲屎官、高贵、本小姐”等通用傲娇模板。
 
-不要频繁使用“赏脸、本喵、勉强、人类、铲屎官、高贵、本小姐”等通用傲娇猫套话。趣味必须来自当前可见行为，而不是把所有猫写成同一种傲娇角色。
+兼容字段：
+- subtext：15–30 字，不重复 voiceLine，只揭示一层有事实依据的小反差。
+- analysis.observation：用一句自然中文串起最关键可见事实，不扩写背景。
+- analysis.personalityInterpretation：只做克制联系；没有人格或证据冲突时明确保守，不强行贴标签。
+- mood：2–6 字，描述当前行为状态。
+- tags：严格 3 个、不带 #，依次是当前行为、行为方式、轻反差；每个 4–10 字，必须一眼能懂。
 
-优先寻找有事实支撑的“A，但其实 B”，但不能为了搞笑虚构画面中不存在的动作、人物、情绪事件或长期习惯。照片只能证明可见行为，不能据此确定它喜欢或讨厌谁、嫉妒、想念主人、长期粘人或有心理问题。证据不足时，宁可写一个具体的小心思，也不要上升到深刻情感或医疗判断。
-
-避免固定套用“别看我、我只是、表面其实、你继续我先、不是不只是”等句式。请在内部形成至少 3 个不同角度的候选表达，最终只选最符合当前照片、人格且最不像模板的一条。
-
-【喵一下文风】
-聪明、自然、轻幽默、有猫味、具体、有一点小脾气，让主人会心一笑。禁止 AI 腔、看图作文、宠物公众号文案、鸡汤、过度煽情、小红书营销腔、大量“喵～”，以及“绝绝子、谁懂、可爱暴击、治愈一整天”等表达。
-
-严格返回 JSON，不要 Markdown，不要附加说明：
-{
-  "text": "猫咪第一人称心声",
-  "subtext": "它没说出口的小心思",
-  "analysis": {
-    "observation": "一个具体行为及其可能含义",
-    "personalityInterpretation": "该行为和既有人格的自然联系"
-  },
-  "mood": "当前行为状态",
-  "tags": ["标签1", "标签2", "标签3"]
-}
-
-输出前在内部自检：
-1. text 换成另一只猫是否仍成立；若成立，请重写。
-2. text 是否针对照片中的具体行为或物体；若没有，请重写。
-3. analysis 是否提供了超越表面描述的新理解；若只是看图作文，请重写。
-4. subtext 是否多揭示了一层小心思；若只是重复 text，请重写。
-5. tags 是否体现这一刻；若只是通用人格词，请重写。
-6. 这句话一个普通养猫人第一次看到，能不能立刻理解；如果不能，请改成更简单的中文。
-7. 是否为了温柔牺牲了这只猫的脾气和个性；若是，请重写。`;
+严格返回符合 schema 的 JSON，不要 Markdown。输出前自检：意图是否有可见证据、心声是否换只猫也成立、是否把人格写成事实、是否出现 AI 造词；任一不合格就重写。`;
   try {
-    const result = await callFirstAvailableJson<{
-      text?: unknown;
-      subtext?: unknown;
-      analysis?: unknown;
-      share?: unknown;
-      mood?: unknown;
-      location?: unknown;
-      tags?: unknown;
-    }>(
+    const result = await callFirstAvailableJson<VoiceGenerationOutput>(
       (provider) => [
         {
           role: "system",
           content:
-            "你是「喵一下」的猫咪心声观察者。先观察可见行为，再结合既有人格创作具体、有猫味、轻幽默的心声。事实优先，不看图作文、不套模板、不虚构、不做医疗判断。只返回合法 JSON。",
+            "你是「喵一下」的猫咪心声观察者。严格执行可见事实→当前意图→人格调味→心声的顺序；事实优先，不虚构、不套模板。只返回符合 schema 的 JSON。",
         },
         { role: "user", content: buildVisionContent(provider, prompt, data.imageDataUrl) },
       ],
@@ -3342,13 +3789,8 @@ ${data.scene || "无补充场景"}
         temperature: 0.62,
         timeoutMs: data.imageDataUrl ? 22_000 : 14_000,
         modelMode: data.imageDataUrl ? "vision" : "text",
-        validate: (parsed) => {
-          const analysis = getObjectRecord(parsed.analysis);
-          return Boolean(
-            asText(parsed.text) &&
-            (asText(parsed.analysis) || asText(analysis?.observation ?? analysis?.summary)),
-          );
-        },
+        responseSchema: VOICE_JSON_SCHEMA,
+        validate: (parsed) => validateVoiceGenerationOutput(parsed, data.persona),
       },
     );
     const parsed = result.parsed;
@@ -3363,13 +3805,13 @@ ${data.scene || "无补充场景"}
       !voice.share?.tags.length
     ) {
       if (await shouldRequireRealAI()) throw new Error("AI voice JSON missing required fields");
-      return buildStableVoice(data.profile, data.imageDataUrl, data.scene);
+      return buildStableVoice(data.profile, data.persona, data.imageDataUrl, data.scene);
     }
     return voice;
   } catch (error) {
     console.error("NEKO voice AI failed", error);
     if (await shouldRequireRealAI()) throw new Error(getUserFacingAIMessage("voice", error));
-    return buildStableVoice(data.profile, data.imageDataUrl, data.scene);
+    return buildStableVoice(data.profile, data.persona, data.imageDataUrl, data.scene);
   }
 }
 

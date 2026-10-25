@@ -28,6 +28,41 @@ export type CatProfile = {
 export type JsonValue =
   string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
+export type PersonaDimensionKey = "social" | "exploration" | "companionship" | "boundary";
+export type PersonaDirection = "left" | "center_left" | "center" | "center_right" | "right";
+export type PersonaStrength = "weak" | "medium" | "strong";
+
+export type PersonaSummary = {
+  mbti: string;
+  personaTitle: string;
+  summary: string;
+};
+
+export type PersonaDimension = {
+  key: PersonaDimensionKey;
+  name: string;
+  leftLabel: string;
+  rightLabel: string;
+  direction: PersonaDirection;
+  strength: PersonaStrength;
+};
+
+export type PersonaInsight = {
+  title: string;
+  conclusion: string;
+};
+
+export type PersonaInsights = {
+  misunderstanding: PersonaInsight;
+  affection: PersonaInsight;
+  relationship: PersonaInsight;
+};
+
+export type PersonaBondSummary = {
+  title: string;
+  quote: string;
+};
+
 export type CatPersona = {
   cloudId?: string;
   catCloudId?: string;
@@ -51,6 +86,11 @@ export type CatPersona = {
   savedAt: number;
   provider?: string;
   model?: string;
+  /** Canonical Persona Result protocol. Legacy fields above are derived compatibility output. */
+  persona?: PersonaSummary;
+  dimensions?: PersonaDimension[];
+  insights?: PersonaInsights;
+  bondSummary?: PersonaBondSummary;
   generation?: {
     generationId: string;
     inputHash: string;

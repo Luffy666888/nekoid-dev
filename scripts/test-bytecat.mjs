@@ -331,22 +331,154 @@ const personaStage2Fixture = {
 };
 
 const personaStage3Fixture = {
-  personaTitle: "会先看清楚",
-  mbti: "INTJ-A",
-  summary: "它习惯先看清楚眼前变化，再按自己的节奏靠近互动。",
-  monologue: "我先看清楚，再决定怎么靠近。",
-  tags: ["先观察再靠近", "不急着靠近", "靠近有分寸", "会先看清楚"],
-  insights: {
-    misunderstanding: "它不是对互动没兴趣，只是常常先停下来确认，再决定要不要靠近。",
-    affection: "它表达喜欢不一定靠一直贴着你，更像是把注意力放在你身上再慢慢回应。",
-    ownerRelationship: "你像它可以放心观察的参照，它会保留自己的节奏，也愿意在你附近。",
+  persona: {
+    personaTitle: "会先看清楚",
+    mbti: "INTJ-A",
+    summary: "它习惯先看清楚眼前变化，再按自己的节奏靠近互动。",
   },
-  matchScore: 88,
-  traits: ["观察欲", "边界感", "主人关注度", "行动派程度"].map((label) => ({
-    label,
-    value: 72,
-  })),
+  insights: {
+    misunderstanding: {
+      title: "你可能一直误会它的一件事",
+      conclusion: "它不是对互动没兴趣，只是常常先停下来确认，再决定要不要靠近。",
+    },
+    affection: {
+      title: "它表达喜欢的方式",
+      conclusion: "它表达喜欢不一定靠一直贴着你，更像是把注意力放在你身上再慢慢回应。",
+    },
+    relationship: {
+      title: "在它眼里，你的位置",
+      conclusion: "你像它可以放心观察的参照，它会保留自己的节奏，也愿意在你附近。",
+    },
+  },
+  bondSummary: {
+    title: "团子和你的关系",
+    quote: "你是它可以放心观察，也愿意回到附近的人。",
+  },
 };
+
+function canonicalPersonaResult(api) {
+  return {
+    ...structuredClone(personaStage3Fixture),
+    dimensions: api.personaDimensionsFromBehavior(personaStage1Fixture.behaviorProfile),
+  };
+}
+
+test("persona result protocol accepts the complete canonical result", () => {
+  const api = loadAIServer("neko-ai", {
+    internals: ["validatePersonaResultProtocol", "personaDimensionsFromBehavior"],
+  });
+  assert.equal(api.validatePersonaResultProtocol(canonicalPersonaResult(api)), true);
+});
+
+test("persona result protocol rejects missing, duplicate and invalid dimensions", () => {
+  const api = loadAIServer("neko-ai", {
+    internals: ["validatePersonaResultProtocol", "personaDimensionsFromBehavior"],
+  });
+  const missing = canonicalPersonaResult(api);
+  missing.dimensions.pop();
+  assert.equal(api.validatePersonaResultProtocol(missing), false);
+
+  const duplicate = canonicalPersonaResult(api);
+  duplicate.dimensions[3] = structuredClone(duplicate.dimensions[0]);
+  assert.equal(api.validatePersonaResultProtocol(duplicate), false);
+
+  const invalidDirection = canonicalPersonaResult(api);
+  invalidDirection.dimensions[0].direction = "mostly_left";
+  assert.equal(api.validatePersonaResultProtocol(invalidDirection), false);
+
+  const invalidStrength = canonicalPersonaResult(api);
+  invalidStrength.dimensions[0].strength = "very_strong";
+  assert.equal(api.validatePersonaResultProtocol(invalidStrength), false);
+});
+
+test("persona result protocol rejects missing insights, missing bond and excess copy", () => {
+  const api = loadAIServer("neko-ai", {
+    internals: ["validatePersonaResultProtocol", "personaDimensionsFromBehavior"],
+  });
+  const missingInsight = canonicalPersonaResult(api);
+  delete missingInsight.insights.affection;
+  assert.equal(api.validatePersonaResultProtocol(missingInsight), false);
+
+  const missingBond = canonicalPersonaResult(api);
+  delete missingBond.bondSummary;
+  assert.equal(api.validatePersonaResultProtocol(missingBond), false);
+
+  const longTitle = canonicalPersonaResult(api);
+  longTitle.persona.personaTitle = "这是一个明显超过十四个中文字符的人格标题";
+  assert.equal(api.validatePersonaResultProtocol(longTitle), false);
+
+  const longSummary = canonicalPersonaResult(api);
+  longSummary.persona.summary = "它".repeat(51);
+  assert.equal(api.validatePersonaResultProtocol(longSummary), false);
+
+  const longInsight = canonicalPersonaResult(api);
+  longInsight.insights.relationship.conclusion = "它".repeat(61);
+  assert.equal(api.validatePersonaResultProtocol(longInsight), false);
+
+  const longQuote = canonicalPersonaResult(api);
+  longQuote.bondSummary.quote = "它".repeat(41);
+  assert.equal(api.validatePersonaResultProtocol(longQuote), false);
+});
+
+test("persona result protocol rejects provider extra fields", () => {
+  const api = loadAIServer("neko-ai", {
+    internals: ["validatePersonaResultProtocol", "personaDimensionsFromBehavior"],
+  });
+  const extra = canonicalPersonaResult(api);
+  extra.providerNote = "unexpected";
+  assert.equal(api.validatePersonaResultProtocol(extra), false);
+});
+
+test("insufficient evidence maps to conservative center and weak dimensions", () => {
+  const api = loadAIServer("neko-ai", {
+    internals: ["validatePersonaResultProtocol", "personaDimensionsFromBehavior"],
+  });
+  const neutral = api.personaDimensionsFromBehavior({
+    sociability: 50,
+    curiosity: 50,
+    caution: 50,
+    attachmentExpression: 50,
+    independence: 50,
+    boundary: 50,
+    environmentalSensitivity: 50,
+    interactionPreference: 50,
+  });
+  assert.deepEqual(
+    Array.from(neutral, (dimension) => [dimension.direction, dimension.strength]),
+    Array(4).fill(["center", "weak"]),
+  );
+});
+
+test("invalid persona result retries and recovers on the next provider", async () => {
+  let calls = 0;
+  const validatingApi = loadAIServer("neko-ai", {
+    env,
+    logger,
+    internals: [
+      "callFirstAvailableJson",
+      "validatePersonaResultProtocol",
+      "personaDimensionsFromBehavior",
+    ],
+    fetch: async () => {
+      calls++;
+      const valid = canonicalPersonaResult(validatingApi);
+      const payload = calls === 1 ? { ...valid, dimensions: valid.dimensions.slice(0, 3) } : valid;
+      return calls === 1
+        ? Response.json({ choices: [{ message: { content: JSON.stringify(payload) } }] })
+        : geminiResponse(JSON.stringify(payload));
+    },
+  });
+  const result = await validatingApi.callFirstAvailableJson(
+    () => [
+      { role: "system", content: "Return JSON" },
+      { role: "user", content: "Generate persona" },
+    ],
+    { modelMode: "text", validate: validatingApi.validatePersonaResultProtocol },
+  );
+  assert.equal(calls, 2);
+  assert.equal(validatingApi.validatePersonaResultProtocol(result.parsed), true);
+  assert.equal(result.model, "gemini-3.7-flash");
+});
 
 function promptTextFromBody(body) {
   const content = body.messages?.[1]?.content;
@@ -484,23 +616,17 @@ test("merged persona preserves four traits and the updated generation settings",
         },
       };
       const stage3 = {
-        personaTitle: "谨慎小探长",
-        mbti: "INTJ-A",
-        matchScore: 88,
-        monologue: "让我先看看，再决定要不要靠近。",
-        summary: "它习惯先确认情况，再按自己的节奏靠近。",
-        insights: {
-          misunderstanding:
-            "它不是不想参与，只是习惯先把局面看明白；坐着不动时，注意力可能早已放在眼前。",
-          affection: "如果它平时也经常这样，它可能更习惯把你放在视线里，用关注而不是紧贴表达亲近。",
-          ownerRelationship:
-            "你可能不是它时时刻刻都要黏着的人，但很可能是它默认会在、可以放心观察周围的人。",
+        persona: {
+          personaTitle: "谨慎小探长",
+          mbti: "INTJ-A",
+          summary: "它习惯先确认情况，再按自己的节奏靠近。",
         },
-        tags: ["观察优先", "保留距离", "心动不动", "小小探长"],
-        traits: ["观察欲", "边界感", "主人关注度", "行动派程度"].map((label) => ({
-          label,
-          value: 72,
-        })),
+        insights: {
+          misunderstanding: { title: "你可能一直误会它的一件事", conclusion: "它不是不想参与，只是习惯先把局面看明白；坐着不动时，注意力可能早已放在眼前。" },
+          affection: { title: "它表达喜欢的方式", conclusion: "如果它平时也经常这样，它可能更习惯把你放在视线里，用关注而不是紧贴表达亲近。" },
+          relationship: { title: "在它眼里，你的位置", conclusion: "你可能不是它时时刻刻都要黏着的人，但很可能是它默认会在、可以放心观察周围的人。" },
+        },
+        bondSummary: { title: "团子和你的关系", quote: "你是它可以放心观察，也愿意回到附近的人。" },
       };
       return Response.json({
         choices: [
@@ -518,9 +644,9 @@ test("merged persona preserves four traits and the updated generation settings",
   assert.equal(result.type, "先看再行动");
   assert.deepEqual(Array.from(result.tags), [
     "先观察再靠近",
-    "不急着靠近",
-    "想靠近又犹豫",
-    "会先看清楚",
+    "边界感强",
+    "喜欢待在附近",
+    "不爱强抱",
   ]);
   assert.equal(result.tags.length, 4);
   assert.equal(result.traits.length, 4);
@@ -591,24 +717,17 @@ test("persona uses video observations as text and does not resend video frames",
         },
       };
       const stage3 = {
-        personaTitle: "先看再动",
-        mbti: "INFP-A",
-        matchScore: 91,
-        monologue: "我先盯准了，再决定要不要扑过去。",
-        summary: "它遇到想玩的东西时，会先看清楚再行动。",
-        insights: {
-          misunderstanding:
-            "它不是对互动没兴趣，只是常常先停下来观察，确认安全和节奏后才会把注意力真正放出来。",
-          affection:
-            "它表达亲近不一定靠一直贴着你，更像是把注意力放在你和眼前互动上，等时机合适再靠近。",
-          ownerRelationship:
-            "你对它来说可能是那个可以让它安心观察的人，它会保留自己的节奏，但也会回应你制造的小互动。",
+        persona: {
+          personaTitle: "先看再动",
+          mbti: "INFP-A",
+          summary: "它遇到想玩的东西时，会先看清楚再行动。",
         },
-        tags: ["盯着玩具", "先看再动", "靠近有分寸", "熟悉后会玩"],
-        traits: ["观察欲", "好奇心", "边界感", "行动派程度"].map((label) => ({
-          label,
-          value: 76,
-        })),
+        insights: {
+          misunderstanding: { title: "你可能一直误会它的一件事", conclusion: "它不是对互动没兴趣，只是常常先停下来观察，确认安全和节奏后才会把注意力真正放出来。" },
+          affection: { title: "它表达喜欢的方式", conclusion: "它表达亲近不一定靠一直贴着你，更像是把注意力放在你和眼前互动上，等时机合适再靠近。" },
+          relationship: { title: "在它眼里，你的位置", conclusion: "你对它来说可能是那个可以让它安心观察的人，它会保留自己的节奏，但也会回应你制造的小互动。" },
+        },
+        bondSummary: { title: "团子和你的关系", quote: "你是它可以安心观察，也愿意回应互动的人。" },
       };
       return Response.json({
         choices: [
@@ -752,23 +871,17 @@ test("persona drift check keeps 六六 stable across five same-input runs", asyn
             {
               message: {
                 content: JSON.stringify({
-                  personaTitle: variant.personaTitle,
-                  mbti: variant.mbti,
-                  matchScore: 88,
-                  monologue: "我会靠近你，但想自己决定距离。",
-                  summary: "它愿意靠近熟悉的人，也希望自己决定互动距离。",
-                  insights: {
-                    misunderstanding:
-                      "它不是不亲人，只是更希望自己决定距离；靠近你和保留边界可以同时存在。",
-                    affection: "它表达喜欢时，会待在你附近看你的反应，也会选择自己舒服的接触方式。",
-                    ownerRelationship:
-                      "你像一个让它安心的人，它愿意回到你附近，也希望你尊重它的节奏。",
+                  persona: {
+                    personaTitle: variant.personaTitle,
+                    mbti: variant.mbti,
+                    summary: "它愿意靠近熟悉的人，也希望自己决定互动距离。",
                   },
-                  tags: variant.tags,
-                  traits: ["边界感", "亲近表达", "观察欲", "互动偏好"].map((label) => ({
-                    label,
-                    value: 72,
-                  })),
+                  insights: {
+                    misunderstanding: { title: "你可能一直误会它的一件事", conclusion: "它不是不亲人，只是更希望自己决定距离；靠近你和保留边界可以同时存在。" },
+                    affection: { title: "它表达喜欢的方式", conclusion: "它表达喜欢时，会待在你附近看你的反应，也会选择自己舒服的接触方式。" },
+                    relationship: { title: "在它眼里，你的位置", conclusion: "你像一个让它安心的人，它愿意回到你附近，也希望你尊重它的节奏。" },
+                  },
+                  bondSummary: { title: "六六和你的关系", quote: "你是它愿意靠近，也能尊重它节奏的人。" },
                 }),
               },
             },
@@ -887,8 +1000,156 @@ test("persona and voice labels rewrite AI-ish phrases into plain cat-owner langu
   ]);
 });
 
-for (const structured of [false, true]) {
-  test(`merged voice accepts ${structured ? "structured" : "text"} analysis and produces share fields`, async () => {
+const voicePersonaFixture = {
+  persona: {
+    mbti: "ISTP-A",
+    personaTitle: "独立探索型",
+    summary: "喜欢自己先弄明白，也会在想互动时主动靠近。",
+  },
+  dimensions: [
+    { key: "social", direction: "center", strength: "weak" },
+    { key: "exploration", direction: "left", strength: "strong" },
+    { key: "companionship", direction: "right", strength: "strong" },
+    { key: "boundary", direction: "center_right", strength: "medium" },
+  ],
+};
+
+test("voice validator covers intent evidence, persona tone, missing persona and weak evidence", () => {
+  const api = loadAIServer("neko-ai", {
+    internals: ["validateVoiceGenerationOutput"],
+  });
+  const cases = [
+    ["高探索+独立玩玩具", ["猫独自盯着羽毛玩具", "前爪伸向玩具"], "想抓", "这根羽毛先别动，我想自己试试从哪边下爪。", voicePersonaFixture],
+    ["高陪伴看主人", ["猫抬头看向主人", "身体靠近主人"], "想让主人参与", "你也过来一点，这件事我想让你一起看看。", null],
+    ["高边界被抱", ["猫被人抱着", "身体向外侧转开"], "想保持距离", "先把手松一点，我想自己决定站在哪里。", null],
+    ["谨慎面对陌生物", ["猫与纸箱保持距离", "视线停在纸箱上"], "想观察", "这个箱子先放着，我要再看清楚一点。", null],
+    ["探索型闻新物体", ["猫鼻子靠近新物体", "正在嗅闻"], "想靠近", "这个味道没见过，让我靠近一点再确认。", null],
+    ["独立型自己玩", ["猫独自用前爪拍球", "旁边没有人手"], "想自己处理", "这个球我自己会处理，你先看着就好。", voicePersonaFixture],
+    ["陪伴型看主人", ["猫看向主人", "停在主人身旁"], "想获得关注", "我都站到你旁边了，你是不是该看我一眼。", null],
+    ["证据不足", ["猫坐着看向镜头"], "想观察", "我先看一会，弄清楚这个小方块在做什么。", null],
+    ["没有人格档案", ["猫趴着闭上眼睛"], "想休息", "这里刚好安静，我先把这一觉睡完。", null],
+    ["画面与活泼人格冲突", ["猫蜷缩着睡觉", "眼睛闭着"], "想休息", "现在先别安排节目，我只想安静睡一会。", voicePersonaFixture],
+  ];
+  for (const [name, visibleObservations, currentIntent, voiceLine, persona] of cases) {
+    assert.equal(
+      api.validateVoiceGenerationOutput(
+        {
+          visibleObservations,
+          currentIntent,
+          voiceLine,
+          subtext: "它这一刻的注意力很具体，没有急着做更多动作。",
+          analysis: {
+            observation: visibleObservations.join("，"),
+            personalityInterpretation: "当前画面优先，既有人格只影响它表达这件事的语气。",
+          },
+          mood: currentIntent,
+          tags: ["看着眼前", "按自己节奏", "还没着急"],
+        },
+        persona,
+      ),
+      true,
+      name,
+    );
+  }
+
+  const invalid = {
+    visibleObservations: ["猫很谨慎，也很独立"],
+    currentIntent: "想观察",
+    voiceLine: "作为一只独立探索型的猫，我展现出了很强的探索欲。",
+    subtext: "它正在观察。",
+    analysis: { observation: "猫坐着。", personalityInterpretation: "它很谨慎。" },
+    mood: "观察中",
+    tags: ["观察", "谨慎", "独立"],
+  };
+  assert.equal(api.validateVoiceGenerationOutput(invalid, voicePersonaFixture), false);
+});
+
+test("same cat voice candidates keep a stable independent tone across five generations", () => {
+  const api = loadAIServer("neko-ai", { internals: ["validateVoiceGenerationOutput"] });
+  const lines = [
+    "这个球我自己会处理，你先看着就好。",
+    "先别替我拿，我想自己试试它会滚到哪里。",
+    "它又跑远了，我自己过去把它找回来。",
+    "你把球放下就行，剩下的我来研究。",
+    "先让我自己玩明白，想叫你时我会抬头。",
+  ];
+  for (const voiceLine of lines) {
+    assert.equal(
+      api.validateVoiceGenerationOutput(
+        {
+          visibleObservations: ["猫独自用前爪拍球", "旁边没有人手"],
+          currentIntent: "想自己处理",
+          voiceLine,
+          subtext: "它专注在球上，没有转头寻找人的帮助。",
+          analysis: {
+            observation: "猫独自用前爪拍球，注意力停在球上。",
+            personalityInterpretation: "这种自己先试的表达，和它偏独立的互动方式一致。",
+          },
+          mood: "自己研究",
+          tags: ["拍着小球", "自己先试", "暂时不求助"],
+        },
+        voicePersonaFixture,
+      ),
+      true,
+      voiceLine,
+    );
+  }
+});
+
+test("invalid voice semantics retry before returning a valid grounded result", async () => {
+  let calls = 0;
+  const api = loadAIServer("neko-ai", {
+    env,
+    logger,
+    fetch: async () => {
+      calls++;
+      const content =
+        calls === 1
+          ? {
+              visibleObservations: ["猫很谨慎"],
+              currentIntent: "想玩",
+              voiceLine: "我今天也要开心呀。",
+              subtext: "它很开心。",
+              analysis: { observation: "猫很谨慎。", personalityInterpretation: "它很谨慎。" },
+              mood: "开心",
+              tags: ["可爱", "萌宠", "治愈"],
+            }
+          : {
+              visibleObservations: ["猫盯着羽毛玩具", "前爪抬起"],
+              currentIntent: "想抓",
+              voiceLine: "那根羽毛先别停，我还在找最好下爪的位置。",
+              subtext: "它没有马上扑，注意力却一直跟着羽毛移动。",
+              analysis: {
+                observation: "猫盯着羽毛玩具并抬起前爪。",
+                personalityInterpretation: "它更像在等自己觉得合适的时机再行动。",
+              },
+              mood: "准备出爪",
+              tags: ["盯着羽毛", "先看再出手", "想玩但没扑"],
+            };
+      return calls === 1
+        ? Response.json({ choices: [{ message: { content: JSON.stringify(content) } }] })
+        : geminiResponse(JSON.stringify(content));
+    },
+  });
+  const result = await api.generateCatVoiceServer({
+    profile: mergedProfile,
+    persona: null,
+    imageDataUrl,
+  });
+  assert.equal(calls, 2);
+  assert.equal(result.text, "那根羽毛先别停，我还在找最好下爪的位置。");
+});
+
+test("voice fallback stays conservative when image evidence is unavailable", () => {
+  const api = loadAIServer("neko-ai", { internals: ["buildStableVoice"] });
+  const result = api.buildStableVoice(mergedProfile, null, imageDataUrl, "");
+  assert.equal(result.text, "这个有点意思，我再看一会。");
+  assert.match(result.analysis.observation, /证据有限|留意周围/);
+  assert.doesNotMatch(result.text, /喜欢|讨厌|想念|嫉妒/);
+});
+
+for (const personaMode of ["without persona", "with persona"]) {
+  test(`voice observation-intent chain works ${personaMode}`, async () => {
     let calls = 0;
     const api = loadAIServer("neko-ai", {
       env,
@@ -903,14 +1164,14 @@ for (const structured of [false, true]) {
             {
               message: {
                 content: JSON.stringify({
-                  text: "你举着那个小方块，我先坐好看看。",
+                  visibleObservations: ["猫端坐着", "眼睛看向镜头"],
+                  currentIntent: "想观察",
+                  voiceLine: "你举着那个小方块，我先坐好看看。",
                   subtext: "它没有急着靠近，还在观察眼前的变化。",
-                  analysis: structured
-                    ? {
-                        observation: "前爪并拢，眼睛看向镜头。",
-                        personalityInterpretation: "可能习惯先看清楚再行动。",
-                      }
-                    : "前爪并拢，眼睛看向镜头，可能正在等待熟悉的互动。",
+                  analysis: {
+                    observation: "前爪并拢，眼睛看向镜头。",
+                    personalityInterpretation: "可能习惯先看清楚再行动。",
+                  },
                   mood: "正在观察",
                   tags: ["先看清楚", "端正坐好", "暂不靠近"],
                 }),
@@ -922,7 +1183,7 @@ for (const structured of [false, true]) {
     });
     const result = await api.generateCatVoiceServer({
       profile: mergedProfile,
-      persona: null,
+      persona: personaMode === "with persona" ? voicePersonaFixture : null,
       imageDataUrl,
     });
     assert.equal(calls, 1);
@@ -1082,10 +1343,16 @@ test("updated voice uses Preview after upstream failure and a thought-only Gemin
       assert.equal(body.generationConfig.temperature, 0.62);
       return geminiResponse(
         JSON.stringify({
-          text: "你举着那个小方块，我先坐好看看。",
-          analysis: "前爪并拢，眼睛看向镜头，可能正在等待熟悉的互动。",
+          visibleObservations: ["猫端坐着", "眼睛看向镜头"],
+          currentIntent: "想观察",
+          voiceLine: "你举着那个小方块，我先坐好看看。",
+          analysis: {
+            observation: "前爪并拢，眼睛看向镜头。",
+            personalityInterpretation: "可能习惯先看清楚再行动。",
+          },
           subtext: "它还没有急着行动，像是在等你先回应。",
-          tags: ["端正坐好", "关注镜头"],
+          mood: "正在观察",
+          tags: ["端正坐好", "关注镜头", "还没行动"],
         }),
       );
     },
