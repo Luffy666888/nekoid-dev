@@ -134,7 +134,7 @@ export function AuthLoginScreen() {
           <StatusBar />
           <div className="absolute inset-0 flex items-center justify-center px-7">
             <div
-              className="w-full rounded-[28px] bg-white/85 p-5 text-center backdrop-blur"
+              className="miao-card w-full p-5 text-center"
               style={{ boxShadow: "var(--shadow-soft)" }}
             >
               <div className="neko-text-card-title text-foreground">云端登录暂不可用</div>
@@ -162,7 +162,7 @@ export function AuthLoginScreen() {
           <StatusBar />
           <div className="absolute inset-0 flex items-center justify-center px-7">
             <div
-              className="w-full rounded-[28px] bg-white/85 p-5 text-center backdrop-blur"
+              className="miao-card w-full p-5 text-center"
               style={{ boxShadow: "var(--shadow-soft)" }}
             >
               <div className="mx-auto mb-4 w-fit">
@@ -208,24 +208,18 @@ export function AuthLoginScreen() {
           </Link>
 
           <div className="mt-8">
-            <div className="neko-text-tiny text-[oklch(0.58_0.08_320)]">
-              喵一下账号
-            </div>
-            <h1 className="mt-3 neko-text-page-title text-foreground">
-              邮箱验证码登录
-            </h1>
+            <div className="neko-text-tiny text-[oklch(0.58_0.08_320)]">喵一下账号</div>
+            <h1 className="mt-3 neko-text-page-title text-foreground">邮箱验证码登录</h1>
             <p className="mt-2 neko-text-micro text-[oklch(0.55_0.06_300)]">
               输入邮箱，我们会给你发送 6 位验证码。
             </p>
           </div>
 
           <div
-            className="mt-8 rounded-[28px] bg-white/85 p-4 backdrop-blur"
+            className="miao-card mt-8 p-5"
             style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.72)" }}
           >
-            <label className="neko-text-tiny text-[oklch(0.55_0.06_300)]">
-              邮箱
-            </label>
+            <label className="neko-text-tiny text-[oklch(0.55_0.06_300)]">邮箱</label>
             <input
               value={email}
               onChange={(event) => setEmail(event.target.value)}
@@ -252,9 +246,7 @@ export function AuthLoginScreen() {
 
             {sentEmail && (
               <div className="mt-5">
-                <label className="neko-text-tiny text-[oklch(0.55_0.06_300)]">
-                  6 位验证码
-                </label>
+                <label className="neko-text-tiny text-[oklch(0.55_0.06_300)]">6 位验证码</label>
                 <input
                   value={code}
                   onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
@@ -284,7 +276,7 @@ export function AuthLoginScreen() {
             )}
           </div>
 
-          <div className="mt-5 rounded-[22px] bg-white/60 p-4 neko-text-tiny text-[oklch(0.55_0.06_300)] backdrop-blur">
+          <div className="miao-card-compact mt-5 p-4 neko-text-support text-[var(--miao-text-secondary)]">
             邮箱会作为账号唯一标识。登录后，你的猫咪档案、人格和心声会通过 RLS 只绑定到当前用户。
           </div>
         </div>
@@ -352,7 +344,7 @@ export function AccountScreen() {
         <StatusBar />
         <div className="absolute inset-0 flex items-center justify-center px-7">
           <div
-            className="w-full rounded-[28px] bg-white/85 p-5 text-center backdrop-blur"
+            className="miao-card w-full p-5 text-center"
             style={{ boxShadow: "var(--shadow-soft)" }}
           >
             <div className="neko-text-card-title text-foreground">需要先登录</div>
@@ -389,7 +381,7 @@ export function AccountScreen() {
         </div>
 
         <div
-          className="mt-5 overflow-hidden rounded-[26px] p-5"
+          className="miao-card mt-5 overflow-hidden p-5"
           style={{
             background: "linear-gradient(135deg, oklch(0.96 0.035 320), oklch(0.95 0.04 280))",
             boxShadow: "var(--shadow-soft)",
@@ -399,9 +391,7 @@ export function AccountScreen() {
           <div className="flex items-center gap-4">
             <CatAvatar size={68} usePhoto />
             <div className="min-w-0 flex-1">
-              <div className="truncate neko-text-button text-foreground">
-                {accountDisplayName}
-              </div>
+              <div className="truncate neko-text-button text-foreground">{accountDisplayName}</div>
               <div className="mt-1 truncate neko-text-tiny text-[oklch(0.55_0.06_300)]">
                 {auth.user.email}
               </div>
@@ -414,7 +404,7 @@ export function AccountScreen() {
         </div>
 
         <div
-          className="mt-4 rounded-[22px] bg-white/80 p-4 backdrop-blur"
+          className="miao-card-compact mt-4 p-4"
           style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}
         >
           <label className="neko-text-tiny text-[oklch(0.55_0.06_300)]">昵称</label>
@@ -442,7 +432,7 @@ export function AccountScreen() {
         </div>
 
         <div
-          className="mt-4 rounded-[22px] bg-white/80 p-4 backdrop-blur"
+          className="miao-card-compact mt-4 p-4"
           style={{ boxShadow: "var(--shadow-soft)", border: "1px solid oklch(1 0 0 / 0.7)" }}
         >
           <div className="neko-text-tiny text-[oklch(0.55_0.06_300)]">自动同步</div>

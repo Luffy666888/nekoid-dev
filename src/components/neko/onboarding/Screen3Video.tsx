@@ -2,7 +2,6 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { analyzeCatVideoClip } from "@/lib/neko-ai.functions";
-import { Sparkles } from "../screens/_shared";
 import { BackButton } from "./BackButton";
 import { getCatProfile } from "../catProfileStore";
 import { getVideoDraft, setVideoDraft, type VideoDraftClip } from "./onboardingDraftStore";
@@ -159,7 +158,6 @@ export function Screen3Video({
       className="absolute inset-0 flex flex-col pt-[58px] overflow-hidden"
       style={{ background: "var(--gradient-cream)" }}
     >
-      <Sparkles count={16} />
       <BackButton onPrev={onPrev} />
       <div className="relative z-10 flex-1 overflow-y-auto scrollbar-none pb-[160px]">
         <input ref={fileRef} type="file" accept="video/*" className="hidden" onChange={onFiles} />
@@ -177,8 +175,8 @@ export function Screen3Video({
           </div>
         </div>
         <div className="relative z-10 px-7">
-          <h1 className="neko-text-module-title text-foreground">上传猫咪视频</h1>
-          <p className="mt-1.5 neko-text-micro text-[oklch(0.58_0.04_300)]">
+          <h1 className="neko-text-main-title text-foreground">上传猫咪视频</h1>
+          <p className="mt-2 neko-text-support text-[var(--miao-text-secondary)]">
             上传 1～3 个视频展示猫咪日常，单个不超过 {NEKO_MAX_ONBOARDING_VIDEO_LABEL}
           </p>
         </div>
@@ -186,22 +184,13 @@ export function Screen3Video({
           <button
             type="button"
             onClick={canAdd ? openPicker : () => toast("最多只能上传 3 个视频哦~")}
-            className="relative block w-full overflow-hidden rounded-[28px] border-[1.5px] border-dashed border-[oklch(0.82_0.08_320/0.55)] bg-white/60 p-7 text-center backdrop-blur active:scale-[0.99] active:bg-white/75 transition-all duration-150"
+            className="miao-card relative block w-full overflow-hidden border-dashed p-7 text-center active:scale-[0.99] transition-all duration-200"
             style={{ minHeight: 200 }}
           >
-            <div className="pointer-events-none absolute -left-10 -top-10 h-40 w-40 rounded-full bg-[oklch(0.9_0.08_320/0.45)] blur-3xl animate-breathe" />
-            <div className="pointer-events-none absolute -right-10 -bottom-10 h-40 w-40 rounded-full bg-[oklch(0.9_0.07_260/0.45)] blur-3xl animate-breathe" />
-            <div
-              className="relative mx-auto mt-1 flex h-16 w-16 items-center justify-center rounded-full text-white neko-text-module-title shadow-[0_18px_40px_-16px_oklch(0.78_0.11_305/0.55)]"
-              style={{
-                background: "linear-gradient(135deg, oklch(0.82 0.1 320), oklch(0.84 0.08 0))",
-              }}
-            >
+            <div className="relative mx-auto mt-1 flex h-14 w-14 items-center justify-center rounded-[22px] bg-[var(--miao-brand)] text-white neko-text-module-title">
               ▶
             </div>
-            <div className="relative mt-3 neko-text-support text-foreground">
-              轻触上传视频
-            </div>
+            <div className="relative mt-3 neko-text-support text-foreground">轻触上传视频</div>
             <div className="relative mt-1 neko-text-tiny text-[oklch(0.58_0.05_300)]">
               每次 1 个 · 可添加 3 次 · ≤ {NEKO_MAX_ONBOARDING_VIDEO_LABEL}
             </div>
@@ -236,16 +225,15 @@ export function Screen3Video({
             </div>
           </div>
         )}
-        <div className="relative z-10 mx-5 mt-5 rounded-[20px] glass p-4 select-none">
-          <div className="neko-text-tiny text-[oklch(0.55_0.06_300)]">建议捕捉</div>
+        <div className="miao-card-compact relative z-10 mx-5 mt-5 select-none p-4">
+          <div className="neko-text-card-title text-foreground">建议捕捉</div>
           <div className="mt-2.5 grid grid-cols-3 gap-2">
-            <Tip emoji="🐾" label="走动" />
-            <Tip emoji="🔊" label="叫声" />
-            <Tip emoji="🎾" label="玩耍" />
+            <Tip label="走动" />
+            <Tip label="叫声" />
+            <Tip label="玩耍" />
           </div>
-          <div className="mt-2.5 flex items-center gap-2 rounded-xl bg-[oklch(0.97_0.025_320/0.8)] px-3 py-2 neko-text-tiny text-[oklch(0.5_0.06_300)]">
-            <span>💡</span>
-            <span>越自然的日常画面，AI 越能感受到它的性格</span>
+          <div className="mt-2.5 rounded-xl bg-[oklch(0.97_0.025_320/0.8)] px-3 py-2 neko-text-support text-[oklch(0.5_0.06_300)]">
+            越自然的日常画面，AI 越能感受到它的性格
           </div>
         </div>
       </div>
@@ -257,8 +245,7 @@ export function Screen3Video({
             e.preventDefault();
             if (!checking) handleContinue();
           }}
-          className="flex w-full touch-manipulation select-none items-center justify-center rounded-full px-6 py-4 neko-text-button text-white shadow-[0_16px_32px_-14px_oklch(0.78_0.11_305/0.55)] active:scale-[0.98] transition-transform duration-75 disabled:opacity-70"
-          style={{ background: "var(--gradient-cta)" }}
+          className="miao-primary-button flex w-full touch-manipulation select-none items-center justify-center disabled:opacity-70"
         >
           {checking ? "识别中…" : "继续"}
         </button>
@@ -267,11 +254,12 @@ export function Screen3Video({
   );
 }
 
-function Tip({ emoji, label }: { emoji: string; label: string }) {
+function Tip({ label }: { label: string }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl bg-white/75 py-3 shadow-[0_4px_14px_-8px_oklch(0.78_0.11_305/0.3)]">
-      <span className="neko-text-module-title">{emoji}</span>
-      <span className="mt-1 neko-text-tiny text-[oklch(0.5_0.05_300)]">{label}</span>
+    <div className="flex min-h-12 items-center justify-center rounded-[14px] border border-[var(--miao-border)] bg-white/52 px-3 py-2 text-center">
+      <span className="neko-text-support font-medium text-[var(--miao-text-secondary)]">
+        {label}
+      </span>
     </div>
   );
 }

@@ -63,24 +63,26 @@
 
 :root {
   --radius: 1.5rem;
-  --font-neko-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "PingFang SC", "HarmonyOS Sans SC", "Inter", system-ui, sans-serif;
+  --font-neko-ui:
+    "PingFang SC", -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui,
+    sans-serif;
   --font-neko-persona-title: "Songti SC", "Songti SC Bold", "STSong", "Noto Serif CJK SC", serif;
   --font-neko-editorial: "Didot", "Bodoni 72", "Baskerville", "Times New Roman", serif;
 
   /* NEKO.ID — cream-moonlight dreamy palette */
-  --background: oklch(0.985 0.008 80);          /* warm cream */
-  --foreground: oklch(0.32 0.03 290);            /* deep mauve ink */
+  --background: oklch(0.985 0.008 80); /* warm cream */
+  --foreground: oklch(0.32 0.03 290); /* deep mauve ink */
   --card: oklch(0.995 0.005 80);
   --card-foreground: oklch(0.32 0.03 290);
   --popover: oklch(0.995 0.005 80);
   --popover-foreground: oklch(0.32 0.03 290);
-  --primary: oklch(0.78 0.09 320);               /* dreamy pink-lavender */
+  --primary: oklch(0.78 0.09 320); /* dreamy pink-lavender */
   --primary-foreground: oklch(0.99 0.005 80);
   --secondary: oklch(0.95 0.02 320);
   --secondary-foreground: oklch(0.4 0.05 300);
   --muted: oklch(0.95 0.012 300);
   --muted-foreground: oklch(0.58 0.04 300);
-  --accent: oklch(0.86 0.06 290);                /* moonlight violet */
+  --accent: oklch(0.86 0.06 290); /* moonlight violet */
   --accent-foreground: oklch(0.3 0.04 290);
   --destructive: oklch(0.7 0.14 25);
   --destructive-foreground: oklch(0.99 0 0);
@@ -101,18 +103,50 @@
   --ink: oklch(0.32 0.03 290);
   --ink-soft: oklch(0.55 0.04 300);
 
-  --gradient-aura: radial-gradient(circle at 25% 15%, oklch(0.9 0.07 0 / 0.55), transparent 55%),
-                   radial-gradient(circle at 80% 25%, oklch(0.88 0.08 305 / 0.5), transparent 55%),
-                   radial-gradient(circle at 50% 90%, oklch(0.9 0.06 260 / 0.45), transparent 60%);
-  --gradient-soul: linear-gradient(135deg, oklch(0.86 0.08 320), oklch(0.88 0.07 0) 45%, oklch(0.88 0.08 260));
+  --gradient-aura:
+    radial-gradient(circle at 25% 15%, oklch(0.9 0.07 0 / 0.55), transparent 55%),
+    radial-gradient(circle at 80% 25%, oklch(0.88 0.08 305 / 0.5), transparent 55%),
+    radial-gradient(circle at 50% 90%, oklch(0.9 0.06 260 / 0.45), transparent 60%);
+  --gradient-soul: linear-gradient(
+    135deg,
+    oklch(0.86 0.08 320),
+    oklch(0.88 0.07 0) 45%,
+    oklch(0.88 0.08 260)
+  );
   --gradient-cream: linear-gradient(180deg, oklch(0.99 0.008 80) 0%, oklch(0.96 0.018 320) 100%);
   --gradient-card: linear-gradient(160deg, oklch(0.99 0.006 80) 0%, oklch(0.96 0.022 320) 100%);
-  --gradient-cta: linear-gradient(90deg, #AE8FE7 0%, #E5AACC 100%);
+  --gradient-cta: linear-gradient(90deg, oklch(0.76 0.09 305) 0%, oklch(0.84 0.075 350) 100%);
   --shadow-cta: 0 8px 20px rgba(168, 139, 234, 0.16);
-  --gradient-selected: linear-gradient(90deg, #C7B3F2 0%, #EBC6D9 100%);
+  --gradient-selected: linear-gradient(90deg, #c7b3f2 0%, #ebc6d9 100%);
 
-  --shadow-soft: 0 8px 30px -10px oklch(0.78 0.11 305 / 0.18), 0 2px 8px -2px oklch(0.78 0.11 305 / 0.08);
+  --shadow-soft:
+    0 8px 30px -10px oklch(0.78 0.11 305 / 0.18), 0 2px 8px -2px oklch(0.78 0.11 305 / 0.08);
   --shadow-card: 0 20px 50px -20px oklch(0.78 0.11 305 / 0.22);
+
+  /* Miao Yixia Design System v1 */
+  --miao-page-margin: 24px;
+  --miao-page-margin-compact: 20px;
+  --miao-space-1: 4px;
+  --miao-space-2: 8px;
+  --miao-space-3: 12px;
+  --miao-space-4: 16px;
+  --miao-space-5: 20px;
+  --miao-space-6: 24px;
+  --miao-space-8: 32px;
+  --miao-space-10: 40px;
+  --miao-radius-chip: 14px;
+  --miao-radius-button: 22px;
+  --miao-radius-card: 24px;
+  --miao-radius-hero: 32px;
+  --miao-surface: oklch(0.995 0.005 80 / 0.92);
+  --miao-surface-muted: oklch(0.975 0.012 320 / 0.82);
+  --miao-border: oklch(0.9 0.02 310 / 0.72);
+  --miao-text-primary: oklch(0.32 0.03 290);
+  --miao-text-secondary: oklch(0.54 0.035 300);
+  --miao-brand: oklch(0.61 0.09 305);
+  --miao-danger: oklch(0.59 0.16 25);
+  --miao-danger-soft: oklch(0.975 0.025 25);
+  --miao-shadow-card: 0 8px 24px -18px oklch(0.55 0.08 305 / 0.28);
 
   --chart-1: oklch(0.78 0.11 305);
   --chart-2: oklch(0.84 0.09 0);
@@ -190,7 +224,7 @@
 @layer utilities {
   .neko-text-page-title {
     font-family: var(--font-neko-ui);
-    font-size: 28px;
+    font-size: 27px;
     line-height: 34px;
     font-weight: 600;
     letter-spacing: 0;
@@ -198,23 +232,23 @@
 
   .neko-text-main-title {
     font-family: var(--font-neko-ui);
-    font-size: 30px;
-    line-height: 38px;
+    font-size: 24px;
+    line-height: 32px;
     font-weight: 600;
     letter-spacing: 0;
   }
 
   .neko-text-module-title {
     font-family: var(--font-neko-ui);
-    font-size: 21px;
-    line-height: 28px;
+    font-size: 20px;
+    line-height: 27px;
     font-weight: 600;
     letter-spacing: 0;
   }
 
   .neko-text-card-title {
     font-family: var(--font-neko-ui);
-    font-size: 18px;
+    font-size: 17px;
     line-height: 24px;
     font-weight: 600;
     letter-spacing: 0;
@@ -254,7 +288,7 @@
 
   .neko-text-badge {
     font-family: var(--font-neko-ui);
-    font-size: 15px;
+    font-size: 14px;
     line-height: 20px;
     font-weight: 500;
     letter-spacing: 0;
@@ -278,16 +312,16 @@
 
   .neko-text-micro {
     font-family: var(--font-neko-ui);
-    font-size: 12px;
-    line-height: 16px;
+    font-size: 14px;
+    line-height: 20px;
     font-weight: 400;
     letter-spacing: 0;
   }
 
   .neko-text-tiny {
     font-family: var(--font-neko-ui);
-    font-size: 11px;
-    line-height: 15px;
+    font-size: 13px;
+    line-height: 18px;
     font-weight: 400;
     letter-spacing: 0;
   }
@@ -335,7 +369,7 @@
   .neko-text-persona-title-large,
   .neko-text-persona-title-medium,
   .neko-text-persona-title-small {
-    font-family: var(--font-neko-persona-title);
+    font-family: var(--font-neko-ui);
     font-weight: 600;
     letter-spacing: 0;
   }
@@ -380,6 +414,88 @@
   }
 }
 
+@layer components {
+  .miao-page {
+    padding-left: var(--miao-page-margin);
+    padding-right: var(--miao-page-margin);
+  }
+
+  .miao-card {
+    border: 1px solid var(--miao-border);
+    border-radius: var(--miao-radius-card);
+    background: var(--miao-surface);
+    box-shadow: var(--miao-shadow-card);
+  }
+
+  .miao-card-compact {
+    border: 1px solid var(--miao-border);
+    border-radius: 22px;
+    background: var(--miao-surface);
+  }
+
+  .miao-primary-button,
+  .miao-secondary-button,
+  .miao-danger-button {
+    min-height: 54px;
+    border-radius: var(--miao-radius-button);
+    padding: 0 20px;
+    font-family: var(--font-neko-ui);
+    font-size: 17px;
+    line-height: 22px;
+    font-weight: 600;
+    white-space: nowrap;
+    transition:
+      transform 0.2s ease,
+      opacity 0.2s ease;
+  }
+
+  .miao-primary-button {
+    color: white;
+    background: var(--gradient-cta);
+    box-shadow: var(--shadow-cta);
+  }
+
+  .miao-secondary-button {
+    color: var(--miao-brand);
+    border: 1px solid oklch(0.76 0.08 305 / 0.8);
+    background: var(--miao-surface);
+  }
+
+  .miao-danger-button {
+    color: var(--miao-danger);
+    border: 1px solid oklch(0.72 0.09 25 / 0.55);
+    background: var(--miao-danger-soft);
+  }
+
+  .miao-primary-button:active,
+  .miao-secondary-button:active,
+  .miao-danger-button:active {
+    transform: scale(0.98);
+  }
+
+  .miao-primary-button:disabled,
+  .miao-secondary-button:disabled,
+  .miao-danger-button:disabled {
+    opacity: 0.5;
+  }
+
+  .miao-bottom-bar {
+    border-top: 1px solid var(--miao-border);
+    background: oklch(0.99 0.006 80 / 0.94);
+    backdrop-filter: blur(16px);
+  }
+
+  .miao-chip {
+    min-height: 32px;
+    border-radius: var(--miao-radius-chip);
+    padding: 6px 14px;
+    font-family: var(--font-neko-ui);
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 500;
+  }
+}
+
 .scrollbar-none {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -401,55 +517,107 @@
 }
 
 @keyframes breathe {
-  0%, 100% { opacity: 0.55; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.04); }
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
 }
 @keyframes scan {
-  0% { transform: translateY(-100%); opacity: 0; }
-  20% { opacity: 0.6; }
-  100% { transform: translateY(100%); opacity: 0; }
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(100%);
+    opacity: 0;
+  }
 }
 @keyframes drift {
-  0%, 100% { transform: translate(0,0); }
-  50% { transform: translate(6px,-8px); }
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(6px, -8px);
+  }
 }
 @keyframes pulse-soft {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 0.9; }
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.9;
+  }
 }
 @keyframes orbit {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 @keyframes dots {
-  0%   { content: ""; }
-  25%  { content: "·"; }
-  50%  { content: "··"; }
-  75%, 100% { content: "···"; }
+  0% {
+    content: "";
+  }
+  25% {
+    content: "·";
+  }
+  50% {
+    content: "··";
+  }
+  75%,
+  100% {
+    content: "···";
+  }
 }
 @keyframes sweep {
-  0%   { transform: translateY(-110%); opacity: 0; }
-  15%  { opacity: 0.85; }
-  85%  { opacity: 0.85; }
-  100% { transform: translateY(110%); opacity: 0; }
+  0% {
+    transform: translateY(-110%);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.85;
+  }
+  85% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translateY(110%);
+    opacity: 0;
+  }
 }
 
 /* Frosted dreamy card */
 .glass {
-  background: linear-gradient(180deg, oklch(1 0 0 / 0.85), oklch(0.98 0.015 320 / 0.65));
-  border: 1px solid oklch(1 0 0 / 0.7);
-  backdrop-filter: blur(24px) saturate(160%);
-  box-shadow: var(--shadow-soft);
+  background: var(--miao-surface);
+  border: 1px solid var(--miao-border);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--miao-shadow-card);
 }
 .glass-tint {
-  background: linear-gradient(160deg, oklch(0.97 0.025 320 / 0.9), oklch(0.95 0.04 0 / 0.6));
-  border: 1px solid oklch(1 0 0 / 0.8);
-  backdrop-filter: blur(20px);
-  box-shadow: var(--shadow-soft);
+  background: var(--miao-surface-muted);
+  border: 1px solid var(--miao-border);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--miao-shadow-card);
 }
 
 .text-soul {
@@ -477,20 +645,28 @@
 }
 .phone-notch {
   position: absolute;
-  top: 12px; left: 50%;
+  top: 12px;
+  left: 50%;
   transform: translateX(-50%);
-  width: 110px; height: 30px;
+  width: 110px;
+  height: 30px;
   background: oklch(0.25 0.02 290);
   border-radius: 999px;
   z-index: 50;
 }
 
-.sparkle::before, .sparkle::after {
+.sparkle::before,
+.sparkle::after {
   content: "";
   position: absolute;
-  width: 6px; height: 6px;
+  width: 6px;
+  height: 6px;
   background: radial-gradient(circle, oklch(1 0 0) 0%, transparent 70%);
 }
 
-.scrollbar-none::-webkit-scrollbar { display: none; }
-.scrollbar-none { scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  scrollbar-width: none;
+}

@@ -1,6 +1,6 @@
 import hero from "@/assets/neko-hero.jpg";
 import { useNavigate } from "@tanstack/react-router";
-import { Bug, ChevronLeft, Share2, X } from "lucide-react";
+import { Bug, Cat, ChevronLeft, Heart, House, Share2, Shield, Sparkles, X } from "lucide-react";
 import { SafeAreaTopBar } from "../screens/_shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
@@ -12,8 +12,6 @@ import { voicesStore } from "../app/voicesStore";
 import { saveLocalNekoToCloud } from "@/lib/neko-cloud";
 import { getPhotoDraft } from "./onboardingDraftStore";
 import { nekoText, nekoTitleForLength } from "../typography";
-
-const KEYWORDS = ["先观察再靠近", "喜欢待在附近", "边界感强", "会用眼神表达"];
 
 export function Screen6Result({
   onRestart,
@@ -43,7 +41,7 @@ export function Screen6Result({
   const persona = useCatPersona();
   const personaType = normalizePersonaTitle(persona?.type ?? "安静观察型");
   const personaMbti = persona?.mbti ?? "ISFJ-A";
-  const personaKeywords = buildPersonaKeywords(persona?.tags);
+  const personaTraits = (persona?.traits ?? []).slice(0, 4);
   const titleLines = useMemo(() => splitPersonaTitle(personaType), [personaType]);
   const titleClass = nekoTitleForLength(personaType);
   const heroImagePosition = useHeroImagePosition(avatarSrc);
@@ -174,7 +172,7 @@ export function Screen6Result({
           }
         />
 
-        <section className="relative isolate h-[clamp(650px,80dvh,700px)] min-h-[650px] w-full overflow-hidden rounded-b-[22px]">
+        <section className="relative isolate h-[clamp(520px,68dvh,560px)] w-full overflow-hidden">
           <img
             src={avatarSrc}
             alt={catName}
@@ -193,42 +191,23 @@ export function Screen6Result({
             }}
           />
           <div
-            aria-hidden="true"
-            className="absolute inset-x-0 bottom-0 h-[280px]"
-            style={{
-              background:
-                "linear-gradient(180deg, transparent 0%, oklch(0.985 0.015 82 / 0.34) 38%, oklch(0.985 0.018 84 / 0.88) 100%)",
-            }}
-          />
-
-          <div
-            className={`absolute left-6 top-[calc(env(safe-area-inset-top,0px)+92px)] z-20 ${nekoText.personaEditorial} text-[#5F5674]/78`}
+            className={`absolute left-6 top-[calc(env(safe-area-inset-top,0px)+80px)] z-20 ${nekoText.personaEditorial} text-[#5F5674]/68`}
           >
             <div className={nekoText.personaEditorial}>
               CAT
               <br />
               PROFILE
             </div>
-            <div className="mt-4 h-px w-8 bg-[#786C91]/55" />
-            <div className={`mt-4 max-w-[94px] ${nekoText.personaEditorialSmall}`}>
-              A Kinder
-              <br />
-              World
-              <br />
-              With Cats
-            </div>
+            <div className="mt-4 h-px w-8 bg-[#786C91]/45" />
           </div>
 
-          <div className="absolute bottom-6 left-6 right-6 z-20 max-w-[360px]">
-            <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 text-[#2E2741]">
+          <div className="absolute bottom-8 left-6 z-20 w-[45%] max-w-[216px]">
+            <div className="flex items-baseline gap-2 whitespace-nowrap text-[#2E2741]">
               <span className="neko-text-module-title">{catName}</span>
-              <span className="neko-text-badge">
-                {personaMbti}
-              </span>
+              <span className="neko-text-badge">{personaMbti}</span>
             </div>
-            <div className="mt-4 h-px w-8 bg-[#75668E]/60" />
             <h1
-              className={`mt-3 ${titleClass} text-[#2E225D]`}
+              className={`mt-4 line-clamp-2 ${titleClass} text-[#2E225D]`}
               style={{
                 textShadow: "0 1px 16px rgb(255 255 255 / 0.72)",
               }}
@@ -239,65 +218,66 @@ export function Screen6Result({
                 </span>
               ))}
             </h1>
-            <p className="mt-4 max-w-[330px] neko-text-body text-[#5A5370]">
-              {heroDescription}
-            </p>
-            <div className="mt-5 flex max-w-[340px] flex-wrap gap-x-[11px] gap-y-[10px]">
-              {personaKeywords.map((k) => (
-                <span
-                  key={k}
-                  className="flex min-h-8 items-center justify-center rounded-full bg-white/78 px-3 text-center neko-text-badge text-[#7259B5] shadow-[0_12px_26px_-22px_rgba(93,64,139,0.65)] backdrop-blur-md"
-                >
-                  {k}
-                </span>
-              ))}
-            </div>
+            <p className="mt-4 line-clamp-2 neko-text-body text-[#5A5370]">{heroDescription}</p>
           </div>
         </section>
       </div>
 
-      <section className="relative z-10 px-5 pt-7">
-        <h2 className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span className="neko-text-module-title text-[#2D2540]">
-            原来{catName}是这样的猫
-          </span>
-          <span className="neko-text-micro text-[#A69AB7]">
-            CAT · INSIGHT
-          </span>
-        </h2>
-        <div className="mt-4 flex flex-col gap-3.5">
-          {resultInsights.map((it) => (
-            <article
-              key={`${it.index}-${it.title}`}
-              className="flex gap-4 rounded-[22px] bg-white/58 px-[22px] py-5 shadow-[0_16px_34px_-30px_rgba(91,65,130,0.45)] backdrop-blur-xl"
-              style={{
-                border: "1px solid rgb(255 255 255 / 0.78)",
-              }}
-            >
-              <span className="mt-[2px] shrink-0 neko-text-body text-[#B197E0]">
-                {it.index}
-              </span>
-              <div className="min-w-0">
-                <h3 className="neko-text-card-title text-[#2F2942]">
-                  {it.title}
-                </h3>
-                <p className="mt-2.5 neko-text-body text-[#6C647C]">{it.text}</p>
-              </div>
-            </article>
-          ))}
+      {personaTraits.length > 0 && (
+        <section className="relative z-10 px-6 pt-6">
+          <div className="miao-card p-5">
+            <h2 className="neko-text-module-title text-foreground">{catName}的四个行为维度</h2>
+            <div className="mt-4">
+              {personaTraits.map((trait, index) => (
+                <TraitRow key={`${trait.label}-${index}`} trait={trait} index={index} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      <section className="relative z-10 px-6 pt-6">
+        <div className="miao-card p-5">
+          <h2 className="flex items-baseline justify-between gap-3">
+            <span className="neko-text-module-title text-[#2D2540]">关于{catName}的 3 个洞察</span>
+            <span className="shrink-0 neko-text-micro text-[#A69AB7]">CAT · INSIGHT</span>
+          </h2>
+          <div className="mt-4">
+            {resultInsights.map((it) => (
+              <article
+                key={`${it.index}-${it.title}`}
+                className="flex min-h-[104px] gap-4 border-t border-[var(--miao-border)] py-4 first:border-t-0 first:pt-0 last:pb-0"
+              >
+                <InsightIcon index={it.index} />
+                <div className="min-w-0">
+                  <h3 className="neko-text-card-title text-[#2F2942]">{it.title}</h3>
+                  <p className="mt-2 line-clamp-2 neko-text-body text-[#6C647C]">{it.text}</p>
+                </div>
+              </article>
+            ))}
+          </div>
         </div>
       </section>
 
-      <div className="h-28" aria-hidden />
+      <section className="relative z-10 px-6 pt-6">
+        <div className="miao-card p-5">
+          <h2 className="neko-text-card-title text-foreground">{catName}和你的关系</h2>
+          <blockquote className="mt-4 neko-text-module-title font-normal text-[#4A405F]">
+            “
+            {shortenCopy(
+              persona?.ownerRelationship ||
+                persona?.ownerRole ||
+                "你是它熟悉且信任的日常伙伴，亲近不一定热闹，却一直有自己的位置。",
+              36,
+            )}
+            ”
+          </blockquote>
+        </div>
+      </section>
 
-      <div
-        className="sticky bottom-0 z-30 px-5 pt-3 pb-[max(20px,env(safe-area-inset-bottom))]"
-        style={{
-          background:
-            "linear-gradient(180deg, rgb(250 245 251 / 0), rgb(250 245 251 / 0.88) 35%, rgb(249 242 250 / 0.98) 100%)",
-          backdropFilter: "blur(18px)",
-        }}
-      >
+      <div className="h-32" aria-hidden />
+
+      <div className="miao-bottom-bar fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-[480px] px-6 pt-3 pb-[max(12px,env(safe-area-inset-bottom))]">
         {canShowPersonaDebug && (
           <button
             type="button"
@@ -308,26 +288,18 @@ export function Screen6Result({
             Debug Persona
           </button>
         )}
-        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2.5">
+        <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
             onClick={() => onRestart?.()}
-            className="flex min-h-[52px] w-full min-w-0 touch-manipulation items-center justify-center whitespace-nowrap rounded-full bg-white/82 px-3 neko-text-button text-[#7459B5] transition-transform duration-75 active:scale-[0.98]"
-            style={{
-              border: "1.5px solid #C5A6F0",
-              boxShadow: "0 12px 24px -20px rgba(93, 64, 139, 0.48)",
-            }}
+            className="miao-secondary-button flex w-full min-w-0 touch-manipulation items-center justify-center"
           >
             重新识别
           </button>
           <button
             type="button"
             onClick={handleSave}
-            className="flex min-h-[52px] w-full min-w-0 touch-manipulation items-center justify-center whitespace-nowrap rounded-full px-3 neko-text-button text-white transition-transform duration-75 active:scale-[0.98]"
-            style={{
-              background: "linear-gradient(90deg, #AA8BE8 0%, #E9ABC9 100%)",
-              boxShadow: "0 16px 30px -16px rgba(148, 100, 203, 0.58)",
-            }}
+            className="miao-primary-button flex w-full min-w-0 touch-manipulation items-center justify-center"
           >
             保存结果
           </button>
@@ -339,6 +311,61 @@ export function Screen6Result({
         <PersonaDebugPanel generation={persona.generation} onClose={() => setDebugOpen(false)} />
       )}
     </div>
+  );
+}
+
+const TRAIT_VISUALS = [
+  { Icon: Heart, left: "主动亲近", right: "慢热谨慎", color: "#E77DA8", soft: "#FCECF3" },
+  { Icon: Sparkles, left: "好奇探索", right: "稳定保守", color: "#9677E6", soft: "#F1EDFC" },
+  { Icon: House, left: "喜欢陪伴", right: "独立自主", color: "#6687E8", soft: "#EDF1FD" },
+  { Icon: Shield, left: "接受互动", right: "边界明确", color: "#E98C53", soft: "#FDF0E8" },
+] as const;
+
+function TraitRow({ trait, index }: { trait: { label: string; value: number }; index: number }) {
+  const visual = TRAIT_VISUALS[index] ?? TRAIT_VISUALS[0];
+  const Icon = visual.Icon;
+  const value = Math.max(0, Math.min(100, trait.value));
+
+  return (
+    <div className="grid h-16 grid-cols-[36px_64px_48px_minmax(64px,1fr)_48px] items-center gap-2 border-t border-[var(--miao-border)] first:border-t-0">
+      <span
+        className="flex h-9 w-9 items-center justify-center rounded-[14px]"
+        style={{ backgroundColor: visual.soft, color: visual.color }}
+      >
+        <Icon size={20} strokeWidth={1.8} />
+      </span>
+      <span className="neko-text-card-title text-[#342D48]">{trait.label}</span>
+      <span className="text-right neko-text-caption text-[var(--miao-text-secondary)]">
+        {visual.left}
+      </span>
+      <span className="relative block h-2 rounded-full bg-[var(--miao-surface-muted)]">
+        <span
+          className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 bg-white"
+          style={{ left: `${value}%`, borderColor: visual.color }}
+        />
+      </span>
+      <span className="neko-text-caption text-[var(--miao-text-secondary)]">{visual.right}</span>
+    </div>
+  );
+}
+
+function InsightIcon({ index }: { index: string }) {
+  const config =
+    index === "01"
+      ? { Icon: Cat, color: "#D97FA4", soft: "#FCECF3" }
+      : index === "02"
+        ? { Icon: Heart, color: "#9677E6", soft: "#F1EDFC" }
+        : { Icon: House, color: "#6687E8", soft: "#EDF1FD" };
+  const Icon = config.Icon;
+
+  return (
+    <span
+      className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-[14px]"
+      style={{ backgroundColor: config.soft, color: config.color }}
+    >
+      <span className="neko-text-caption">{index}</span>
+      <Icon className="mt-1" size={22} strokeWidth={1.8} />
+    </span>
   );
 }
 
@@ -389,11 +416,6 @@ function splitPersonaTitle(title: string) {
   return [clean.slice(0, splitAt), clean.slice(splitAt)];
 }
 
-function buildPersonaKeywords(tags: string[] | undefined) {
-  const merged = [...(tags ?? []), ...KEYWORDS].map(normalizePersonaTag).filter(Boolean);
-  return Array.from(new Set(merged)).slice(0, 4);
-}
-
 const titleReplacements: Record<string, string> = {
   亲近有边界: "边界感亲近派",
   好奇但谨慎: "好奇谨慎型",
@@ -403,18 +425,6 @@ const titleReplacements: Record<string, string> = {
   会先看清楚: "先看再行动",
   先看再动: "先看再行动",
 };
-
-const labelReplacements: Array<[RegExp, string]> = [
-  [/观察优先/g, "先观察再靠近"],
-  [/保留距离/g, "不急着靠近"],
-  [/心动不动/g, "想靠近又犹豫"],
-  [/小小?探长|小小?侦探/g, "会先看清楚"],
-  [/互动控场王/g, "喜欢互动"],
-  [/眼神(?:发令机|施压|催促)/g, "会用眼神表达"],
-  [/克制讨关注/g, "安静等你发现"],
-  [/稳态陪伴/g, "喜欢待在附近"],
-  [/精准互动/g, "表达得很清楚"],
-];
 
 const bannedCopyPattern =
   /营业|控场|发令|施压|稳态|高质|策略性|仪式感极强|端庄定点|克制讨关注|精准互动|节奏掌控|掌控节奏/u;
@@ -431,24 +441,6 @@ function normalizePersonaTitle(value: string) {
     jargonSuffixPattern.test(clean)
   ) {
     return "安静观察型";
-  }
-  return clean;
-}
-
-function normalizePersonaTag(value: string) {
-  let clean = value.trim().replace(/\s+/g, "");
-  for (const [pattern, replacement] of labelReplacements) {
-    clean = clean.replace(pattern, replacement);
-  }
-  clean = clean.replace(/[^\p{Script=Han}A-Za-z0-9]/gu, "");
-  const length = Array.from(clean).length;
-  if (
-    length < 2 ||
-    length > 8 ||
-    bannedCopyPattern.test(clean) ||
-    jargonSuffixPattern.test(clean)
-  ) {
-    return "";
   }
   return clean;
 }
@@ -512,9 +504,7 @@ function PersonaDebugPanel({
       <div className="mx-auto flex h-full max-w-[460px] flex-col overflow-hidden rounded-[22px] bg-[#fbf8ff] shadow-[0_24px_70px_-34px_rgba(25,18,37,0.8)]">
         <div className="flex min-h-[58px] items-center justify-between border-b border-[#E7DDF4] px-4">
           <div>
-            <div className="neko-text-micro text-[#7B63B5]">
-              PERSONA DEBUG
-            </div>
+            <div className="neko-text-micro text-[#7B63B5]">PERSONA DEBUG</div>
             <div className="mt-0.5 neko-text-tiny text-[#7A7188]">
               {generation.generationId} · {generation.inputHash}
             </div>
@@ -595,9 +585,7 @@ function ShareSheet({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mx-auto h-1 w-10 rounded-full bg-[oklch(0.9_0.03_320)]" />
-        <div className="mt-4 text-center neko-text-support text-foreground">
-          分享我的猫人格
-        </div>
+        <div className="mt-4 text-center neko-text-support text-foreground">分享我的猫人格</div>
         <div className="mt-5 grid grid-cols-3 gap-2">
           {items.map((it) => (
             <button

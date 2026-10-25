@@ -1,4 +1,3 @@
-import { Sparkles } from "../screens/_shared";
 import { BackButton } from "./BackButton";
 import { useEffect, useState } from "react";
 import { getCurrentSessionCatAvatar } from "../catAvatarStore";
@@ -112,26 +111,15 @@ export function Screen5Analyzing({
           "linear-gradient(180deg, oklch(0.98 0.018 80) 0%, oklch(0.95 0.04 320) 55%, oklch(0.95 0.04 270) 100%)",
       }}
     >
-      <Sparkles count={34} />
       <BackButton onPrev={onPrev} />
-      <div className="relative z-10 neko-text-tiny text-[oklch(0.55_0.08_320)]">
-        A I · A N A L Y Z I N G
-      </div>
-      <div className="relative z-10 mt-2 neko-text-module-title text-foreground">
+      <div className="relative z-10 mt-2 neko-text-main-title text-foreground">
         {status === "failed" ? "识别失败" : "AI 分析中"}
       </div>
-      <div className="relative z-10 mt-0.5 neko-text-micro text-[oklch(0.58_0.05_300)]">
+      <div className="relative z-10 mt-2 neko-text-support text-[var(--miao-text-secondary)]">
         {status === "failed" ? "没有使用 demo 结果，请重试真实识别" : "正在构建属于它的人格画像"}
       </div>
 
       <div className="relative z-10 mt-7 h-[212px] w-[212px]">
-        <div
-          className="absolute inset-3 rounded-full opacity-75 blur-3xl animate-breathe"
-          style={{
-            background:
-              "radial-gradient(circle, oklch(0.92 0.07 320 / 0.78), oklch(0.92 0.05 260 / 0.22) 62%, transparent 78%)",
-          }}
-        />
         <div className="absolute inset-5 rounded-full border border-white/70" />
         <svg viewBox="0 0 200 200" className="absolute inset-0 -rotate-90">
           <defs>
@@ -159,7 +147,7 @@ export function Screen5Analyzing({
             strokeDasharray={`${(C * pct) / 100} ${C}`}
           />
         </svg>
-        <div className="absolute inset-[29px] overflow-hidden rounded-full bg-white p-1.5 shadow-[0_20px_42px_-24px_oklch(0.78_0.11_305/0.5)]">
+        <div className="absolute inset-[29px] overflow-hidden rounded-full bg-white p-1.5 shadow-[var(--miao-shadow-card)]">
           <div className="relative h-full w-full overflow-hidden rounded-full">
             {avatarSrc ? (
               <img
@@ -196,7 +184,7 @@ export function Screen5Analyzing({
           return (
             <div
               key={i}
-              className={`relative flex items-center gap-3 overflow-hidden rounded-2xl px-4 py-2.5 neko-text-micro backdrop-blur transition-all duration-500 ${ active ? "bg-white/85 shadow-[0_8px_20px_-12px_oklch(0.78_0.11_305/0.45)] scale-[1.01]" : "bg-white/65" }`}
+              className={`relative flex items-center gap-3 overflow-hidden rounded-2xl px-4 py-2.5 neko-text-micro backdrop-blur transition-all duration-500 ${active ? "bg-white/85 shadow-[0_8px_20px_-12px_oklch(0.78_0.11_305/0.45)] scale-[1.01]" : "bg-white/65"}`}
               style={{ opacity: done || active ? 1 : 0.55 }}
             >
               {active && (
@@ -225,7 +213,9 @@ export function Screen5Analyzing({
                 {!active && "..."}
               </span>
               {done && (
-                <span className="relative ml-auto neko-text-tiny text-[oklch(0.55_0.1_305)]">✓</span>
+                <span className="relative ml-auto neko-text-tiny text-[oklch(0.55_0.1_305)]">
+                  ✓
+                </span>
               )}
               {active && (
                 <span className="relative ml-auto flex gap-1">

@@ -1,4 +1,3 @@
-import { Sparkles } from "../screens/_shared";
 import { BackButton } from "./BackButton";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
@@ -35,7 +34,10 @@ function compressAvatarImage(dataUrl: string, maxSide = 900, quality = 0.82): Pr
   });
 }
 
-export function Screen2Photo({ onNext, onPrev }: { onNext?: () => void; onPrev?: () => void } = {}) {
+export function Screen2Photo({
+  onNext,
+  onPrev,
+}: { onNext?: () => void; onPrev?: () => void } = {}) {
   const draft = getPhotoDraft();
   const draftAvatar = getStableAvatar(draft.avatar);
   const [gender, setGenderState] = useState<"m" | "f" | null>(draft.gender);
@@ -170,29 +172,28 @@ export function Screen2Photo({ onNext, onPrev }: { onNext?: () => void; onPrev?:
   };
 
   return (
-    <div className="absolute inset-0 flex flex-col pt-[58px] overflow-hidden"
-      style={{ background: "var(--gradient-cream)" }}>
-      <Sparkles count={18} />
+    <div
+      className="absolute inset-0 flex flex-col pt-[58px] overflow-hidden"
+      style={{ background: "var(--gradient-cream)" }}
+    >
       <BackButton onPrev={onPrev} />
       <div className="relative z-10 flex-1 overflow-y-auto scrollbar-none pb-[190px]">
         <StepBar step={1} />
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={onFile}
-        />
-        <div className="relative z-10 px-7 mt-2">
-          <h1 className="neko-text-module-title text-foreground">上传猫咪正脸照片</h1>
-          <p className="mt-1.5 neko-text-micro text-[oklch(0.58_0.04_300)]">头像会用于生成人格档案 · 图片不超过 {NEKO_MAX_UPLOAD_LABEL}</p>
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
+        <div className="relative z-10 px-6 mt-2">
+          <h1 className="neko-text-main-title text-foreground">上传猫咪正脸照片</h1>
+          <p className="mt-2 neko-text-support text-[var(--miao-text-secondary)]">
+            头像会用于生成人格档案 · 图片不超过 {NEKO_MAX_UPLOAD_LABEL}
+          </p>
         </div>
         <div className="relative z-10 mt-6 flex justify-center">
-          <button type="button" onClick={pickPhoto} className="relative h-[170px] w-[170px] outline-none">
-            <div className="absolute inset-0 rounded-full opacity-80 blur-2xl animate-breathe"
-              style={{ background: "radial-gradient(circle, oklch(0.9 0.08 320 / 0.9), transparent 70%)" }} />
+          <button
+            type="button"
+            onClick={pickPhoto}
+            className="relative h-[170px] w-[170px] outline-none"
+          >
             <div className="absolute inset-0 rounded-full border-[1.5px] border-dashed border-[oklch(0.82_0.08_320/0.6)]" />
-            <div className="absolute inset-3 overflow-hidden rounded-full bg-white p-1 shadow-[0_18px_40px_-18px_oklch(0.78_0.11_305/0.5)]">
+            <div className="absolute inset-3 overflow-hidden rounded-full bg-white p-1 shadow-[var(--miao-shadow-card)]">
               {avatar ? (
                 <img
                   src={avatar}
@@ -218,17 +219,22 @@ export function Screen2Photo({ onNext, onPrev }: { onNext?: () => void; onPrev?:
                   <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/80 shadow-[0_10px_24px_-16px_oklch(0.7_0.12_305/0.5)]">
                     <ImagePlus className="h-5 w-5" strokeWidth={1.8} />
                   </span>
-                  <span className="mt-2 neko-text-tiny">上传正脸</span>
-                  <span className="mt-1 neko-text-tiny text-[oklch(0.68_0.04_300)]">JPG / PNG</span>
+                  <span className="mt-2 neko-text-support">上传正脸</span>
+                  <span className="mt-1 neko-text-tiny text-[var(--miao-text-secondary)]">
+                    选择清晰照片
+                  </span>
                 </div>
               )}
             </div>
-            <span className="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full text-white neko-text-body shadow-[0_8px_20px_-6px_oklch(0.78_0.11_305/0.6)]"
-              style={{ background: "linear-gradient(135deg, oklch(0.70 0.14 305), oklch(0.76 0.11 0))" }}>＋</span>
+            <span className="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full bg-[var(--miao-brand)] text-white neko-text-body">
+              ＋
+            </span>
           </button>
         </div>
-        <p className="relative z-10 mt-3 text-center neko-text-tiny text-[oklch(0.6_0.06_300)]">点击上传 · JPG / PNG</p>
-        <div className="relative z-10 mx-5 mt-6 rounded-[24px] glass p-5">
+        <p className="relative z-10 mt-3 text-center neko-text-support text-[var(--miao-text-secondary)]">
+          点击选择猫咪照片
+        </p>
+        <div className="miao-card relative z-10 mx-5 mt-6 p-5">
           <Label>猫咪名称</Label>
           <div
             onClick={() => nameRef.current?.focus()}
@@ -245,17 +251,19 @@ export function Screen2Photo({ onNext, onPrev }: { onNext?: () => void; onPrev?:
               maxLength={12}
               className="flex-1 bg-transparent outline-none placeholder:text-[oklch(0.7_0.04_300)]"
             />
-            <span className="ml-2 shrink-0 neko-text-tiny text-[oklch(0.6_0.05_300)]">{[...name].length} / 12</span>
+            <span className="ml-2 shrink-0 neko-text-tiny text-[oklch(0.6_0.05_300)]">
+              {[...name].length} / 12
+            </span>
           </div>
         </div>
-        <div className="relative z-10 mx-5 mt-3 rounded-[24px] glass p-5">
+        <div className="miao-card relative z-10 mx-5 mt-4 p-5">
           <Label>性别</Label>
           <div className="mt-3 grid grid-cols-2 gap-2.5">
             <Pill text="小公猫" active={gender === "m"} onClick={() => setGender("m")} />
             <Pill text="小母猫" active={gender === "f"} onClick={() => setGender("f")} />
           </div>
         </div>
-        <div className="relative z-10 mx-5 mt-3 rounded-[24px] glass p-5">
+        <div className="miao-card relative z-10 mx-5 mt-4 p-5">
           <Label>年龄阶段</Label>
           <div className="mt-3 grid grid-cols-2 gap-2.5">
             <Pill text="幼猫" sub="0 – 1 岁" active={age === 0} onClick={() => setAge(0)} />
@@ -269,9 +277,11 @@ export function Screen2Photo({ onNext, onPrev }: { onNext?: () => void; onPrev?:
         <button
           type="button"
           disabled={checking}
-          onPointerDown={(e) => { e.preventDefault(); if (!checking) onContinue(); }}
-          className="flex w-full touch-manipulation select-none items-center justify-center rounded-full px-6 py-4 neko-text-button text-white shadow-[0_16px_32px_-14px_oklch(0.78_0.11_305/0.55)] active:scale-[0.98] transition-transform duration-75 disabled:opacity-70"
-          style={{ background: "var(--gradient-cta)" }}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            if (!checking) onContinue();
+          }}
+          className="miao-primary-button flex w-full touch-manipulation select-none items-center justify-center disabled:opacity-70"
         >
           {checking ? "识别中…" : "继续"}
         </button>
@@ -281,18 +291,41 @@ export function Screen2Photo({ onNext, onPrev }: { onNext?: () => void; onPrev?:
 }
 
 function Label({ children }: { children: React.ReactNode }) {
-  return <div className="neko-text-tiny text-[oklch(0.55_0.06_300)]">{children}</div>;
+  return <div className="neko-text-support text-[var(--miao-text-secondary)]">{children}</div>;
 }
-function Pill({ text, sub, active, onClick }: { text: string; sub?: string; active?: boolean; onClick?: () => void }) {
+function Pill({
+  text,
+  sub,
+  active,
+  onClick,
+}: {
+  text: string;
+  sub?: string;
+  active?: boolean;
+  onClick?: () => void;
+}) {
   return (
-    <button type="button" onClick={onClick} className={
-      "flex items-center justify-center gap-2 rounded-2xl px-4 py-3 neko-text-badge border transition active:scale-[0.98] duration-150 " +
-      (active
-        ? "text-white border-transparent shadow-[0_8px_20px_-10px_oklch(0.78_0.11_305/0.5)]"
-        : "bg-white/70 text-foreground border-[oklch(0.9_0.02_310/0.6)]")
-    } style={active ? { background: "var(--gradient-selected)" } : undefined}>
-      <span >{text}</span>
-      {sub && <span className={"ml-1 neko-text-tiny " + (active ? "text-white/85" : "text-[oklch(0.6_0.05_300)]")}>{sub}</span>}
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        "flex items-center justify-center gap-2 rounded-2xl px-4 py-3 neko-text-badge border transition active:scale-[0.98] duration-150 " +
+        (active
+          ? "text-white border-transparent shadow-[0_8px_20px_-10px_oklch(0.78_0.11_305/0.5)]"
+          : "bg-white/70 text-foreground border-[oklch(0.9_0.02_310/0.6)]")
+      }
+      style={active ? { background: "var(--gradient-selected)" } : undefined}
+    >
+      <span>{text}</span>
+      {sub && (
+        <span
+          className={
+            "ml-1 neko-text-tiny " + (active ? "text-white/85" : "text-[oklch(0.6_0.05_300)]")
+          }
+        >
+          {sub}
+        </span>
+      )}
     </button>
   );
 }
@@ -302,7 +335,13 @@ function StepBar({ step }: { step: number }) {
     <div className="relative z-10 mb-4 flex items-center justify-end px-7">
       <div className="flex gap-1.5">
         {[1, 2, 3, 4].map((i) => (
-          <span key={i} className={"h-1 rounded-full " + (i <= step ? "w-6 bg-[oklch(0.82_0.1_320)]" : "w-3 bg-[oklch(0.9_0.02_310)]")} />
+          <span
+            key={i}
+            className={
+              "h-1 rounded-full " +
+              (i <= step ? "w-6 bg-[oklch(0.82_0.1_320)]" : "w-3 bg-[oklch(0.9_0.02_310)]")
+            }
+          />
         ))}
       </div>
     </div>

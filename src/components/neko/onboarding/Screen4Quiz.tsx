@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { Sparkles } from "../screens/_shared";
 import { BackButton } from "./BackButton";
 import { updateCatProfile } from "../catProfileStore";
 
@@ -74,7 +73,6 @@ export function Screen4Quiz({ onNext, onPrev }: { onNext?: () => void; onPrev?: 
       className="absolute inset-0 flex flex-col pt-[58px] overflow-hidden"
       style={{ background: "var(--gradient-cream)" }}
     >
-      <Sparkles count={14} />
       <BackButton onPrev={onPrev} />
       <div className="relative z-10 flex-1 overflow-y-auto scrollbar-none pb-[170px]">
         <div className="relative z-10 mb-3 flex items-center justify-end px-7">
@@ -90,33 +88,34 @@ export function Screen4Quiz({ onNext, onPrev }: { onNext?: () => void; onPrev?: 
             ))}
           </div>
         </div>
-        <div className="relative z-10 px-7">
+        <div className="relative z-10 px-6">
           <div className="flex items-center justify-between">
-            <h1 className="neko-text-module-title text-foreground">行为小测试</h1>
+            <h1 className="neko-text-main-title text-foreground">行为小测试</h1>
             <button
               onClick={() => {
                 updateCatProfile({ quiz: answers });
                 onNext?.();
               }}
-              className="neko-text-button text-[oklch(0.6_0.06_300)]"
+              className="min-h-11 neko-text-support text-[var(--miao-brand)]"
             >
-              跳过 ›
+              跳过
             </button>
           </div>
-          <p className="mt-1.5 neko-text-micro text-[oklch(0.58_0.04_300)]">
-            帮助 AI 更准确理解它（可跳过）
-          </p>
+          <div className="mt-2 flex items-center justify-between neko-text-support text-[var(--miao-text-secondary)]">
+            <p>帮助 AI 更准确理解它（可跳过）</p>
+            <span>已完成 {Object.values(answers).filter(Boolean).length}/8</span>
+          </div>
         </div>
-        <div className="relative z-10 mt-5 space-y-3 px-5">
+        <div className="relative z-10 mt-6 space-y-6 px-5">
           {QUESTIONS.map((q, i) => (
-            <div key={i} className="rounded-[22px] glass p-4">
-              <div className="flex items-center gap-2">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[oklch(0.95_0.04_320)] neko-text-tiny text-[oklch(0.5_0.1_320)]">
-                  {i + 1}
+            <section key={i}>
+              <div className="flex items-start gap-2.5">
+                <span className="pt-0.5 neko-text-badge text-[var(--miao-brand)]">
+                  {String(i + 1).padStart(2, "0")}
                 </span>
-                <span className="neko-text-micro text-foreground">{q.q}</span>
+                <h2 className="neko-text-card-title text-foreground">{q.q}</h2>
               </div>
-              <div className="mt-3 grid gap-2">
+              <div className="mt-3 grid gap-3">
                 <Opt
                   label="A"
                   text={q.a}
@@ -136,7 +135,7 @@ export function Screen4Quiz({ onNext, onPrev }: { onNext?: () => void; onPrev?: 
                   onClick={() => pick(i, "c")}
                 />
               </div>
-            </div>
+            </section>
           ))}
         </div>
       </div>
@@ -147,17 +146,10 @@ export function Screen4Quiz({ onNext, onPrev }: { onNext?: () => void; onPrev?: 
             e.preventDefault();
             handleSubmit();
           }}
-          className="flex w-full touch-manipulation select-none items-center justify-center gap-2 rounded-full px-6 py-4 neko-text-button text-white shadow-[0_16px_32px_-14px_oklch(0.78_0.11_305/0.55)] active:scale-[0.98] transition-transform duration-75"
-          style={{ background: "var(--gradient-cta)" }}
+          className="miao-primary-button flex w-full touch-manipulation select-none items-center justify-center"
         >
-          <span>好了，开始解析</span>
-          <span>✨</span>
+          看看它的猫格
         </button>
-        <p className="mt-3 text-center neko-text-tiny text-[oklch(0.58_0.05_300)]">
-          AI 将结合测试结果，
-          <br />
-          生成更准确的人格分析
-        </p>
       </div>
     </div>
   );
@@ -179,24 +171,23 @@ function Opt({
       type="button"
       onClick={onClick}
       className={
-        "flex items-center gap-2 rounded-2xl px-3 py-2.5 neko-text-micro text-left transition active:scale-[0.98] duration-150 " +
+        "flex min-h-[68px] items-center gap-4 rounded-[22px] px-4 py-3 neko-text-body text-left transition active:scale-[0.98] duration-200 " +
         (active
-          ? "text-white shadow-[0_8px_18px_-10px_oklch(0.78_0.11_305/0.45)]"
-          : "bg-white/70 text-[oklch(0.45_0.04_300)] border border-[oklch(0.9_0.02_310/0.5)]")
+          ? "border border-[var(--miao-brand)] bg-[var(--miao-surface-muted)] text-foreground"
+          : "border border-[var(--miao-border)] bg-[var(--miao-surface)] text-foreground")
       }
-      style={active ? { background: "var(--gradient-selected)" } : undefined}
     >
       <span
         className={
-          "flex h-5 w-5 shrink-0 items-center justify-center rounded-full neko-text-tiny " +
+          "flex h-8 w-8 shrink-0 items-center justify-center rounded-full neko-text-badge " +
           (active
-            ? "bg-white/25 text-white"
-            : "bg-[oklch(0.95_0.025_320)] text-[oklch(0.5_0.1_320)]")
+            ? "bg-[var(--miao-brand)] text-white"
+            : "bg-[var(--miao-surface-muted)] text-[var(--miao-brand)]")
         }
       >
         {label}
       </span>
-      <span >{text}</span>
+      <span>{text}</span>
     </button>
   );
 }
