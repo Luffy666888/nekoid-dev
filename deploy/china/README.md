@@ -135,6 +135,37 @@ script can still request a certificate without it.
 
 ## Verify
 
+### Account deletion
+
+The native app uses `POST /api/ios/cloud/account/delete` with a user bearer token
+and `{ "confirmation": "DELETE" }`. Configure `SUPABASE_SERVICE_ROLE_KEY` with the
+**current** project's service_role key in `/etc/nekoid/nekoid.env` (or use
+`SUPABASE_SECRET_KEY` for a supported Supabase secret key). Never put it in `VITE_*`,
+the iOS project, or source control. Missing admin configuration fails before any
+data is deleted. Cloudflare deployments use the same server-only secret names.
+
+The TOS identity also needs ListObjectVersions and DeleteObject/versions permissions
+on the media bucket. Cleanup is restricted to the authenticated UUID's prefix,
+including abandoned uploads and old versions. Legacy `neko-media` Supabase Storage
+objects are cleaned too; an absent bucket is allowed, permission errors are not.
+Business rows are deleted with explicit owner filters before Auth hard deletion.
+The migration's cascading foreign keys remain an additional safeguard.
+
+A server-owned `app_metadata.neko_account_deletion_pending` flag blocks new API
+writes once cleanup starts. Failures retain this flag and login identity so the
+user can retry from Settings; only a completed Auth deletion returns success.
+Do not clear this flag to claim a partial deletion completed. Existing direct-TOS
+upload URLs cannot be revoked individually and remain valid until their short TTL:
+before public rollout, arrange a delayed prefix sweep after the upload TTL for
+accounts deleted while another device was uploading. Backups follow the separate
+backup retention policy; exports already saved to the user's Photos are untouched.
+
+Run `node --test scripts/test-account-deletion.mjs` for isolated failure/ownership
+tests. Before enabling in production, verify with **new disposable test accounts**:
+create data and media, delete account A, query all four business tables and Auth to
+confirm removal, verify A's old access/refresh tokens fail, and confirm account B
+and its objects remain. Never test deletion against an existing user's account.
+
 ```sh
 curl -i http://127.0.0.1:3000/api/ios/health
 curl -I http://api.nekoid.cn

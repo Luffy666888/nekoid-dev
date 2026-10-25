@@ -1,6 +1,12 @@
 import { detectCatFaceServer, setCatFaceWorkerEnv } from "./catface.functions";
 import { handleIOSAuthRequest, IOSAuthError } from "./ios-auth.server";
 import {
+  ACCOUNT_DELETION_PATH,
+  ACCOUNT_DELETION_PENDING,
+  AccountDeletionError,
+  deleteCurrentAccount,
+} from "./account-deletion.server";
+import {
   handleIOSCloudMediaRequest,
   handleIOSCloudRequest,
   IOSCloudError,
@@ -122,9 +128,25 @@ async function requireSupabaseUser(request: Request, env: unknown) {
     throw new APIError(401, "invalid_auth", "Invalid or expired Supabase session");
   }
 
-  const user = (await response.json()) as { id?: string; email?: string | null };
+  const user = (await response.json()) as {
+    id?: string;
+    email?: string | null;
+    app_metadata?: Record<string, unknown>;
+  };
   if (!user.id) {
     throw new APIError(401, "invalid_auth", "Invalid Supabase session");
+  }
+
+  const allowedDuringDeletion = [
+    ACCOUNT_DELETION_PATH,
+    "/api/ios/cloud/state",
+    "/api/ios/cloud/account-summary",
+  ];
+  if (
+    user.app_metadata?.[ACCOUNT_DELETION_PENDING] === true &&
+    !allowedDuringDeletion.includes(new URL(request.url).pathname)
+  ) {
+    throw new APIError(409, "account_deletion_pending", "账号正在注销，请前往设置页继续完成注销。");
   }
 
   return { token, user: { id: user.id, email: user.email ?? null } };
@@ -208,6 +230,10 @@ export async function handleIOSAPIRequest(request: Request, env: unknown) {
 
     const { token, user } = await requireSupabaseUser(request, env);
 
+    if (url.pathname === ACCOUNT_DELETION_PATH) {
+      return jsonResponse({ ok: true, data: await deleteCurrentAccount(env, token, user, body) });
+    }
+
     const cloudResult = await handleIOSCloudRequest(
       url.pathname,
       body,
@@ -232,6 +258,7 @@ export async function handleIOSAPIRequest(request: Request, env: unknown) {
     if (
       error instanceof APIError ||
       error instanceof IOSAuthError ||
+      error instanceof AccountDeletionError ||
       error instanceof IOSCloudError
     ) {
       if (error instanceof IOSCloudError) {

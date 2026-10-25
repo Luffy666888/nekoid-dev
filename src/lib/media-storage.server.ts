@@ -212,6 +212,7 @@ async function createTosAuthorization(
   canonicalPath: string,
   host: string,
   extraSignedHeaders: Record<string, string>,
+  query: Record<string, string | undefined> = {},
 ) {
   if (!globalThis.crypto?.subtle) {
     throw new MediaStorageError(
@@ -242,7 +243,7 @@ async function createTosAuthorization(
   const canonicalRequest = [
     method,
     canonicalPath,
-    "",
+    canonicalQueryString(query),
     `${canonicalHeaders}\n`,
     signedHeaders,
     payloadHash,
@@ -340,7 +341,13 @@ async function fetchTosObject(
   env: unknown,
   method: "GET" | "PUT" | "DELETE",
   objectKey: string,
-  init: { body?: BodyInit; cacheControl?: string; contentType?: string } = {},
+  init: {
+    body?: BodyInit;
+    cacheControl?: string;
+    contentType?: string;
+    query?: Record<string, string | undefined>;
+    signal?: AbortSignal;
+  } = {},
 ) {
   const config = requireTosConfig(env);
   const { canonicalPath, host, url } = buildTosUrl(config, objectKey);
@@ -354,7 +361,9 @@ async function fetchTosObject(
     canonicalPath,
     host,
     extraSignedHeaders,
+    init.query,
   );
+  if (init.query) url.search = canonicalQueryString(init.query);
   const headers = new Headers({
     authorization,
     "x-tos-content-sha256": payloadHash,
@@ -369,6 +378,7 @@ async function fetchTosObject(
     body: init.body,
     headers,
     method,
+    signal: init.signal,
   });
 
   if (!response.ok) {
@@ -517,4 +527,128 @@ export async function removeStoredMedia(
   }
 
   await client.storage.from(NEKO_MEDIA_BUCKET).remove(objectKeys);
+}
+
+/** Destructive: admin-only, scoped to an Auth-verified UUID, never a caller prefix. */
+export async function removeAccountMedia(client: SupabaseClient, env: unknown, userId: string) {
+  if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(userId)) {
+    throw new MediaStorageError(400, "invalid_media_owner", "Invalid media owner");
+  }
+  const prefix = `${userId}/`;
+  const deadline = Date.now() + 45_000;
+  const checkDeadline = () => {
+    if (Date.now() > deadline)
+      throw new MediaStorageError(503, "cleanup_pending", "Media cleanup needs retry");
+  };
+  const assertOwned = (key: string) => {
+    if (
+      typeof key !== "string" ||
+      !key.startsWith(prefix) ||
+      key.includes("..") ||
+      key.includes("\\") ||
+      key.includes("//")
+    ) {
+      throw new MediaStorageError(500, "invalid_media_owner", "Storage returned an unowned object");
+    }
+  };
+
+  if (resolveMediaStorageProvider(env) === "tos") {
+    // Re-read page one after each deletion so changing pagination cannot skip
+    // objects. Include historical versions and deletion markers, not only live keys.
+    for (let page = 0; ; page += 1) {
+      checkDeadline();
+      if (page >= 1_000)
+        throw new MediaStorageError(503, "cleanup_pending", "Media cleanup needs retry");
+      const response = await fetchTosObject(env, "GET", "", {
+        query: { versions: "", prefix, "max-keys": "100" },
+        signal: AbortSignal.timeout(10_000),
+      });
+      const listing = (await response.json()) as {
+        Versions?: Array<{ Key: string; VersionId: string }>;
+        DeleteMarkers?: Array<{ Key: string; VersionId: string }>;
+        IsTruncated: boolean;
+      };
+      if (
+        typeof listing.IsTruncated !== "boolean" ||
+        (listing.Versions !== undefined && !Array.isArray(listing.Versions)) ||
+        (listing.DeleteMarkers !== undefined && !Array.isArray(listing.DeleteMarkers))
+      ) {
+        throw new MediaStorageError(502, "invalid_media_listing", "Invalid storage listing");
+      }
+      const objects = [...(listing.Versions ?? []), ...(listing.DeleteMarkers ?? [])];
+      if (!objects.length) {
+        if (listing.IsTruncated)
+          throw new MediaStorageError(502, "invalid_media_listing", "Incomplete storage listing");
+        break;
+      }
+      // Validate the whole page before issuing any deletes.
+      for (const object of objects) {
+        assertOwned(object.Key);
+        if (typeof object.VersionId !== "string" || !object.VersionId) {
+          throw new MediaStorageError(502, "invalid_media_listing", "Missing object version");
+        }
+      }
+      for (let offset = 0; offset < objects.length; offset += 4) {
+        checkDeadline();
+        const results = await Promise.allSettled(
+          objects.slice(offset, offset + 4).map(async (object) => {
+            try {
+              await fetchTosObject(env, "DELETE", object.Key, {
+                query: { versionId: object.VersionId },
+                signal: AbortSignal.timeout(10_000),
+              });
+            } catch (error) {
+              if (!(error instanceof MediaStorageError && error.status === 404)) throw error;
+            }
+          }),
+        );
+        const failure = results.find((result) => result.status === "rejected");
+        if (failure?.status === "rejected") throw failure.reason;
+      }
+    }
+  }
+
+  // Also remove legacy Supabase objects even when current uploads use TOS.
+  const { error: bucketError } = await client.storage.getBucket(NEKO_MEDIA_BUCKET);
+  if (bucketError) {
+    // An absent legacy bucket is fine; permissions/network errors are not.
+    if (String((bucketError as { statusCode?: unknown }).statusCode) === "404") return;
+    throw new MediaStorageError(503, "storage_list_failed", bucketError.message);
+  }
+  const bucket = client.storage.from(NEKO_MEDIA_BUCKET);
+  const cleanFolder = async (folder: string, depth: number) => {
+    if (depth > 20)
+      throw new MediaStorageError(500, "invalid_media_listing", "Storage nesting too deep");
+    // Virtual folders disappear when emptied. Always consume the first page.
+    for (let page = 0; ; page += 1) {
+      checkDeadline();
+      if (page >= 1_000)
+        throw new MediaStorageError(503, "cleanup_pending", "Media cleanup needs retry");
+      const { data, error } = await bucket.list(folder, {
+        limit: 100,
+        offset: 0,
+        sortBy: { column: "name", order: "asc" },
+      });
+      if (error || !Array.isArray(data))
+        throw new MediaStorageError(503, "storage_list_failed", "Cannot list account media");
+      if (!data.length) return;
+      const files: string[] = [];
+      const folders: string[] = [];
+      for (const item of data) {
+        if (!item.name || item.name.includes("/"))
+          throw new MediaStorageError(502, "invalid_media_listing", "Invalid storage name");
+        const key = `${folder}/${item.name}`;
+        assertOwned(key);
+        if (item.id == null && item.metadata == null) folders.push(key);
+        else files.push(key);
+      }
+      if (files.length) {
+        const { error: removeError } = await bucket.remove(files);
+        if (removeError)
+          throw new MediaStorageError(503, "storage_delete_failed", "Cannot delete account media");
+      }
+      for (const child of folders) await cleanFolder(child, depth + 1);
+    }
+  };
+  await cleanFolder(userId, 0);
 }
