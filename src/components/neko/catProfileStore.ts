@@ -86,6 +86,8 @@ export type CatPersona = {
   savedAt: number;
   provider?: string;
   model?: string;
+  /** Exact answers used for this result; persisted independently of debug metadata. */
+  questionnaireAnswers?: Record<string, "a" | "b" | "c">;
   /** Canonical Persona Result protocol. Legacy fields above are derived compatibility output. */
   persona?: PersonaSummary;
   dimensions?: PersonaDimension[];

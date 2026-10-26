@@ -1,4 +1,5 @@
 import { detectCatFaceServer, setCatFaceWorkerEnv } from "./catface.functions";
+import { PerformanceTrace, elapsedMs, type PerformanceOperation } from "./performance-trace";
 import { handleIOSAuthRequest, IOSAuthError } from "./ios-auth.server";
 import {
   ACCOUNT_DELETION_PATH,
@@ -28,7 +29,8 @@ const JSON_HEADERS = {
 const CORS_HEADERS = {
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "GET, POST, OPTIONS",
-  "access-control-allow-headers": "authorization, content-type",
+  "access-control-allow-headers": "authorization, content-type, x-neko-request-id, x-neko-flow-id",
+  "access-control-expose-headers": "x-neko-request-id, x-neko-server-duration-ms, server-timing",
   "access-control-max-age": "86400",
 };
 
@@ -176,6 +178,29 @@ class APIError extends Error {
 }
 
 export async function handleIOSAPIRequest(request: Request, env: unknown) {
+  const operations: Record<string, PerformanceOperation> = {
+    "/api/ios/onboarding/persona": "persona",
+    "/api/ios/onboarding/video-analysis": "video_analysis",
+    "/api/ios/voice": "voice",
+    "/api/ios/detect-cat-face": "cat_detection",
+    "/api/ios/cloud/cat-profile": "profile_save",
+    "/api/ios/cloud/media-upload": "media_upload_url",
+  };
+  const operation = operations[new URL(request.url).pathname];
+  if (!operation || request.method !== "POST") return handleIOSAPIRequestInternal(request, env);
+  const trace = new PerformanceTrace(operation, request.headers.get("x-neko-request-id"), request.headers.get("x-neko-flow-id"));
+  trace.log("http_start");
+  const response = await handleIOSAPIRequestInternal(request, env, trace);
+  if (!response) return response;
+  const durationMs = elapsedMs(trace.startedAt);
+  response.headers.set("x-neko-request-id", trace.requestId);
+  response.headers.set("x-neko-server-duration-ms", String(durationMs));
+  response.headers.set("server-timing", `app;dur=${durationMs}`);
+  trace.log("http_end", { durationMs, httpStatus: response.status, outcome: response.ok ? "ok" : "error" });
+  return response;
+}
+
+async function handleIOSAPIRequestInternal(request: Request, env: unknown, trace?: PerformanceTrace) {
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/api/ios/")) return null;
 
@@ -200,7 +225,7 @@ export async function handleIOSAPIRequest(request: Request, env: unknown) {
       throw new APIError(405, "method_not_allowed", "Use POST");
     }
 
-    const body = await readJson(request);
+    const body = await (trace ? trace.measure("body_read", () => readJson(request)) : readJson(request));
 
     if (url.pathname === "/api/ios/detect-cat-face") {
       const result = await detectCatFaceServer(
@@ -212,6 +237,7 @@ export async function handleIOSAPIRequest(request: Request, env: unknown) {
     if (url.pathname === "/api/ios/onboarding/persona") {
       const result = await generateCatPersonaServer(
         body as Parameters<typeof generateCatPersonaServer>[0],
+        trace,
       );
       return jsonResponse({ ok: true, data: result });
     }
@@ -219,6 +245,7 @@ export async function handleIOSAPIRequest(request: Request, env: unknown) {
     if (url.pathname === "/api/ios/onboarding/video-analysis") {
       const result = await analyzeCatVideoClipServer(
         body as Parameters<typeof analyzeCatVideoClipServer>[0],
+        trace,
       );
       return jsonResponse({ ok: true, data: result });
     }
@@ -228,13 +255,15 @@ export async function handleIOSAPIRequest(request: Request, env: unknown) {
       return jsonResponse({ ok: true, data: authResult });
     }
 
-    const { token, user } = await requireSupabaseUser(request, env);
+    const { token, user } = await (trace
+      ? trace.measure("auth", () => requireSupabaseUser(request, env))
+      : requireSupabaseUser(request, env));
 
     if (url.pathname === ACCOUNT_DELETION_PATH) {
       return jsonResponse({ ok: true, data: await deleteCurrentAccount(env, token, user, body) });
     }
 
-    const cloudResult = await handleIOSCloudRequest(
+    const cloudOperation = () => handleIOSCloudRequest(
       url.pathname,
       body,
       env,
@@ -242,6 +271,8 @@ export async function handleIOSAPIRequest(request: Request, env: unknown) {
       user,
       url.origin,
     );
+    const cloudResult = await (trace && url.pathname.startsWith("/api/ios/cloud/")
+      ? trace.measure("cloud_operation", cloudOperation) : cloudOperation());
     if (cloudResult !== null) {
       return jsonResponse({ ok: true, data: cloudResult });
     }
@@ -249,6 +280,7 @@ export async function handleIOSAPIRequest(request: Request, env: unknown) {
     if (url.pathname === "/api/ios/voice") {
       const result = await generateCatVoiceServer(
         body as Parameters<typeof generateCatVoiceServer>[0],
+        trace,
       );
       return jsonResponse({ ok: true, data: result });
     }

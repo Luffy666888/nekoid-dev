@@ -10,6 +10,10 @@ import {
   uploadStoredMedia,
 } from "@/lib/media-storage.server";
 import { NEKO_MAX_UPLOAD_BYTES, NEKO_MAX_UPLOAD_LABEL } from "@/lib/neko-upload-limits";
+import {
+  personaGenerationInputForStorage,
+  storedPersonaQuestionnaireAnswers,
+} from "./persona-questionnaire";
 
 type EnvLike = Record<string, string | undefined>;
 
@@ -50,6 +54,7 @@ type PersonaRow = {
   provider?: string | null;
   model?: string | null;
   updated_at?: string | null;
+  generation_input?: unknown;
 };
 
 type VoiceRow = {
@@ -75,7 +80,7 @@ type VoiceRow = {
 
 const CAT_COLUMNS = "id,name,gender,age_stage,avatar_object_key,quiz,updated_at";
 const PERSONA_COLUMNS =
-  "id,cat_id,type,mbti,match_score,monologue,analysis,core_personality,misunderstanding,love_language,owner_role,tags,traits,observations,evidence,daily_mood,provider,model,updated_at";
+  "id,cat_id,type,mbti,match_score,monologue,analysis,core_personality,misunderstanding,love_language,owner_role,tags,traits,observations,evidence,daily_mood,provider,model,updated_at,generation_input";
 const VOICE_COLUMNS =
   "id,text,subtext,analysis,analysis_summary,personality_interpretation,share_headline,share_insight,share_tags,location,tags,media_object_key,media_type,aspect,video_duration,grad,local_time_label,created_at";
 const PROFILE_COLUMNS =
@@ -398,6 +403,7 @@ function mapPersonaRow(row: PersonaRow | null | undefined) {
     dailyMood: row.daily_mood,
     provider: row.provider ?? "server",
     model: row.model ?? "neko-id-server-persona",
+    questionnaireAnswers: storedPersonaQuestionnaireAnswers(row.generation_input) ?? undefined,
   };
 }
 
@@ -628,12 +634,12 @@ async function upsertPersona(
         daily_mood: cleanString(value.dailyMood, "今天好像有点想你"),
         provider: cleanString(value.provider, "ios-native"),
         model: cleanString(value.model, "native-onboarding-v1"),
+        generation_input: personaGenerationInputForStorage(value),
         ...(value.generation && typeof value.generation === "object"
           ? {
               generation_id: cleanString((value.generation as JsonRecord).generationId) || null,
               input_hash: cleanString((value.generation as JsonRecord).inputHash) || null,
               prompt_version: (value.generation as JsonRecord).promptVersion ?? null,
-              generation_input: (value.generation as JsonRecord).rawInputs ?? null,
               stage_outputs: {
                 behaviorProfile: (value.generation as JsonRecord).behaviorProfile,
                 groundedTraits: (value.generation as JsonRecord).groundedTraits,

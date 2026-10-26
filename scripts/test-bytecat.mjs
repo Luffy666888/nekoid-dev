@@ -492,6 +492,75 @@ function personaPipelineFixtureForPrompt(prompt) {
   throw new Error(`Unknown persona pipeline prompt: ${prompt.slice(0, 80)}`);
 }
 
+test("persona performance correlates stages and real retries without logging inputs or output", async () => {
+  const events = [];
+  const stage3Calls = new Map();
+  const api = loadAIServer("neko-ai", {
+    env: { ...env, NEKO_AI_DEBUG_PROMPTS: "false", NEKO_PERSONA_DEBUG: "false" },
+    logger: { info(label, data) { if (label === "NEKO perf") events.push(JSON.parse(data)); }, error() {} },
+    fetch: async (_url, init) => {
+      const body = JSON.parse(init.body);
+      const prompt = body.messages?.[0]?.content ?? body.systemInstruction?.parts?.[0]?.text;
+      let payload = structuredClone(personaPipelineFixtureForPrompt(prompt));
+      if (prompt.includes("Stage 3")) {
+        const model = body.model ?? "gemini";
+        stage3Calls.set(model, (stage3Calls.get(model) ?? 0) + 1);
+        if (body.model) payload.persona.summary = "私密输出".repeat(20); // valid JSON, invalid business length
+      }
+      if (body.model) return Response.json({ choices: [{ message: { content: JSON.stringify(payload) } }], usage: { prompt_tokens: 111, completion_tokens: 222 } });
+      return Response.json({ candidates: [{ finishReason: "STOP", content: { parts: [{ text: JSON.stringify(payload) }] } }], usageMetadata: { promptTokenCount: 123, candidatesTokenCount: 234, thoughtsTokenCount: 56 } });
+    },
+  });
+  await Promise.all([1, 2].map(() => api.generateCatPersonaServer({ profile: { ...mergedProfile, name: "私密猫名", quiz: { 0: "b" } }, imageDataUrl })));
+  const groups = Map.groupBy(events, event => event.requestId);
+  assert.equal(groups.size, 2);
+  for (const group of groups.values()) {
+    const ends = group.filter(event => event.event === "persona_stage_end");
+    assert.deepEqual(ends.map(event => event.stage), ["stage1", "stage2", "stage3"]);
+    assert.deepEqual(ends.map(event => event.modelAttempts), [1, 1, 2]);
+    const rejected = group.find(event => event.event === "ai_attempt_end" && event.errorCategory === "validation");
+    assert.equal(rejected.stage, "stage3");
+    assert.equal(rejected.willRetry, true);
+    assert.ok(rejected.reasons.includes("persona_summary_too_long"));
+    const transport = group.find(event => event.event === "ai_transport_end" && event.transport === "gemini");
+    assert.equal(transport.inputTokens, 123);
+    assert.equal(transport.outputTokens, 234);
+    assert.equal(transport.thoughtTokens, 56);
+    assert.equal(transport.httpStatus, 200);
+    assert.ok(transport.requestBytes > 0 && transport.headersMs >= 0 && transport.bodyMs >= 0);
+    const end = group.find(event => event.event === "persona_end");
+    assert.equal(end.modelAttempts, 4);
+    assert.equal(end.modelRetries, 1);
+    assert.ok(end.localRepairs >= 0 && end.postprocessMs >= 0);
+    assert.equal(group.filter(event => event.event === "ai_attempt_start").length, 4);
+  }
+  const serialized = JSON.stringify(events);
+  for (const secret of ["私密猫名", "私密输出", imageDataUrl, "test-gpt-key", "test-gemini-key", "behavio", "https://"])
+    assert.equal(serialized.includes(secret), false, `must not log ${secret}`);
+});
+
+test("performance distinguishes a stalled response body timeout from validation and logs terminal failures", async () => {
+  const events = [];
+  const api = loadAIServer("neko-ai", {
+    env: { ...env, BYTECAT_TEXT_TIMEOUT_MS: "10" },
+    logger: { info(label, data) { if (label === "NEKO perf") events.push(JSON.parse(data)); }, error() {} },
+    fetch: async (_url, { signal }) => new Response(new ReadableStream({ start(controller) {
+      signal.addEventListener("abort", () => controller.error(new DOMException("Aborted", "AbortError")), { once: true });
+    } })),
+  });
+  await assert.rejects(api.generateCatPersonaServer({ profile: mergedProfile }));
+  const transports = events.filter(event => event.event === "ai_transport_end");
+  assert.ok(transports.length >= 1);
+  assert.ok(transports.every(event => event.errorCategory === "timeout" && event.headersMs !== null && event.bodyMs === null));
+  const attempts = events.filter(event => event.event === "ai_attempt_end");
+  assert.ok(attempts.every(event => event.errorCategory === "timeout"));
+  assert.equal(attempts.at(-1).willRetry, false);
+  const end = events.find(event => event.event === "persona_end");
+  assert.equal(end.outcome, "error");
+  assert.equal(end.modelAttempts, attempts.length);
+  assert.equal(end.completedStages, 0);
+});
+
 test("video clip analysis sends extracted frames and returns structured observation", async () => {
   let calls = 0;
   const api = loadAIServer("neko-ai", {
@@ -918,6 +987,56 @@ test("persona drift check keeps 六六 stable across five same-input runs", asyn
     assert.equal(result.generation.evalResult.consistency.anchored, true);
     assert.equal(result.generation.evalResult.consistency.behaviorAverageDifference, 0);
     assert.equal(result.generation.evalResult.consistency.quizChanges, 0);
+  }
+});
+
+test("persona prior requires exact answers, is excluded from prompts on any change, and survives production JSON round trips", async () => {
+  const prompts = [];
+  const answers = { 0: "a", 1: "b", 2: "a", 3: "b", 4: "c", 5: "a", 6: "b", 7: "a" };
+  const api = loadAIServer("neko-ai", {
+    env: { ...env, NEKO_PERSONA_DEBUG: "false" },
+    logger,
+    fetch: async (_url, init) => {
+      const prompt = promptTextFromBody(JSON.parse(init.body));
+      prompts.push(prompt);
+      return Response.json({ choices: [{ message: { content: JSON.stringify(personaPipelineFixtureForPrompt(prompt)) } }] });
+    },
+  });
+  const first = await api.generateCatPersonaServer({ profile: { ...mergedProfile, quiz: answers } });
+  assert.equal(first.generation, undefined);
+  assert.deepEqual(JSON.parse(JSON.stringify(first.questionnaireAnswers)), answers);
+  const previous = JSON.parse(JSON.stringify(first));
+  previous.mbti = previous.persona.mbti = "ISFP-A";
+  previous.type = previous.persona.personaTitle = "旧版独立参考派";
+
+  const cases = [
+    { name: "identical in different key order", quiz: Object.fromEntries(Object.entries(answers).reverse()), previous, retain: true },
+    ...Object.keys(answers).map(key => ({ name: `one changed answer Q${key}`, quiz: { ...answers, [key]: answers[key] === "a" ? "b" : "a" }, previous, retain: false })),
+    { name: "one answer removed", quiz: { ...answers, 7: null }, previous, retain: false },
+    { name: "one answer added", quiz: answers, previous: { ...previous, questionnaireAnswers: { ...answers, 7: null } }, retain: false },
+    { name: "legacy unknown snapshot", quiz: answers, previous: { ...previous, questionnaireAnswers: undefined }, retain: false },
+    { name: "invalid snapshot", quiz: answers, previous: { ...previous, questionnaireAnswers: { ...answers, 7: "invalid" } }, retain: false },
+    { name: "known empty snapshot", quiz: {}, previous: { ...previous, questionnaireAnswers: {} }, retain: true },
+    { name: "unknown is not empty", quiz: {}, previous: { ...previous, questionnaireAnswers: undefined }, retain: false },
+    { name: "legacy full debug snapshot", quiz: answers, previous: { ...previous, questionnaireAnswers: undefined, generation: { questionnaireAnswers: answers } }, retain: true },
+  ];
+  for (const item of cases) {
+    // Simulate API/storage serialization: absent optional keys stay absent.
+    const prior = JSON.parse(JSON.stringify(item.previous));
+    prompts.length = 0;
+    const result = await api.generateCatPersonaServer({
+      profile: { ...mergedProfile, quiz: item.quiz },
+      previousPersona: prior,
+      videoObservations: [{ containsCat: true, confidence: "high", summary: "新视频里它主动靠近玩具并伸出前爪。", personalityEvidence: [{ fact: "它持续追逐玩具并主动参与互动。", interpretation: "它愿意尝试新的互动方式。" }] }],
+    });
+    assert.equal(prompts.length, 3, item.name);
+    assert.equal(result.mbti, item.retain ? "ISFP-A" : first.mbti, item.name);
+    for (const prompt of [prompts[0], prompts[2]]) {
+      assert.equal(prompt.includes("旧版独立参考派"), item.retain, item.name);
+      assert.equal(prompt.includes("上一版人格 prior：null"), !item.retain, item.name);
+    }
+    const normalized = Object.fromEntries(Object.entries(item.quiz).filter(([, value]) => value !== null));
+    assert.deepEqual(JSON.parse(JSON.stringify(result.questionnaireAnswers)), normalized, item.name);
   }
 });
 

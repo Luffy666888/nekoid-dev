@@ -17,6 +17,10 @@ import {
   NEKO_MEDIA_BUCKET,
 } from "@/lib/supabase/client";
 import { isNekoUploadSizeAllowed, NEKO_MAX_UPLOAD_LABEL } from "@/lib/neko-upload-limits";
+import {
+  personaGenerationInputForStorage,
+  storedPersonaQuestionnaireAnswers,
+} from "@/lib/persona-questionnaire";
 
 type CloudAuthState =
   | { status: "unconfigured"; session: null; user: null }
@@ -115,9 +119,9 @@ const SIGNED_URL_TTL_SECONDS = 60 * 60;
 const PROFILE_COLUMNS =
   "id,email,display_name,avatar_object_key,onboarding_completed_at,created_at,updated_at";
 const PERSONA_BASE_COLUMNS =
-  "id,cat_id,type,mbti,match_score,monologue,analysis,core_personality,misunderstanding,love_language,owner_role,tags,traits,observations,evidence,daily_mood,updated_at";
+  "id,cat_id,type,mbti,match_score,monologue,analysis,core_personality,misunderstanding,love_language,owner_role,tags,traits,observations,evidence,daily_mood,updated_at,generation_input";
 const PERSONA_DEBUG_COLUMNS =
-  "generation_id,input_hash,prompt_version,generation_input,stage_outputs,eval_result,stage_logs,generation_model,generation_retry_count";
+  "generation_id,input_hash,prompt_version,stage_outputs,eval_result,stage_logs,generation_model,generation_retry_count";
 const LEGACY_DEFAULT_DISPLAY_NAME = "喵一下用户";
 const EMPTY_ACCOUNT_DISPLAY_NAME = "猫咪主人";
 
@@ -655,12 +659,12 @@ async function savePersona(
         observations: persona.observations ?? [],
         evidence: persona.evidence ?? [],
         daily_mood: persona.dailyMood,
+        generation_input: personaGenerationInputForStorage(persona),
         ...(persona.generation
           ? {
               generation_id: persona.generation.generationId,
               input_hash: persona.generation.inputHash,
               prompt_version: persona.generation.promptVersion,
-              generation_input: persona.generation.rawInputs ?? null,
               stage_outputs: {
                 behaviorProfile: persona.generation.behaviorProfile,
                 groundedTraits: persona.generation.groundedTraits,
@@ -686,6 +690,7 @@ async function savePersona(
     ...persona,
     cloudId: row.id,
     catCloudId: row.cat_id,
+    questionnaireAnswers: storedPersonaQuestionnaireAnswers(row.generation_input) ?? undefined,
     generation: persona.generation ?? personaGenerationFromRow(row),
     savedAt: isoToMs(row.updated_at),
   };
@@ -836,6 +841,7 @@ export async function loadNekoFromCloud() {
         evidence: personaRow.evidence ?? [],
         dailyMood: personaRow.daily_mood,
         generation: personaGenerationFromRow(personaRow),
+        questionnaireAnswers: storedPersonaQuestionnaireAnswers(personaRow.generation_input) ?? undefined,
         savedAt: isoToMs(personaRow.updated_at),
       }
     : null;

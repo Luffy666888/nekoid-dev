@@ -13,6 +13,11 @@ import type {
 } from "@/components/neko/catProfileStore";
 import type { Voice } from "@/components/neko/app/voicesStore";
 import { buildBehaviorProfile, buildCombinationInsights } from "@/lib/neko-behavior-profile";
+import { PerformanceTrace, elapsedMs, monotonicNow, performanceErrorCategory, performanceNetworkCode } from "./performance-trace";
+import {
+  parseQuestionnaireAnswers as quizAnswersFromJson,
+  personaQuestionnaireAnswers as extractPreviousQuiz,
+} from "@/lib/persona-questionnaire";
 
 export type PersonaInput = {
   profile: CatProfile;
@@ -142,9 +147,9 @@ type PersonaAIResponse = Omit<CatPersona, "misunderstanding" | "loveLanguage" | 
 };
 
 export const PERSONA_PROMPT_VERSIONS = {
-  stage1: "persona_stage1_v2",
+  stage1: "persona_stage1_v3",
   stage2: "persona_stage2_v1",
-  stage3: "persona_stage3_protocol_v1",
+  stage3: "persona_stage3_protocol_v2",
 } as const;
 
 type PersonaPromptStage = keyof typeof PERSONA_PROMPT_VERSIONS;
@@ -255,6 +260,8 @@ type AIValidationContext = {
   durationMs: number;
 };
 
+type AIDiagnostics = { trace: PerformanceTrace; stage: string; attempt?: number };
+
 let workerEnv: Record<string, string | undefined> | null = null;
 let envFileCache: Record<string, string> | null | undefined;
 
@@ -360,13 +367,6 @@ async function shouldExposePersonaDebug() {
   const explicit = (await getServerEnv("NEKO_PERSONA_DEBUG"))?.toLowerCase().trim();
   if (explicit) return explicit === "1" || explicit === "true" || explicit === "yes";
   return (await getServerEnv("NODE_ENV")) === "development";
-}
-
-function createGenerationId() {
-  return (
-    globalThis.crypto?.randomUUID?.() ??
-    `persona-${Date.now()}-${Math.random().toString(16).slice(2)}`
-  );
 }
 
 function stableStringify(value: unknown): string {
@@ -1470,17 +1470,6 @@ function behaviorProfileFromJson(value: unknown): PersonaBehaviorProfile | null 
   return seen >= 4 ? profile : null;
 }
 
-function quizAnswersFromJson(value: unknown): Record<string, string> | null {
-  const raw = getObjectRecord(value);
-  if (!raw) return null;
-  const answers: Record<string, string> = {};
-  for (const [key, rawValue] of Object.entries(raw)) {
-    const answer = asText(rawValue).toLowerCase();
-    if (answer === "a" || answer === "b" || answer === "c") answers[String(key)] = answer;
-  }
-  return Object.keys(answers).length ? answers : null;
-}
-
 function countQuizChanges(
   current: Record<string, string> | null,
   previous: Record<string, string> | null,
@@ -1502,15 +1491,13 @@ function averageBehaviorDifference(
   return Math.round((total / behaviorProfileKeys.length) * 10) / 10;
 }
 
-function extractPreviousQuiz(previous: CatPersona) {
-  const generation = getObjectRecord(previous.generation);
-  const rawInputs = getObjectRecord(generation?.rawInputs);
-  const rawProfile = getObjectRecord(rawInputs?.profile);
-  return (
-    quizAnswersFromJson(generation?.questionnaireAnswers) ??
-    quizAnswersFromJson(rawProfile?.quiz) ??
-    quizAnswersFromJson(rawInputs?.questionnaireAnswers)
+function previousPersonaForIdenticalQuiz(data: PersonaInput): CatPersona | null {
+  if (!data.previousPersona) return null;
+  const changes = countQuizChanges(
+    quizAnswersFromJson(data.profile.quiz ?? {}),
+    extractPreviousQuiz(data.previousPersona),
   );
+  return changes === 0 ? data.previousPersona : null;
 }
 
 function extractPreviousBehavior(previous: CatPersona) {
@@ -1525,7 +1512,10 @@ function extractPreviousBehavior(previous: CatPersona) {
 function previousHasRawInputs(previous: CatPersona) {
   const generation = getObjectRecord(previous.generation);
   return Boolean(
-    generation?.rawInputs || generation?.behaviorProfile || generation?.questionnaireAnswers,
+    previous.questionnaireAnswers ||
+      generation?.rawInputs ||
+      generation?.behaviorProfile ||
+      generation?.questionnaireAnswers,
   );
 }
 
@@ -1629,30 +1619,11 @@ function evaluatePersonaDrift(
   const mbtiStable = !previous.mbti || previous.mbti === finalCopy.persona.mbti;
   const hasRaw = previousHasRawInputs(previous);
 
-  const rawStable =
-    hasRaw &&
-    quizChanges !== null &&
-    quizChanges <= 1 &&
-    behaviorAverageDifference !== null &&
-    behaviorAverageDifference < 15 &&
-    !strongNewEvidence;
-  const rawLikelyStable =
-    hasRaw &&
-    quizChanges !== null &&
-    quizChanges <= 1 &&
-    behaviorAverageDifference === null &&
-    !strongNewEvidence &&
-    (mbtiStable || tagOverlap >= 0.34 || coreTraitSimilarity >= 0.18);
-  const visibleLikelyStable =
-    !hasRaw &&
-    !strongNewEvidence &&
-    (mbtiStable || tagOverlap >= 0.34 || titleSimilarity >= 0.3 || coreTraitSimilarity >= 0.18);
-  const anchored = Boolean(previousTitle) && (rawStable || rawLikelyStable || visibleLikelyStable);
+  // The questionnaire is the only retention gate. Even one changed answer
+  // disables the prior, regardless of similar traits, copy or model scores.
+  const anchored = quizChanges === 0;
 
   const warnings = [];
-  if (!anchored && previousTitle && !strongNewEvidence && !mbtiStable) {
-    warnings.push("persona_drift_allowed_without_strong_video_evidence");
-  }
   if (anchored && tagOverlap < 0.67) warnings.push("tag_overlap_repaired_to_previous_anchor");
   if (anchored && !mbtiStable) warnings.push("mbti_repaired_to_previous_anchor");
 
@@ -1662,12 +1633,10 @@ function evaluatePersonaDrift(
     anchored,
     action: anchored ? "anchor_previous" : "keep_current",
     reason: anchored
-      ? hasRaw
-        ? "similar_questionnaire_and_behavior_profile"
-        : "visible_previous_persona_matches_current_direction"
-      : strongNewEvidence
-        ? "strong_new_video_evidence"
-        : "input_or_semantic_direction_changed",
+      ? "identical_questionnaire"
+      : quizChanges === null
+        ? "previous_questionnaire_unavailable"
+        : "questionnaire_changed",
     quizChanges,
     behaviorAverageDifference,
     coreTraitSimilarity,
@@ -1903,6 +1872,38 @@ function validatePersonaStage3ModelOutput(value: unknown, dimensions: PersonaDim
   const raw = getObjectRecord(value);
   if (!raw || !hasExactKeys(raw, ["persona", "insights", "bondSummary"])) return false;
   return validatePersonaResultProtocol({ ...raw, dimensions });
+}
+
+// Diagnostics only. The existing boolean validators remain the acceptance gate.
+function personaValidationReasons(stage: PersonaPromptStage, value: unknown): string[] {
+  const raw = getObjectRecord(value);
+  if (!raw) return ["root_not_object"];
+  if (stage === "stage1") {
+    return [!raw.behaviorProfile && "behavior_profile_missing", !Array.isArray(raw.coreTraits) && "core_traits_not_array",
+      !Array.isArray(raw.unsupportedClaims) && "unsupported_claims_not_array"].filter((v): v is string => Boolean(v));
+  }
+  if (stage === "stage2") {
+    return [!raw.misunderstanding && "misunderstanding_missing", !raw.affection && "affection_missing",
+      !raw.ownerRelationship && "relationship_missing"].filter((v): v is string => Boolean(v));
+  }
+  const reasons: string[] = [];
+  if (!hasExactKeys(raw, ["persona", "insights", "bondSummary"])) reasons.push("root_keys");
+  const check = (value: unknown, name: string, fields: Record<string, number | null>) => {
+    const object = getObjectRecord(value);
+    if (!object) { reasons.push(`${name}_missing`); return; }
+    if (!hasExactKeys(object, Object.keys(fields))) reasons.push(`${name}_keys`);
+    for (const [field, limit] of Object.entries(fields)) {
+      if (!asText(object[field])) reasons.push(`${name}_${field}_empty`);
+      else if (limit !== null && charLength(asText(object[field])) > limit) reasons.push(`${name}_${field}_too_long`);
+    }
+  };
+  check(raw.persona, "persona", { mbti: null, personaTitle: 14, summary: 50 });
+  check(raw.bondSummary, "bond", { title: null, quote: 40 });
+  const insights = getObjectRecord(raw.insights);
+  if (!insights || !hasExactKeys(insights, ["misunderstanding", "affection", "relationship"])) reasons.push("insight_keys");
+  for (const name of ["misunderstanding", "affection", "relationship"])
+    check(insights?.[name], name, { title: null, conclusion: 60 });
+  return reasons.length ? reasons : ["result_protocol"];
 }
 
 function hasHighRiskCopy(value: string) {
@@ -2796,6 +2797,7 @@ async function callChatCompletion(
     modelMode?: "text" | "vision";
     model?: string;
     responseSchema?: Record<string, unknown>;
+    diagnostics?: AIDiagnostics;
   } = {},
 ) {
   const isDeepSeek = provider === "deepseek";
@@ -2836,6 +2838,22 @@ async function callChatCompletion(
   const startedAt = Date.now();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const isGeminiGenerateContent = isBytecat && isByteCatGeminiModel(model);
+  const transportStarted = monotonicNow();
+  let headersMs: number | null = null;
+  let bodyMs: number | null = null;
+  let httpStatus: number | null = null;
+  let requestBytes = 0;
+  let inputTokens: number | null = null;
+  let outputTokens: number | null = null;
+  let thoughtTokens: number | null = null;
+  let outcome = "error";
+  let errorCategory: string | null = null;
+  let networkCode: string | null = null;
+  const requestBody = (payload: unknown) => {
+    const body = JSON.stringify(payload);
+    if (options.diagnostics) requestBytes = new TextEncoder().encode(body).byteLength;
+    return body;
+  };
   let res: Response;
   try {
     await logAIPromptDebug({
@@ -2856,7 +2874,7 @@ async function callChatCompletion(
             "Content-Type": "application/json",
             "x-goog-api-key": apiKey,
           },
-          body: JSON.stringify(chatMessagesToGeminiPayload(messages, options)),
+          body: requestBody(chatMessagesToGeminiPayload(messages, options)),
         },
       );
     } else {
@@ -2867,7 +2885,7 @@ async function callChatCompletion(
           "Content-Type": "application/json",
           Authorization: `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({
+        body: requestBody({
           model,
           temperature: options.temperature ?? 0.82,
           ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
@@ -2887,14 +2905,24 @@ async function callChatCompletion(
       });
     }
 
+    headersMs = elapsedMs(transportStarted);
+    httpStatus = res.status;
     if (!res.ok) {
+      const bodyStarted = monotonicNow();
       const text = await res.text();
+      bodyMs = elapsedMs(bodyStarted);
       const label = providerLabel(provider);
       throw new Error(`${label} ${model} error ${res.status}: ${text.slice(0, 300)}`);
     }
 
     // Keep the deadline active until the entire response body has arrived.
+    const bodyStarted = monotonicNow();
     const json = await res.json();
+    bodyMs = elapsedMs(bodyStarted);
+    const tokenCount = (value: unknown) => typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+    inputTokens = tokenCount(json.usageMetadata?.promptTokenCount ?? json.usage?.prompt_tokens);
+    outputTokens = tokenCount(json.usageMetadata?.candidatesTokenCount ?? json.usage?.completion_tokens);
+    thoughtTokens = tokenCount(json.usageMetadata?.thoughtsTokenCount ?? json.usage?.completion_tokens_details?.reasoning_tokens);
     const content = isGeminiGenerateContent
       ? extractGeminiText(json)
       : json.choices?.[0]?.message?.content;
@@ -2907,14 +2935,23 @@ async function callChatCompletion(
     console.info(
       `NEKO ${providerLabel(provider)} success model=${model} duration=${Date.now() - startedAt}ms`,
     );
+    outcome = "ok";
     return content;
   } catch (error) {
+    errorCategory = controller.signal.aborted ? "timeout" : performanceErrorCategory(error);
+    networkCode = performanceNetworkCode(error);
     if (controller.signal.aborted) {
       throw new Error(`${providerLabel(provider)} ${model} timeout after ${timeoutMs}ms`);
     }
     throw error;
   } finally {
     clearTimeout(timer);
+    options.diagnostics?.trace.log("ai_transport_end", {
+      stage: options.diagnostics.stage, attempt: options.diagnostics.attempt ?? 1,
+      provider, model, transport: isGeminiGenerateContent ? "gemini" : "chat",
+      durationMs: elapsedMs(transportStarted), timeoutMs, headersMs, bodyMs,
+      httpStatus, requestBytes, inputTokens, outputTokens, thoughtTokens, outcome, errorCategory, networkCode,
+    });
   }
 }
 
@@ -2944,8 +2981,10 @@ async function callFirstAvailableJson<T>(
     modelMode?: "text" | "vision";
     validate?: (parsed: T, context: AIValidationContext) => boolean;
     responseSchema?: Record<string, unknown>;
+    diagnostics?: AIDiagnostics;
+    validationReasons?: (parsed: T) => string[];
   },
-): Promise<{ parsed: T; provider: AIProvider; model: string }> {
+): Promise<{ parsed: T; provider: AIProvider; model: string; attempts: number }> {
   const providers = await getAIProviderOrder();
   let lastError: unknown;
   let attempt = 0;
@@ -2954,28 +2993,50 @@ async function callFirstAvailableJson<T>(
     for (const model of models) {
       attempt++;
       const startedAt = Date.now();
+      const attemptStarted = monotonicNow();
+      const diagnostics = options.diagnostics ? { ...options.diagnostics, attempt } : undefined;
+      if (diagnostics) {
+        diagnostics.trace.modelAttempts++;
+        diagnostics.trace.log("ai_attempt_start", { stage: diagnostics.stage, attempt, provider, model });
+      }
+      let reasons: string[] = [];
+      let validationMs: number | null = null;
       try {
         const raw = await callChatCompletion(provider, buildMessages(provider), {
           ...options,
           model,
+          diagnostics,
         });
+        const validationStarted = monotonicNow();
         const parsed = extractJson<T>(raw);
-        if (
+        const invalid =
           !parsed ||
           (options.validate && !options.validate(parsed, {
             provider,
             model,
             attempt,
             durationMs: Date.now() - startedAt,
-          }))
-        ) {
+          }));
+        validationMs = elapsedMs(validationStarted);
+        if (invalid) {
+          reasons = parsed && options.validationReasons ? options.validationReasons(parsed) : ["required_fields"];
           throw new Error(`${providerLabel(provider)} ${model} JSON missing required fields`);
         }
-        return { parsed, provider, model };
+        diagnostics?.trace.log("ai_attempt_end", {
+          stage: diagnostics.stage, attempt, provider, model, outcome: "ok",
+          durationMs: elapsedMs(attemptStarted), validationMs, willRetry: false,
+        });
+        return { parsed, provider, model, attempts: attempt };
       } catch (error) {
         lastError = error;
         const hasNextModel = models.indexOf(model) < models.length - 1;
         const hasNextProvider = providers.indexOf(provider) < providers.length - 1;
+        diagnostics?.trace.log("ai_attempt_end", {
+          stage: diagnostics.stage, attempt, provider, model, outcome: "error",
+          durationMs: elapsedMs(attemptStarted), validationMs,
+          errorCategory: performanceErrorCategory(error), reasons,
+          willRetry: hasNextModel || hasNextProvider,
+        });
         console.error(
           `NEKO ${providerLabel(provider)} model=${model} failed, ${
             hasNextModel
@@ -3000,6 +3061,8 @@ function validatePersonaInput(input: unknown): PersonaInput {
   if (data.imageDataUrl && data.imageDataUrl.length > 8_000_000) throw new Error("image too large");
   return {
     ...data,
+    // Filter before constructing either prompt, not merely after generation.
+    previousPersona: previousPersonaForIdenticalQuiz(data),
     videoObservations: normalizeVideoObservationsInput(data.videoObservations, data.profile),
   };
 }
@@ -3049,6 +3112,7 @@ function validateVideoAnalysisInput(input: unknown): VideoAnalysisInput {
 
 export async function analyzeCatVideoClipServer(
   input: VideoAnalysisInput,
+  trace = new PerformanceTrace("video_analysis"),
 ): Promise<CatVideoObservation> {
   const data = validateVideoAnalysisInput(input);
   await logAIDebugEvent("video input", {
@@ -3114,6 +3178,7 @@ ${frameOrder}
       ],
       {
         maxTokens: 720,
+        diagnostics: { trace, stage: "video_observation" },
         temperature: 0.45,
         timeoutMs: 24_000,
         modelMode: "vision",
@@ -3229,7 +3294,7 @@ function stage1Prompt(data: PersonaInput, behaviorProfile: PersonaBehaviorProfil
 3. 如果证据不足，就降低 confidence 或不要生成 trait。
 4. 不要为了凑完整人格而创造 trait。
 5. 禁止把固定时间、固定路线、每天按点、生活秩序严格、主人不在时一定怎样等长期频率事实写成结论；出现这类内容必须进入 unsupportedClaims。
-6. previousPersona 只能作为稳定性参考。如果当前问卷/视频没有强新证据，不要轻易改变核心方向；如果强证据变化，必须以当前输入为准。
+6. previousPersona 仅在两次问卷答案完全一致时提供；提供时保持上一版 MBTI。未提供时必须独立判断，不猜测或沿用历史人格。
 
 输出严格 JSON，不要 Markdown：
 {
@@ -3379,7 +3444,7 @@ Insights：${JSON.stringify(stage2)}
 【人格结论】
 - persona 只包含 mbti、personaTitle、summary。
 - summary 只总结最重要的人格特征，30-50 个中文字符，不重复罗列 dimensions。
-- MBTI 和标题在相同输入下应保持稳定；没有强新证据时，不推翻上一版核心方向。
+- 上一版 prior 仅在问卷答案完全一致时提供；提供时保留上一版 MBTI。prior 为 null 时独立生成，不参考历史人格。
 
 personaTitle 规则：
 - 可理解性 > 准确 > 共鸣 > 创意。
@@ -3435,12 +3500,14 @@ Final Copy Self-check：
 
 async function runPersonaAIStage<T>({
   stage,
+  trace,
   fallback,
   buildMessages,
   normalize,
   options,
 }: {
   stage: PersonaPromptStage;
+  trace: PerformanceTrace;
   fallback: T;
   buildMessages: (provider: AIProvider) => unknown[];
   normalize: (value: unknown, fallback: T) => T;
@@ -3454,12 +3521,20 @@ async function runPersonaAIStage<T>({
   };
 }): Promise<{ output: T; log: PersonaStageLog }> {
   const startedAt = Date.now();
+  const started = monotonicNow();
+  const attemptsBefore = trace.modelAttempts;
+  trace.log("persona_stage_start", { stage, promptVersion: PERSONA_PROMPT_VERSIONS[stage] });
   try {
     const result = await callFirstAvailableJson<unknown>(buildMessages, {
       ...options,
       validate: options.validate,
+      diagnostics: { trace, stage },
+      validationReasons: (parsed) => personaValidationReasons(stage, parsed),
     });
+    const normalizationStarted = monotonicNow();
     const output = normalize(result.parsed, fallback);
+    trace.log("persona_stage_end", { stage, outcome: "ok", durationMs: elapsedMs(started),
+      normalizeMs: elapsedMs(normalizationStarted), modelAttempts: result.attempts, modelRetries: result.attempts - 1 });
     return {
       output,
       log: {
@@ -3475,6 +3550,8 @@ async function runPersonaAIStage<T>({
       },
     };
   } catch (error) {
+    trace.log("persona_stage_end", { stage, outcome: "error", durationMs: elapsedMs(started),
+      modelAttempts: trace.modelAttempts - attemptsBefore, errorCategory: performanceErrorCategory(error) });
     if (await shouldRequireRealAI()) throw error;
     return {
       output: fallback,
@@ -3494,15 +3571,19 @@ async function runPersonaAIStage<T>({
   }
 }
 
-export async function generateCatPersonaServer(input: PersonaInput): Promise<CatPersona> {
+export async function generateCatPersonaServer(input: PersonaInput, trace = new PerformanceTrace("persona")): Promise<CatPersona> {
+  const pipelineStarted = monotonicNow();
   const data = validatePersonaInput(input);
-  const generationId = createGenerationId();
+  const generationId = trace.requestId;
   const stableStage1 = buildStableStage1(data);
   const inputTimestamp = new Date().toISOString();
   const inputSnapshot = personaInputSnapshot(data, stableStage1.behaviorProfile, inputTimestamp);
   const inputHash = hashInput(inputSnapshot);
   const stageLogs: PersonaStageLog[] = [];
   let retryCount = 0;
+  trace.log("persona_start", { hasImage: Boolean(data.imageDataUrl),
+    answeredCount: Object.keys(data.profile.quiz ?? {}).length,
+    videoObservationCount: data.videoObservations?.length ?? 0, hasPrior: Boolean(data.previousPersona) });
 
   await logAIDebugEvent("persona input snapshot", {
     generationId,
@@ -3513,6 +3594,7 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
   try {
     const stage1Run = await runPersonaAIStage<PersonaStage1Output>({
       stage: "stage1",
+      trace,
       fallback: stableStage1,
       buildMessages: (provider) => [
         {
@@ -3550,6 +3632,7 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
     const stableStage2 = buildStableStage2(stage1Run.output, data.profile);
     const stage2Run = await runPersonaAIStage<PersonaStage2Output>({
       stage: "stage2",
+      trace,
       fallback: stableStage2,
       buildMessages: () => [
         {
@@ -3581,12 +3664,14 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
         "Stage 2 produced an unsupported long-term claim; replaced with grounded fallback.";
       stage2Run.log.output = stage2Output;
       retryCount += 1;
+      trace.log("persona_local_repair", { stage: "stage2", reason: "unsupported_long_term_claim", extraModelCalls: 0 });
     }
     stageLogs.push(stage2Run.log);
 
     const stableStage3 = buildStableStage3(stage1Run.output, stage2Output, data.profile);
     const stage3Run = await runPersonaAIStage<PersonaStage3Output>({
       stage: "stage3",
+      trace,
       fallback: stableStage3,
       buildMessages: () => [
         {
@@ -3609,6 +3694,7 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
         validate: (parsed) => validatePersonaStage3ModelOutput(parsed, stableStage3.dimensions),
       },
     });
+    const postprocessStarted = monotonicNow();
     let finalCopy = stage3Run.output;
     const selfCheck = runFinalCopySelfCheck(finalCopy, data.profile);
     if (!selfCheck.passed) {
@@ -3622,6 +3708,7 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
         .filter(Boolean)
         .join("; ");
       retryCount += 1;
+      trace.log("persona_local_repair", { stage: "stage3", reason: "self_check", extraModelCalls: 0 });
     }
 
     let driftCheck = evaluatePersonaDrift(data, stage1Run.output, finalCopy);
@@ -3647,6 +3734,7 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
         .filter(Boolean)
         .join("; ");
       retryCount += 1;
+      trace.log("persona_local_repair", { stage: "stage3", reason: "previous_persona_anchor", extraModelCalls: 0 });
     }
 
     let evalResult = evaluatePersonaGeneration({
@@ -3687,6 +3775,7 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
       stage3Run.log.output = finalCopy;
       stage3Run.log.retryCount += 1;
       retryCount += 1;
+      trace.log("persona_local_repair", { stage: "stage3", reason: "fatal_eval", extraModelCalls: 0 });
     }
     stageLogs.push(stage3Run.log);
 
@@ -3695,6 +3784,7 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
       .join(", ");
     const persona = {
       ...stage3ToPersona(finalCopy, stage1Run.output, data.profile),
+      questionnaireAnswers: quizAnswersFromJson(data.profile.quiz ?? {}) ?? undefined,
       provider: "persona-pipeline",
       model: modelSummary,
     } satisfies CatPersona;
@@ -3730,11 +3820,17 @@ export async function generateCatPersonaServer(input: PersonaInput): Promise<Cat
       stageLogs,
     });
 
+    trace.log("persona_end", { outcome: "ok", durationMs: elapsedMs(pipelineStarted),
+      postprocessMs: elapsedMs(postprocessStarted), modelAttempts: trace.modelAttempts,
+      modelRetries: Math.max(0, trace.modelAttempts - 3), localRepairs: retryCount });
     return persona;
   } catch (error) {
+    trace.log("persona_end", { outcome: "error", durationMs: elapsedMs(pipelineStarted),
+      modelAttempts: trace.modelAttempts, completedStages: stageLogs.length, errorCategory: performanceErrorCategory(error) });
     console.error("NEKO persona pipeline failed", error);
     if (await shouldRequireRealAI()) throw new Error(getUserFacingAIMessage("persona", error));
     const fallback = buildStablePersona(data.profile);
+    fallback.questionnaireAnswers = quizAnswersFromJson(data.profile.quiz ?? {}) ?? undefined;
     if (await shouldExposePersonaDebug()) {
       fallback.generation = {
         generationId,
@@ -3762,9 +3858,9 @@ export const generateCatPersona = createServerFn({ method: "POST" })
   .inputValidator(validatePersonaInput)
   .handler(async ({ data }): Promise<CatPersona> => generateCatPersonaServer(data));
 
-export async function generateCatVoiceServer(input: VoiceInput): Promise<Voice> {
+export async function generateCatVoiceServer(input: VoiceInput, trace = new PerformanceTrace("voice")): Promise<Voice> {
   const data = validateVoiceInput(input);
-  const generationId = createGenerationId();
+  const generationId = trace.requestId;
   const startedAt = Date.now();
   const personaContext = canonicalVoicePersona(data.persona);
   const profileContext = {
@@ -3835,6 +3931,7 @@ ${data.scene || "无补充场景"}
         timeoutMs: data.imageDataUrl ? 22_000 : 14_000,
         modelMode: data.imageDataUrl ? "vision" : "text",
         responseSchema: VOICE_JSON_SCHEMA,
+        diagnostics: { trace, stage: "voice_generation" },
         validate: (parsed, context) =>
           validateVoiceGenerationOutput(parsed, data.persona, {
             ...context,
