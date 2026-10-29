@@ -16,6 +16,7 @@ export function loadAIServer(
     logger = console,
     timers = {},
     internals = [],
+    random = Math.random,
   } = {},
 ) {
   const filename = new URL(`../src/lib/${name}.functions.ts`, import.meta.url);
@@ -39,6 +40,23 @@ export function loadAIServer(
     { filename: questionnaireFilename.pathname },
   );
   const source = readFileSync(filename, "utf8") + `\nexport { ${internals.join(", ")} };\n`;
+  const voiceAnalysisModule = {};
+  vm.runInNewContext(ts.transpileModule(readFileSync(new URL("../src/lib/voice-analysis.ts", import.meta.url), "utf8"), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText, { exports: voiceAnalysisModule });
+  const voiceStyleModule = {};
+  const styleMath = Object.create(Math);
+  styleMath.random = random;
+  vm.runInNewContext(ts.transpileModule(readFileSync(new URL("../src/lib/voice-analysis-style.ts", import.meta.url), "utf8"), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText, {
+    exports: voiceStyleModule,
+    Math: styleMath,
+    require: (id) => {
+      if (id === "./voice-analysis") return voiceAnalysisModule;
+      throw new Error(`Unexpected style import: ${id}`);
+    },
+  });
   const performanceModule = {};
   vm.runInNewContext(ts.transpileModule(readFileSync(new URL("../src/lib/performance-trace.ts", import.meta.url), "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
@@ -60,7 +78,11 @@ export function loadAIServer(
               ? questionnaireModule
               : id === "./performance-trace"
                 ? performanceModule
-                : require(id),
+                : id === "./voice-analysis"
+                  ? voiceAnalysisModule
+                  : id === "./voice-analysis-style"
+                    ? voiceStyleModule
+                    : require(id),
       process: { env, cwd: () => "/__neko_test_no_env_file__" },
       fetch: request,
       console: logger,

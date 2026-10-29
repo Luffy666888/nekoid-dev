@@ -1159,7 +1159,7 @@ test("voice validator covers intent evidence, persona tone, missing persona and 
           subtext: "它这一刻的注意力很具体，没有急着做更多动作。",
           analysis: {
             observation: visibleObservations.join("，"),
-            personalityInterpretation: "当前画面优先，既有人格只影响它表达这件事的语气。",
+            personalityInterpretation: "暂以当前画面为准。",
           },
           mood: currentIntent,
           tags: ["看着眼前", "按自己节奏", "还没着急"],
@@ -1202,7 +1202,7 @@ test("same cat voice candidates keep a stable independent tone across five gener
           subtext: "它专注在球上，没有转头寻找人的帮助。",
           analysis: {
             observation: "猫独自用前爪拍球，注意力停在球上。",
-            personalityInterpretation: "这种自己先试的表达，和它偏独立的互动方式一致。",
+            personalityInterpretation: "它似乎想先自己试试。",
           },
           mood: "自己研究",
           tags: ["拍着小球", "自己先试", "暂时不求助"],
@@ -1242,6 +1242,7 @@ test("voice diagnostics identify each rule without changing acceptance or exposi
     ["subtext_missing", { subtext: "" }],
     ["analysis_observation_missing", { analysis: { ...valid.analysis, observation: "" } }],
     ["analysis_personality_interpretation_missing", { analysis: { ...valid.analysis, personalityInterpretation: "" } }],
+    ["analysis_too_long", { analysis: { observation: "看".repeat(40), personalityInterpretation: "想".repeat(40) } }],
     ["tags_not_array", { tags: "private-tags" }],
     ["tag_count_not_three", { tags: ["一个标签"] }],
   ];

@@ -16,6 +16,7 @@ function load(name, internals = []) {
     exports,
     require(id) {
       if (id === "./persona-questionnaire") return load("persona-questionnaire");
+      if (id === "./voice-analysis") return load("voice-analysis");
       if (id === "@supabase/supabase-js") return require(id);
       if (id === "@/lib/media-storage.server" || id === "@/lib/neko-upload-limits") return {};
       throw new Error(`Unexpected import: ${id}`);

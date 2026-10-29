@@ -14,6 +14,8 @@ import type {
 import type { Voice } from "@/components/neko/app/voicesStore";
 import { buildBehaviorProfile, buildCombinationInsights } from "@/lib/neko-behavior-profile";
 import { PerformanceTrace, elapsedMs, monotonicNow, performanceErrorCategory, performanceNetworkCode } from "./performance-trace";
+import { joinVoiceAnalysis, limitVoiceAnalysis, VOICE_ANALYSIS_GENERATION_MAX_CHARACTERS } from "./voice-analysis";
+import { buildVoiceAnalysisStylePrompt, selectVoiceAnalysisStyleExamples, VOICE_ANALYSIS_STYLE_VERSION } from "./voice-analysis-style";
 import {
   parseQuestionnaireAnswers as quizAnswersFromJson,
   personaQuestionnaireAnswers as extractPreviousQuiz,
@@ -2255,6 +2257,10 @@ function inspectVoiceGenerationOutput(parsed: VoiceGenerationOutput, persona: Ca
   const personaTitle = persona?.persona?.personaTitle || persona?.type || "";
   const mbti = persona?.persona?.mbti || persona?.mbti || "";
   const analysis = getObjectRecord(parsed.analysis);
+  const analysisLength = charLength(joinVoiceAnalysis({
+    observation: asText(analysis?.observation),
+    personalityInterpretation: asText(analysis?.personalityInterpretation),
+  }));
   const validIntent = VOICE_CURRENT_INTENTS.includes(currentIntent);
   const voiceLineLength = charLength(voiceLine);
   const voiceLineSentences = sentenceCount(voiceLine);
@@ -2278,6 +2284,7 @@ function inspectVoiceGenerationOutput(parsed: VoiceGenerationOutput, persona: Ca
     subtext_missing: !asText(parsed.subtext),
     analysis_observation_missing: !asText(analysis?.observation),
     analysis_personality_interpretation_missing: !asText(analysis?.personalityInterpretation),
+    analysis_too_long: analysisLength > VOICE_ANALYSIS_GENERATION_MAX_CHARACTERS,
     tags_not_array: !Array.isArray(parsed.tags),
     tag_count_not_three: Array.isArray(parsed.tags) && parsed.tags.length !== 3,
   };
@@ -2297,6 +2304,7 @@ function inspectVoiceGenerationOutput(parsed: VoiceGenerationOutput, persona: Ca
       currentIntent: validIntent ? currentIntent : null,
       voiceLineLength,
       voiceLineSentences,
+      analysisLength,
       tagCount: Array.isArray(parsed.tags) ? parsed.tags.length : null,
       hasPersona: Boolean(persona),
     },
@@ -2346,15 +2354,10 @@ function normalizeVoiceForProfile(
       ? (input.analysis as Record<string, unknown>)
       : {};
   const legacyAnalysis = typeof input.analysis === "string" ? input.analysis : undefined;
-  const analysisSummary = boundedCopy(
-    normalizeCatFacts(
-      rawAnalysis.observation ?? rawAnalysis.summary ?? legacyAnalysis,
-      profile,
-      `${profile.name}保持停留并注视周围，姿态放松，同时持续关注当前互动。`,
-    ),
-    `${profile.name}保持停留并注视周围，姿态放松，同时持续关注当前互动。`,
-    20,
-    30,
+  const analysisSummary = normalizeCatFacts(
+    rawAnalysis.observation ?? rawAnalysis.summary ?? legacyAnalysis,
+    profile,
+    "它停留原地，注视周围。",
   );
   const subtext = boundedCopy(
     normalizeCatFacts(input.subtext, profile, "它没有急着行动，像是在等自己想动的时候。"),
@@ -2362,11 +2365,10 @@ function normalizeVoiceForProfile(
     15,
     30,
   );
-  const personalityInterpretation = boundedCopy(
-    normalizeCatFacts(rawAnalysis.personalityInterpretation ?? input.subtext, profile, subtext),
-    subtext,
-    20,
-    30,
+  const personalityInterpretation = normalizeCatFacts(
+    rawAnalysis.personalityInterpretation ?? input.subtext,
+    profile,
+    "它似乎想先观察一会儿。",
   );
   const rawShare =
     input.share && typeof input.share === "object" ? (input.share as Record<string, unknown>) : {};
@@ -2397,10 +2399,10 @@ function normalizeVoiceForProfile(
     subtext,
     media: imageDataUrl ?? undefined,
     mediaType: "photo",
-    analysis: {
+    analysis: limitVoiceAnalysis({
       observation: analysisSummary,
       personalityInterpretation,
-    },
+    }, VOICE_ANALYSIS_GENERATION_MAX_CHARACTERS),
     share: {
       headline: boundedCopy(
         normalizeCatFacts(rawShare.headline, profile, asText(input.voiceLine ?? input.text)),
@@ -2452,16 +2454,16 @@ function buildStableVoice(
     text = `我听见了，先让我看看是怎么回事。`;
   }
   const analysisSummary = sceneText
-    ? `结合你补充的场景，只能确认${profile.name}正在关注当前发生的事情。`
-    : `当前画面证据有限，只能确认${profile.name}正在留意周围。`;
+    ? "结合补充场景，它正在留意周围。"
+    : "画面证据有限，它正在留意周围。";
   return normalizeVoiceForProfile(
     {
       text,
       analysis: {
         observation: analysisSummary,
         personalityInterpretation: persona
-          ? `它仍按自己熟悉的节奏回应，但这一刻更具体的想法还需要更多线索。`
-          : `这一刻更像是临时反应，现有线索不足以判断长期习惯。`,
+          ? "具体想法还需要更多线索。"
+          : "暂不能据此判断长期习惯。",
       },
       share: {
         headline: text,
@@ -3862,6 +3864,12 @@ export async function generateCatVoiceServer(input: VoiceInput, trace = new Perf
   const data = validateVoiceInput(input);
   const generationId = trace.requestId;
   const startedAt = Date.now();
+  const styleExamples = selectVoiceAnalysisStyleExamples();
+  const stylePrompt = buildVoiceAnalysisStylePrompt(styleExamples);
+  trace.log("voice_style_examples", {
+    version: VOICE_ANALYSIS_STYLE_VERSION,
+    exampleIds: styleExamples.map(({ id }) => id),
+  });
   const personaContext = canonicalVoicePersona(data.persona);
   const profileContext = {
     name: data.profile.name,
@@ -3909,19 +3917,20 @@ ${data.scene || "无补充场景"}
 
 兼容字段：
 - subtext：15–30 字，不重复 voiceLine，只揭示一层有事实依据的小反差。
+- analysis 是页面的「AI 解读」正文：observation 与 personalityInterpretation 两项合计不超过 ${VOICE_ANALYSIS_GENERATION_MAX_CHARACTERS} 个字符（含标点和两项之间的一个空格），不是每项各 ${VOICE_ANALYSIS_GENERATION_MAX_CHARACTERS} 字。用完整自然的句子，不设最低字数；超长时重新精简表达，禁止截掉句尾或用省略号凑字数。
 - analysis.observation：用一句自然中文串起最关键可见事实，不扩写背景。
 - analysis.personalityInterpretation：只做克制联系；没有人格或证据冲突时明确保守，不强行贴标签。
 - mood：2–6 字，描述当前行为状态。
 - tags：严格 3 个、不带 #，依次是当前行为、行为方式、轻反差；每个 4–10 字，必须一眼能懂。
 
-严格返回符合 schema 的 JSON，不要 Markdown。输出前自检：意图是否有可见证据、心声是否换只猫也成立、是否把人格写成事实、是否出现 AI 造词；任一不合格就重写。`;
+严格返回符合 schema 的 JSON，不要 Markdown。输出前自检：意图是否有可见证据、心声是否换只猫也成立、是否把人格写成事实、是否出现 AI 造词、AI 解读合计是否超过 ${VOICE_ANALYSIS_GENERATION_MAX_CHARACTERS} 字；任一不合格就重写。`;
   try {
     const result = await callFirstAvailableJson<VoiceGenerationOutput>(
       (provider) => [
         {
           role: "system",
           content:
-            "你是「喵一下」的猫咪心声观察者。严格执行可见事实→当前意图→人格调味→心声的顺序；事实优先，不虚构、不套模板。只返回符合 schema 的 JSON。",
+            "你是「喵一下」的猫咪心声观察者。严格执行可见事实→当前意图→人格调味→心声的顺序；事实优先，不虚构、不套模板。只返回符合 schema 的 JSON。\n\n" + stylePrompt,
         },
         { role: "user", content: buildVisionContent(provider, prompt, data.imageDataUrl) },
       ],

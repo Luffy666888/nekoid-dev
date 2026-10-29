@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { voiceAnalysisStorageFields } from "./voice-analysis";
 import type { Session, SupabaseClient, User } from "@supabase/supabase-js";
 
 import { getCatAvatar } from "@/components/neko/catAvatarStore";
@@ -707,7 +708,6 @@ async function saveVoice(client: SupabaseClient, user: User, catId: string, voic
   );
 
   const createdAt = msToIso(voice.createdAt);
-  const structuredAnalysis = typeof voice.analysis === "object" ? voice.analysis : undefined;
   const { error } = await client.from("cat_voices").upsert(
     {
       id: voiceId,
@@ -715,14 +715,7 @@ async function saveVoice(client: SupabaseClient, user: User, catId: string, voic
       user_id: user.id,
       text: voice.text,
       subtext: voice.subtext ?? null,
-      analysis:
-        typeof voice.analysis === "string"
-          ? voice.analysis
-          : [structuredAnalysis?.observation, structuredAnalysis?.personalityInterpretation]
-              .filter(Boolean)
-              .join("\n\n") || null,
-      analysis_summary: structuredAnalysis?.observation ?? null,
-      personality_interpretation: structuredAnalysis?.personalityInterpretation ?? null,
+      ...voiceAnalysisStorageFields(voice.analysis),
       share_headline: voice.share?.headline ?? null,
       share_insight: voice.share?.insight ?? null,
       share_tags: cleanStringList(voice.share?.tags),

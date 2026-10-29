@@ -822,11 +822,9 @@ function VoiceResultInfo({
           <span className="text-soul neko-text-support">✦</span>
           <h2 className="neko-text-card-title text-[oklch(0.33_0.045_295)]">AI 解读</h2>
         </div>
-        <div className="mt-3.5 space-y-4 neko-text-body text-[oklch(0.31_0.04_295)]">
-          {paragraphs.map((paragraph, index) => (
-            <p key={`${paragraph}-${index}`}>{paragraph}</p>
-          ))}
-        </div>
+        <p className="mt-3.5 line-clamp-5 neko-text-body text-[oklch(0.31_0.04_295)]">
+          {paragraphs.join(" ")}
+        </p>
       </div>
     </section>
   );

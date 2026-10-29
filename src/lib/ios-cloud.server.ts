@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { voiceAnalysisStorageFields } from "./voice-analysis";
 
 import {
   createSignedMediaDownloadUrl,
@@ -836,12 +837,7 @@ async function saveVoice(
     cleanString(voice.mediaObjectKey),
   );
   const createdAt = msToIso(voice.createdAt);
-  const analysis =
-    voice.analysis && typeof voice.analysis === "object" ? (voice.analysis as JsonRecord) : {};
   const share = voice.share && typeof voice.share === "object" ? (voice.share as JsonRecord) : {};
-  const legacyAnalysis = typeof voice.analysis === "string" ? cleanString(voice.analysis) : "";
-  const analysisSummary = cleanString(analysis.observation || analysis.summary);
-  const personalityInterpretation = cleanString(analysis.personalityInterpretation);
   const { data, error } = await client
     .from("cat_voices")
     .upsert(
@@ -851,12 +847,7 @@ async function saveVoice(
         user_id: user.id,
         text: cleanString(voice.text),
         subtext: cleanString(voice.subtext) || null,
-        analysis:
-          legacyAnalysis ||
-          [analysisSummary, personalityInterpretation].filter(Boolean).join("\n\n") ||
-          null,
-        analysis_summary: analysisSummary || null,
-        personality_interpretation: personalityInterpretation || null,
+        ...voiceAnalysisStorageFields(voice.analysis),
         share_headline: cleanString(share.headline) || null,
         share_insight: cleanString(share.insight) || null,
         share_tags: cleanStringList(share.tags),
