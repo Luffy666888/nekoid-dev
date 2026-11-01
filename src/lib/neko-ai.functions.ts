@@ -57,7 +57,7 @@ type VoiceGenerationOutput = {
     personalityInterpretation: string;
   };
   mood: string;
-  tags: string[];
+  sceneTags: string[];
 };
 
 const VOICE_CURRENT_INTENTS: VoiceCurrentIntent[] = [
@@ -83,7 +83,7 @@ const VOICE_JSON_SCHEMA = {
     "subtext",
     "analysis",
     "mood",
-    "tags",
+    "sceneTags",
   ],
   properties: {
     visibleObservations: {
@@ -93,7 +93,7 @@ const VOICE_JSON_SCHEMA = {
       items: { type: "string" },
     },
     currentIntent: { type: "string", enum: VOICE_CURRENT_INTENTS },
-    voiceLine: { type: "string" },
+    voiceLine: { type: "string", minLength: 14, maxLength: 28 },
     subtext: { type: "string" },
     analysis: {
       type: "object",
@@ -105,11 +105,11 @@ const VOICE_JSON_SCHEMA = {
       },
     },
     mood: { type: "string" },
-    tags: {
+    sceneTags: {
       type: "array",
       minItems: 3,
       maxItems: 3,
-      items: { type: "string" },
+      items: { type: "string", minLength: 4, maxLength: 10 },
     },
   },
 } as const;
@@ -633,6 +633,12 @@ function boundedCopy(value: string, fallback: string, min: number, max: number) 
   const normalized = value.replace(/\s+/g, " ").trim();
   const selected = charLength(normalized) >= min ? normalized : fallback;
   return limitChars(selected, max);
+}
+
+function strictLengthCopy(value: string, fallback: string, min: number, max: number) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  const length = charLength(normalized);
+  return length >= min && length <= max ? normalized : fallback;
 }
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number) {
@@ -1297,28 +1303,53 @@ function buildStableStage3(
   stage2: PersonaStage2Output,
   profile: CatProfile,
 ): PersonaStage3Output {
-  const relationship = boundedCopy(stage2.ownerRelationship.explanation, "", 16, 60);
+  const summaryFallback =
+    "它习惯先观察环境变化，再按自己的节奏决定是否靠近或参与互动。";
+  const misunderstandingFallback =
+    "它不是对眼前的互动没兴趣，而是更习惯先确认安全和节奏再靠近。";
+  const affectionFallback =
+    "它会用待在附近、留意你的动向和适时回应，表达对你的亲近。";
+  const relationshipFallback =
+    "你是它生活里稳定而熟悉的重要参照，也是它愿意安心靠近的人。";
+  const bondFallback =
+    "不用时时靠得很近，它知道你一直是可以安心回来的地方。";
+  const relationship = strictLengthCopy(
+    stage2.ownerRelationship.explanation,
+    relationshipFallback,
+    28,
+    45,
+  );
   return {
     persona: {
       personaTitle: choosePersonaTitle(stage1),
       mbti: mappedMbti(stage1.behaviorProfile),
-      summary: boundedCopy(
+      summary: strictLengthCopy(
         stage1.coreTraits[0]?.description ??
-          "现在的线索还不够多，先保守判断它更习惯按自己的节奏观察和靠近。",
-        "它更习惯按自己的节奏观察和靠近。",
-        10,
-        50,
+          summaryFallback,
+        summaryFallback,
+        28,
+        42,
       ),
     },
     dimensions: personaDimensionsFromBehavior(stage1.behaviorProfile),
     insights: {
       misunderstanding: {
         title: "你可能一直误会它的一件事",
-        conclusion: boundedCopy(stage2.misunderstanding.explanation, "", 16, 60),
+        conclusion: strictLengthCopy(
+          stage2.misunderstanding.explanation,
+          misunderstandingFallback,
+          28,
+          45,
+        ),
       },
       affection: {
         title: "它表达喜欢的方式",
-        conclusion: boundedCopy(stage2.affection.explanation, "", 16, 60),
+        conclusion: strictLengthCopy(
+          stage2.affection.explanation,
+          affectionFallback,
+          28,
+          45,
+        ),
       },
       relationship: {
         title: "在它眼里，你的位置",
@@ -1327,7 +1358,12 @@ function buildStableStage3(
     },
     bondSummary: {
       title: `${profile.name}和你的关系`,
-      quote: boundedCopy(stage2.ownerRelationship.claim || relationship, relationship, 10, 40),
+      quote: strictLengthCopy(
+        stage2.ownerRelationship.claim || bondFallback,
+        bondFallback,
+        20,
+        35,
+      ),
     },
   };
 }
@@ -1668,14 +1704,14 @@ function applyPreviousPersonaAnchor(
     persona: {
       personaTitle: previousTitle || finalCopy.persona.personaTitle,
       mbti: previousMbti || finalCopy.persona.mbti,
-      summary: boundedCopy(
+      summary: strictLengthCopy(
         normalizeCatFacts(
           previous.persona?.summary ?? previous.corePersonality ?? previous.analysis ?? "",
           profile,
         ),
         finalCopy.persona.summary,
-        10,
-        50,
+        28,
+        42,
       ),
     },
     insights: {
@@ -1737,9 +1773,14 @@ function normalizeStage2Output(value: unknown, fallback: PersonaStage2Output) {
 }
 
 function normalizeFinalInsight(value: unknown, fallback: string) {
-  if (typeof value === "string") return boundedCopy(value, fallback, 16, 60);
+  if (typeof value === "string") return strictLengthCopy(value, fallback, 28, 45);
   const raw = getObjectRecord(value);
-  return boundedCopy(asText(raw?.text ?? raw?.explanation ?? raw?.claim), fallback, 16, 60);
+  return strictLengthCopy(
+    asText(raw?.text ?? raw?.explanation ?? raw?.claim),
+    fallback,
+    28,
+    45,
+  );
 }
 
 function normalizeStage3Output(
@@ -1755,11 +1796,11 @@ function normalizeStage3Output(
     const entry = getObjectRecord(rawInsights[key]) ?? {};
     return {
       title: asText(entry.title, fallback.insights[key].title),
-      conclusion: boundedCopy(
+      conclusion: strictLengthCopy(
         normalizeCatFacts(entry.conclusion, profile),
         fallback.insights[key].conclusion,
-        16,
-        60,
+        28,
+        45,
       ),
     };
   };
@@ -1773,11 +1814,11 @@ function normalizeStage3Output(
       mbti: /^[IE][NS][FT][JP]-[AT]$/.test(asText(rawPersona.mbti))
         ? asText(rawPersona.mbti)
         : fallback.persona.mbti,
-      summary: boundedCopy(
+      summary: strictLengthCopy(
         normalizeCatFacts(rawPersona.summary, profile),
         fallback.persona.summary,
-        10,
-        50,
+        28,
+        42,
       ),
     },
     dimensions: fallback.dimensions,
@@ -1788,11 +1829,11 @@ function normalizeStage3Output(
     },
     bondSummary: {
       title: asText(rawBond.title, fallback.bondSummary.title),
-      quote: boundedCopy(
+      quote: strictLengthCopy(
         normalizeCatFacts(rawBond.quote, profile),
         fallback.bondSummary.quote,
-        10,
-        40,
+        20,
+        35,
       ),
     },
   };
@@ -1819,6 +1860,80 @@ function hasExactKeys(record: Record<string, unknown>, keys: string[]) {
   return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
 }
 
+const FINAL_COPY_LENGTHS = {
+  personaTitle: { min: 4, max: 12 },
+  summary: { min: 28, max: 42 },
+  insight: { min: 28, max: 45 },
+  bondSummary: { min: 20, max: 35 },
+} as const;
+
+const genericFinalCopyPatterns = [
+  /它很(?:可爱|温柔|特别|有个性)/,
+  /独一无二/,
+  /治愈(?:你|一切|每一天)/,
+  /充满爱/,
+  /性格很好/,
+];
+
+function hasLengthInRange(value: string, range: { min: number; max: number }) {
+  const length = charLength(value);
+  return length >= range.min && length <= range.max;
+}
+
+function normalizedSimilarityText(value: string) {
+  return value.replace(/[，。！？、；：,.!?;:\s]/g, "");
+}
+
+function finalCopyIsHighlySimilar(left: string, right: string) {
+  const a = normalizedSimilarityText(left);
+  const b = normalizedSimilarityText(right);
+  if (!a || !b) return false;
+  const contained = Math.min(charLength(a), charLength(b)) >= 12 && (a.includes(b) || b.includes(a));
+  return contained || semanticSimilarity(a, b) >= 0.5;
+}
+
+function hasIncrementalFinalCopy(
+  misunderstanding: string,
+  affection: string,
+  relationship: string,
+  bondSummary: string,
+) {
+  const sections = [misunderstanding, affection, relationship, bondSummary];
+  for (let left = 0; left < sections.length; left += 1) {
+    for (let right = left + 1; right < sections.length; right += 1) {
+      if (finalCopyIsHighlySimilar(sections[left], sections[right])) return false;
+    }
+  }
+  return true;
+}
+
+function summaryHasCorePersonaScope(value: string) {
+  return !/(?:你|主人|我们|彼此|关系|比如|例如|每当|有一次)/.test(value);
+}
+
+function hasMisunderstandingContrast(value: string) {
+  return /不是[^。！？]{2,}而是[^。！？]{2,}/.test(value);
+}
+
+function hasConcreteAffectionBehavior(value: string) {
+  return /(?:靠近|待在|留在|跟着|看着|注视|眼神|蹭|贴|碰|呼噜|尾巴|守在|坐在|躺在|玩耍|回应|迎接|等你|附近|同一空间)/.test(value);
+}
+
+function describesOwnerRole(value: string) {
+  return value.includes("你") &&
+    /(?:参照|依靠|归处|底气|伙伴|家人|安全感|安心|放心|信任|熟悉|稳定|重要|可以.+的人|愿意.+的人)/.test(value);
+}
+
+function isEmotionalBondClosing(value: string) {
+  const analyzesPersona = /(?:人格|倾向|维度|行为模式|说明|意味着|表明|更像|不是.+而是|因为|所以)/.test(value);
+  const hasWarmRelation = /(?:你|彼此|一起|身边|回来|回到|安心|放心|陪着)/.test(value);
+  return !analyzesPersona && hasWarmRelation;
+}
+
+function hasGenericFinalCopy(value: string) {
+  return genericFinalCopyPatterns.some((pattern) => pattern.test(value));
+}
+
 export function validatePersonaResultProtocol(value: unknown): boolean {
   const raw = getObjectRecord(value);
   if (!raw || !hasExactKeys(raw, ["persona", "dimensions", "insights", "bondSummary"]))
@@ -1832,17 +1947,56 @@ export function validatePersonaResultProtocol(value: unknown): boolean {
   if (!hasExactKeys(bond, ["title", "quote"])) return false;
   if (!asText(persona.mbti) || !asText(persona.personaTitle) || !asText(persona.summary))
     return false;
-  if (charLength(asText(persona.personaTitle)) > 14 || charLength(asText(persona.summary)) > 50)
+  const personaTitle = asText(persona.personaTitle);
+  const summary = asText(persona.summary);
+  const bondQuote = asText(bond.quote);
+  if (
+    !hasLengthInRange(personaTitle, FINAL_COPY_LENGTHS.personaTitle) ||
+    !hasLengthInRange(summary, FINAL_COPY_LENGTHS.summary) ||
+    !summaryHasCorePersonaScope(summary)
+  )
     return false;
-  if (!asText(bond.title) || !asText(bond.quote) || charLength(asText(bond.quote)) > 40)
+  if (
+    !asText(bond.title) ||
+    !hasLengthInRange(bondQuote, FINAL_COPY_LENGTHS.bondSummary) ||
+    !isEmotionalBondClosing(bondQuote)
+  )
     return false;
 
+  const conclusions: Record<"misunderstanding" | "affection" | "relationship", string> = {
+    misunderstanding: "",
+    affection: "",
+    relationship: "",
+  };
   for (const key of ["misunderstanding", "affection", "relationship"] as const) {
     const item = getObjectRecord(insights[key]);
     if (!item || !hasExactKeys(item, ["title", "conclusion"])) return false;
-    if (!asText(item.title) || !asText(item.conclusion) || charLength(asText(item.conclusion)) > 60)
+    const conclusion = asText(item.conclusion);
+    if (!asText(item.title) || !hasLengthInRange(conclusion, FINAL_COPY_LENGTHS.insight))
       return false;
+    conclusions[key] = conclusion;
   }
+  if (asText(getObjectRecord(insights.misunderstanding)?.title) !== "你可能一直误会它的一件事") return false;
+  if (asText(getObjectRecord(insights.affection)?.title) !== "它表达喜欢的方式") return false;
+  if (asText(getObjectRecord(insights.relationship)?.title) !== "在它眼里，你的位置") return false;
+  if (!hasMisunderstandingContrast(conclusions.misunderstanding)) return false;
+  if (!hasConcreteAffectionBehavior(conclusions.affection)) return false;
+  if (!describesOwnerRole(conclusions.relationship)) return false;
+  if (
+    hasGenericFinalCopy(
+      [summary, conclusions.misunderstanding, conclusions.affection, conclusions.relationship, bondQuote].join("\n"),
+    )
+  )
+    return false;
+  if (
+    !hasIncrementalFinalCopy(
+      conclusions.misunderstanding,
+      conclusions.affection,
+      conclusions.relationship,
+      bondQuote,
+    )
+  )
+    return false;
 
   if (!Array.isArray(raw.dimensions) || raw.dimensions.length !== 4) return false;
   const seen = new Set<string>();
@@ -1890,21 +2044,47 @@ function personaValidationReasons(stage: PersonaPromptStage, value: unknown): st
   }
   const reasons: string[] = [];
   if (!hasExactKeys(raw, ["persona", "insights", "bondSummary"])) reasons.push("root_keys");
-  const check = (value: unknown, name: string, fields: Record<string, number | null>) => {
+  const check = (
+    value: unknown,
+    name: string,
+    fields: Record<string, { min: number; max: number } | null>,
+  ) => {
     const object = getObjectRecord(value);
     if (!object) { reasons.push(`${name}_missing`); return; }
     if (!hasExactKeys(object, Object.keys(fields))) reasons.push(`${name}_keys`);
-    for (const [field, limit] of Object.entries(fields)) {
+    for (const [field, range] of Object.entries(fields)) {
       if (!asText(object[field])) reasons.push(`${name}_${field}_empty`);
-      else if (limit !== null && charLength(asText(object[field])) > limit) reasons.push(`${name}_${field}_too_long`);
+      else if (range !== null && charLength(asText(object[field])) < range.min)
+        reasons.push(`${name}_${field}_too_short`);
+      else if (range !== null && charLength(asText(object[field])) > range.max)
+        reasons.push(`${name}_${field}_too_long`);
     }
   };
-  check(raw.persona, "persona", { mbti: null, personaTitle: 14, summary: 50 });
-  check(raw.bondSummary, "bond", { title: null, quote: 40 });
+  check(raw.persona, "persona", {
+    mbti: null,
+    personaTitle: FINAL_COPY_LENGTHS.personaTitle,
+    summary: FINAL_COPY_LENGTHS.summary,
+  });
+  check(raw.bondSummary, "bond", { title: null, quote: FINAL_COPY_LENGTHS.bondSummary });
   const insights = getObjectRecord(raw.insights);
   if (!insights || !hasExactKeys(insights, ["misunderstanding", "affection", "relationship"])) reasons.push("insight_keys");
   for (const name of ["misunderstanding", "affection", "relationship"])
-    check(insights?.[name], name, { title: null, conclusion: 60 });
+    check(insights?.[name], name, { title: null, conclusion: FINAL_COPY_LENGTHS.insight });
+  const persona = getObjectRecord(raw.persona);
+  const bond = getObjectRecord(raw.bondSummary);
+  const misunderstanding = asText(getObjectRecord(insights?.misunderstanding)?.conclusion);
+  const affection = asText(getObjectRecord(insights?.affection)?.conclusion);
+  const relationship = asText(getObjectRecord(insights?.relationship)?.conclusion);
+  const quote = asText(bond?.quote);
+  if (persona && !summaryHasCorePersonaScope(asText(persona.summary))) reasons.push("summary_scope");
+  if (misunderstanding && !hasMisunderstandingContrast(misunderstanding)) reasons.push("misunderstanding_contrast");
+  if (affection && !hasConcreteAffectionBehavior(affection)) reasons.push("affection_not_concrete");
+  if (relationship && !describesOwnerRole(relationship)) reasons.push("relationship_role_missing");
+  if (quote && !isEmotionalBondClosing(quote)) reasons.push("bond_not_emotional_closing");
+  if (
+    misunderstanding && affection && relationship && quote &&
+    !hasIncrementalFinalCopy(misunderstanding, affection, relationship, quote)
+  ) reasons.push("final_copy_semantic_overlap");
   return reasons.length ? reasons : ["result_protocol"];
 }
 
@@ -1935,9 +2115,25 @@ function runFinalCopySelfCheck(stage3: PersonaStage3Output, profile: CatProfile)
     stage3.bondSummary.quote,
   ].join("\n");
   const issues: string[] = [];
-  if (charLength(stage3.persona.personaTitle) > 14 || charLength(stage3.persona.personaTitle) < 4) {
+  if (!hasLengthInRange(stage3.persona.personaTitle, FINAL_COPY_LENGTHS.personaTitle)) {
     issues.push("title_length");
   }
+  if (!hasLengthInRange(stage3.persona.summary, FINAL_COPY_LENGTHS.summary)) issues.push("summary_length");
+  if (!summaryHasCorePersonaScope(stage3.persona.summary)) issues.push("summary_scope");
+  if (!hasMisunderstandingContrast(stage3.insights.misunderstanding.conclusion))
+    issues.push("misunderstanding_contrast");
+  if (!hasConcreteAffectionBehavior(stage3.insights.affection.conclusion))
+    issues.push("affection_not_concrete");
+  if (!describesOwnerRole(stage3.insights.relationship.conclusion))
+    issues.push("relationship_role_missing");
+  if (!isEmotionalBondClosing(stage3.bondSummary.quote)) issues.push("bond_not_emotional_closing");
+  if (
+    !Object.values(stage3.insights).every((item) =>
+      hasLengthInRange(item.conclusion, FINAL_COPY_LENGTHS.insight),
+    )
+  ) issues.push("insight_length");
+  if (!hasLengthInRange(stage3.bondSummary.quote, FINAL_COPY_LENGTHS.bondSummary))
+    issues.push("bond_length");
   if (hasHighRiskCopy(allText) || hasHighRiskLabel(stage3.persona.personaTitle)) {
     issues.push("high_risk_jargon");
   }
@@ -1955,6 +2151,15 @@ function runFinalCopySelfCheck(stage3: PersonaStage3Output, profile: CatProfile)
   ) {
     issues.push("duplicate_insights");
   }
+  if (
+    !hasIncrementalFinalCopy(
+      stage3.insights.misunderstanding.conclusion,
+      stage3.insights.affection.conclusion,
+      stage3.insights.relationship.conclusion,
+      stage3.bondSummary.quote,
+    )
+  ) issues.push("duplicate_final_sections");
+  if (hasGenericFinalCopy(allText)) issues.push("generic_copy");
   return { passed: issues.length === 0, issues };
 }
 
@@ -1965,20 +2170,34 @@ function repairStage3Output(
 ) {
   const checked = runFinalCopySelfCheck(stage3, profile);
   if (checked.passed) return stage3;
+  const personaNeedsFallback = checked.issues.some((issue) =>
+    ["title_length", "summary_length", "summary_scope", "high_risk_jargon", "generic_copy"].includes(issue),
+  );
+  const insightsNeedFallback = checked.issues.some((issue) =>
+    [
+      "insight_length",
+      "misunderstanding_contrast",
+      "affection_not_concrete",
+      "relationship_role_missing",
+      "duplicate_insights",
+      "duplicate_final_sections",
+      "generic_copy",
+    ].includes(issue),
+  );
+  const bondNeedsFallback = checked.issues.some((issue) =>
+    [
+      "bond_length",
+      "bond_not_emotional_closing",
+      "duplicate_final_sections",
+      "unsupported_long_term_claim",
+      "generic_copy",
+    ].includes(issue),
+  );
   return {
     ...stage3,
-    persona: {
-      ...stage3.persona,
-      personaTitle:
-        checked.issues.includes("title_length") || checked.issues.includes("high_risk_jargon")
-          ? fallback.persona.personaTitle
-          : stage3.persona.personaTitle,
-      summary: normalizeCatFacts(stage3.persona.summary, profile, fallback.persona.summary),
-    },
-    insights: checked.issues.includes("duplicate_insights") ? fallback.insights : stage3.insights,
-    bondSummary: checked.issues.includes("unsupported_long_term_claim")
-      ? fallback.bondSummary
-      : stage3.bondSummary,
+    persona: personaNeedsFallback ? fallback.persona : stage3.persona,
+    insights: insightsNeedFallback ? fallback.insights : stage3.insights,
+    bondSummary: bondNeedsFallback ? fallback.bondSummary : stage3.bondSummary,
   };
 }
 
@@ -2022,15 +2241,34 @@ export function evaluatePersonaGeneration({
       id: "title_readability",
       passed:
         charLength(finalCopy.persona.personaTitle) >= 4 &&
-        charLength(finalCopy.persona.personaTitle) <= 14 &&
+        charLength(finalCopy.persona.personaTitle) <= 12 &&
         !hasHighRiskLabel(finalCopy.persona.personaTitle),
       detail: "标题不可自然理解或含高风险造词",
     },
     { id: "ai_jargon", passed: !hasHighRiskCopy(allText), detail: "出现明显 AI 造词或报告腔词汇" },
     {
       id: "duplicate_insights",
-      passed: !selfCheck.issues.includes("duplicate_insights"),
-      detail: "3 条 insight 语义重复",
+      passed:
+        !selfCheck.issues.includes("duplicate_insights") &&
+        !selfCheck.issues.includes("duplicate_final_sections"),
+      detail: "洞察或关系总结语义重复",
+    },
+    {
+      id: "final_copy_roles",
+      passed: !selfCheck.issues.some((issue) =>
+        [
+          "summary_length",
+          "summary_scope",
+          "insight_length",
+          "misunderstanding_contrast",
+          "affection_not_concrete",
+          "relationship_role_missing",
+          "bond_length",
+          "bond_not_emotional_closing",
+          "generic_copy",
+        ].includes(issue),
+      ),
+      detail: "最终文案长度或字段职责不符合协议",
     },
     {
       id: "unsupported_claim_visible",
@@ -2060,16 +2298,19 @@ export function evaluatePersonaGeneration({
   const insightValue = Math.max(
     0,
     20 -
-      insightTexts.filter((text) => charLength(text) < 24).length * 4 -
-      (selfCheck.issues.includes("duplicate_insights") ? 10 : 0),
+      insightTexts.filter((text) => !hasLengthInRange(text, FINAL_COPY_LENGTHS.insight)).length * 4 -
+      (selfCheck.issues.includes("duplicate_insights") ||
+      selfCheck.issues.includes("duplicate_final_sections")
+        ? 10
+        : 0),
   );
   const shareability = Math.max(
     0,
     20 -
-      (charLength(finalCopy.bondSummary.quote) < 10 || charLength(finalCopy.bondSummary.quote) > 40
+      (!hasLengthInRange(finalCopy.bondSummary.quote, FINAL_COPY_LENGTHS.bondSummary)
         ? 5
         : 0) -
-      (charLength(finalCopy.persona.personaTitle) > 14 ? 5 : 0) -
+      (charLength(finalCopy.persona.personaTitle) > 12 ? 5 : 0) -
       (hasHighRiskCopy(finalCopy.bondSummary.quote) ? 6 : 0),
   );
   const scores = {
@@ -2221,6 +2462,79 @@ function sentenceCount(value: string) {
     .filter(Boolean).length;
 }
 
+function normalizedComparableText(value: string) {
+  return Array.from(value)
+    .filter((character) => /[\p{L}\p{N}]/u.test(character))
+    .join("");
+}
+
+function hasMeaningfulTextOverlap(first: string, second: string) {
+  const source = normalizedComparableText(first);
+  const target = normalizedComparableText(second);
+  if (!source || !target) return false;
+  const shorter = source.length <= target.length ? source : target;
+  const longer = source.length <= target.length ? target : source;
+  const windowSize = Math.min(6, shorter.length);
+  if (windowSize < 4) return longer.includes(shorter);
+  for (let index = 0; index <= shorter.length - windowSize; index += 1) {
+    if (longer.includes(shorter.slice(index, index + windowSize))) return true;
+  }
+  return false;
+}
+
+const sceneTagVisibleActionPattern =
+  /看|盯|望|坐|蹲|趴|躺|站|靠|贴|抬|伸|缩|蜷|闻|舔|抓|扑|踩|蹭|歪|竖|垂|张|闭|停|回头|侧身|并拢|前倾|朝向|窝|扒|抱|视线|身体|前爪|耳朵|尾巴/;
+
+const sceneTagStatePattern =
+  /想|等|端着|假装|忍住|盘算|犹豫|不急|认真|好奇|专注|跃跃|准备|待机|观望|淡定|克制|评估/;
+
+const sceneTagForbiddenTerms = [
+  "MBTI",
+  "人格",
+  "性格",
+  "长期",
+  "每天",
+  "总是",
+  "经常",
+  "平时",
+  "习惯",
+  "慢热",
+  "温柔",
+  "可爱",
+  "治愈",
+  "高冷",
+  "独立",
+  "乖巧",
+  "敏感",
+  "谨慎",
+  "稳重",
+  "亲人",
+  "黏人",
+  "社恐",
+];
+
+function sceneTagsRepeat(first: string, second: string) {
+  const source = normalizedComparableText(first);
+  const target = normalizedComparableText(second);
+  if (!source || !target) return false;
+  if (source === target || source.includes(target) || target.includes(source)) return true;
+  const shorter = source.length <= target.length ? source : target;
+  const longer = source.length <= target.length ? target : source;
+  for (let index = 0; index <= shorter.length - 3; index += 1) {
+    if (longer.includes(shorter.slice(index, index + 3))) return true;
+  }
+  return false;
+}
+
+function normalizeSceneTags(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => asText(item).replace(/^#+/, "").trim())
+    .filter(Boolean)
+    .filter((tag, index, tags) => tags.findIndex((candidate) => candidate === tag) === index)
+    .slice(0, 3);
+}
+
 function voiceStyleConflictsWithPersona(
   voiceLine: string,
   intent: VoiceCurrentIntent,
@@ -2257,21 +2571,38 @@ function inspectVoiceGenerationOutput(parsed: VoiceGenerationOutput, persona: Ca
   const personaTitle = persona?.persona?.personaTitle || persona?.type || "";
   const mbti = persona?.persona?.mbti || persona?.mbti || "";
   const analysis = getObjectRecord(parsed.analysis);
+  const analysisObservation = asText(analysis?.observation);
+  const analysisInterpretation = asText(analysis?.personalityInterpretation);
   const analysisLength = charLength(joinVoiceAnalysis({
-    observation: asText(analysis?.observation),
-    personalityInterpretation: asText(analysis?.personalityInterpretation),
+    observation: analysisObservation,
+    personalityInterpretation: analysisInterpretation,
   }));
   const validIntent = VOICE_CURRENT_INTENTS.includes(currentIntent);
   const voiceLineLength = charLength(voiceLine);
   const voiceLineSentences = sentenceCount(voiceLine);
+  const sceneTags = normalizeSceneTags(parsed.sceneTags);
+  const sceneTagsHaveValidLength = sceneTags.every((tag) => {
+    const length = charLength(tag);
+    return length >= 4 && length <= 10;
+  });
+  const sceneTagsAreShortChineseLabels = sceneTags.every((tag) => /^[\p{Script=Han}]{4,10}$/u.test(tag));
+  const sceneTagsHaveForbiddenContent = sceneTags.some((tag) =>
+    sceneTagForbiddenTerms.some((term) => tag.includes(term)),
+  );
+  const sceneTagsHaveDistinctMeaning = sceneTags.every(
+    (tag, index) => !sceneTags.slice(index + 1).some((candidate) => sceneTagsRepeat(tag, candidate)),
+  );
+  const sceneTagsRepeatAnalysis = sceneTags.some((tag) =>
+    hasMeaningfulTextOverlap(tag, `${analysisObservation}${analysisInterpretation}`),
+  );
 
   // Report every applicable failure, without requiring literal intent keywords.
   // Dependent checks are skipped when their prerequisites are already invalid.
   const failedChecks = {
     visible_observations_missing: observations.length === 0,
     current_intent_invalid: !validIntent,
-    voice_line_too_short: voiceLineLength < 8,
-    voice_line_too_long: voiceLineLength > 35,
+    voice_line_too_short: voiceLineLength < 14,
+    voice_line_too_long: voiceLineLength > 28,
     voice_line_too_many_sentences: voiceLineSentences > 2,
     voice_line_forbidden_terms: voiceLineForbiddenTerms.some((term) => voiceLine.includes(term)),
     voice_line_generic_template: genericVoiceLines.some((line) => voiceLine.includes(line)),
@@ -2282,11 +2613,28 @@ function inspectVoiceGenerationOutput(parsed: VoiceGenerationOutput, persona: Ca
       observations.length > 0 &&
       voiceStyleConflictsWithPersona(voiceLine, currentIntent, persona),
     subtext_missing: !asText(parsed.subtext),
-    analysis_observation_missing: !asText(analysis?.observation),
-    analysis_personality_interpretation_missing: !asText(analysis?.personalityInterpretation),
+    analysis_observation_missing: !analysisObservation,
+    analysis_personality_interpretation_missing: !analysisInterpretation,
     analysis_too_long: analysisLength > VOICE_ANALYSIS_GENERATION_MAX_CHARACTERS,
-    tags_not_array: !Array.isArray(parsed.tags),
-    tag_count_not_three: Array.isArray(parsed.tags) && parsed.tags.length !== 3,
+    analysis_repeats_voice_line: hasMeaningfulTextOverlap(
+      voiceLine,
+      `${analysisObservation}${analysisInterpretation}`,
+    ),
+    scene_tags_not_array: !Array.isArray(parsed.sceneTags),
+    scene_tag_count_not_three: Array.isArray(parsed.sceneTags) && sceneTags.length !== 3,
+    scene_tag_length_invalid: sceneTags.length === 3 && !sceneTagsHaveValidLength,
+    scene_tag_not_short_chinese_label:
+      sceneTags.length === 3 && !sceneTagsAreShortChineseLabels,
+    scene_tag_forbidden_content: sceneTags.length === 3 && sceneTagsHaveForbiddenContent,
+    scene_tag_visible_slots_invalid:
+      sceneTags.length === 3 &&
+      (!sceneTagVisibleActionPattern.test(sceneTags[0] ?? "") ||
+        !sceneTagVisibleActionPattern.test(sceneTags[1] ?? "")),
+    scene_tag_state_slot_invalid:
+      sceneTags.length === 3 && !sceneTagStatePattern.test(sceneTags[2] ?? ""),
+    scene_tags_semantically_repeated:
+      sceneTags.length === 3 && !sceneTagsHaveDistinctMeaning,
+    scene_tags_repeat_analysis: sceneTags.length === 3 && sceneTagsRepeatAnalysis,
   };
   const reasons = Object.entries(failedChecks)
     .filter(([, failed]) => failed)
@@ -2305,7 +2653,7 @@ function inspectVoiceGenerationOutput(parsed: VoiceGenerationOutput, persona: Ca
       voiceLineLength,
       voiceLineSentences,
       analysisLength,
-      tagCount: Array.isArray(parsed.tags) ? parsed.tags.length : null,
+      sceneTagCount: Array.isArray(parsed.sceneTags) ? parsed.sceneTags.length : null,
       hasPersona: Boolean(persona),
     },
   };
@@ -2335,20 +2683,18 @@ function normalizeVoiceForProfile(
     share?: unknown;
     mood?: unknown;
     location?: unknown;
+    sceneTags?: unknown;
     tags?: unknown;
   },
   profile: CatProfile,
   imageDataUrl?: string | null,
 ): Voice {
-  const tags = Array.isArray(input.tags)
-    ? uniqueNaturalLabels(input.tags, profile).slice(0, 3)
-    : [];
+  const generatedSceneTags = normalizeSceneTags(input.sceneTags ?? input.tags);
   const mood = normalizeCatFacts(input.mood, profile, "想被关注");
-  const voiceTags = (
-    tags.length >= 3
-      ? tags
-      : uniqueNaturalLabels([...tags, mood, "想靠近一点", "安静等你发现", "有点小主意"], profile)
-  ).slice(0, 3);
+  const sceneTags =
+    generatedSceneTags.length === 3
+      ? generatedSceneTags
+      : ["看着眼前", "保持原位", "正在观望中"];
   const rawAnalysis =
     input.analysis && typeof input.analysis === "object"
       ? (input.analysis as Record<string, unknown>)
@@ -2372,29 +2718,18 @@ function normalizeVoiceForProfile(
   );
   const rawShare =
     input.share && typeof input.share === "object" ? (input.share as Record<string, unknown>) : {};
-  const parsedShareTags = Array.isArray(rawShare.tags)
-    ? uniqueNaturalLabels(rawShare.tags, profile).slice(0, 3)
-    : [];
-  const shareTags = (
-    parsedShareTags.length >= 2
-      ? parsedShareTags
-      : uniqueNaturalLabels(
-          [...parsedShareTags, ...voiceTags, "会用眼神表达", "先观察再回应", "有点小主意"],
-          profile,
-        )
-  ).slice(0, 3);
   return {
     time: "刚刚",
     createdAt: Date.now(),
     location: normalizeCatFacts(input.location, profile, "家里") || "家里",
     grad: "linear-gradient(135deg, oklch(0.9 0.06 280), oklch(0.92 0.05 320))",
-    tags: voiceTags,
+    sceneTags,
+    tags: sceneTags,
     aspect: "3:4",
-    text: boundedCopy(
-      normalizeCatFacts(input.voiceLine ?? input.text, profile, `我先看看，再决定要不要靠近。`),
+    text: normalizeCatFacts(
+      input.voiceLine ?? input.text,
+      profile,
       `我先看看，再决定要不要靠近。`,
-      12,
-      30,
     ),
     subtext,
     media: imageDataUrl ?? undefined,
@@ -2416,7 +2751,7 @@ function normalizeVoiceForProfile(
         18,
         35,
       ),
-      tags: shareTags,
+      tags: sceneTags,
     },
   } as Voice;
 }
@@ -2431,18 +2766,23 @@ function buildStableVoice(
   const sceneLower = sceneText ?? "";
   let text = `这个有点意思，我再看一会。`;
   let mood = "想观察";
+  let sceneTags = ["看着眼前", "保持原位", "正在观望中"];
   if (/猫条|零食|吃|罐头|冻干/.test(sceneLower)) {
     text = `我已经闻到了，这个先别拿走。`;
     mood = "想靠近";
+    sceneTags = ["朝向食物", "闻着眼前", "等着开饭中"];
   } else if (/逗猫棒|玩具|球|羽毛|玩/.test(sceneLower)) {
     text = `你先别停，我还在看什么时候出爪。`;
     mood = "想抓";
+    sceneTags = ["盯住玩具", "抬爪准备", "想玩先等等"];
   } else if (/睡|窝|床|沙发|趴/.test(sceneLower)) {
     text = `这里正合适，先让我安静躺一会。`;
     mood = "想休息";
+    sceneTags = ["趴在原地", "趴着放松", "准备再眯会"];
   } else if (/看|盯|拍照|镜头|照片/.test(sceneLower)) {
     text = `你先别动，我还要再看清楚一点。`;
     mood = "想观察";
+    sceneTags = ["看着镜头", "保持坐姿", "认真打量中"];
   } else if (/抱|摸|靠近|蹭|陪/.test(sceneLower)) {
     const boundary = persona?.dimensions?.find((item) => item.key === "boundary");
     text =
@@ -2450,6 +2790,7 @@ function buildStableVoice(
         ? `先别急着抱，让我自己靠近你。`
         : `可以再靠近一点，我现在没有要躲。`;
     mood = boundary?.direction === "right" ? "想保持距离" : "想靠近";
+    sceneTags = ["身体靠近", "看着眼前", "想靠近一点"];
   } else if (sceneText) {
     text = `我听见了，先让我看看是怎么回事。`;
   }
@@ -2468,11 +2809,10 @@ function buildStableVoice(
       share: {
         headline: text,
         insight: `它不是没反应，只是更习惯先看一会儿，等你注意到它。`,
-        tags: [mood, "先看清楚", "暂时不急"],
       },
       mood,
       location: "家里",
-      tags: [mood, "先看清楚", "暂时不急"],
+      sceneTags,
     },
     profile,
     imageDataUrl,
@@ -3374,8 +3714,8 @@ const PERSONA_STAGE3_JSON_SCHEMA: Record<string, unknown> = {
       required: ["mbti", "personaTitle", "summary"],
       properties: {
         mbti: { type: "string", minLength: 1 },
-        personaTitle: { type: "string", minLength: 1, maxLength: 14 },
-        summary: { type: "string", minLength: 1, maxLength: 50 },
+        personaTitle: { type: "string", minLength: 4, maxLength: 12 },
+        summary: { type: "string", minLength: 28, maxLength: 42 },
       },
     },
     insights: {
@@ -3391,7 +3731,7 @@ const PERSONA_STAGE3_JSON_SCHEMA: Record<string, unknown> = {
             required: ["title", "conclusion"],
             properties: {
               title: { type: "string", minLength: 1 },
-              conclusion: { type: "string", minLength: 1, maxLength: 60 },
+              conclusion: { type: "string", minLength: 28, maxLength: 45 },
             },
           },
         ]),
@@ -3403,7 +3743,7 @@ const PERSONA_STAGE3_JSON_SCHEMA: Record<string, unknown> = {
       required: ["title", "quote"],
       properties: {
         title: { type: "string", minLength: 1 },
-        quote: { type: "string", minLength: 1, maxLength: 40 },
+        quote: { type: "string", minLength: 20, maxLength: 35 },
       },
     },
   },
@@ -3445,25 +3785,34 @@ Insights：${JSON.stringify(stage2)}
 
 【人格结论】
 - persona 只包含 mbti、personaTitle、summary。
-- summary 只总结最重要的人格特征，30-50 个中文字符，不重复罗列 dimensions。
+- summary 只总结核心人格，不讲主人关系，不举例，不重复罗列 dimensions；严格 28-42 个中文字符。
 - 上一版 prior 仅在问卷答案完全一致时提供；提供时保留上一版 MBTI。prior 为 null 时独立生成，不参考历史人格。
 
 personaTitle 规则：
 - 可理解性 > 准确 > 共鸣 > 创意。
 - 禁止造词，禁止 XX控、XX王、XX机、营业、控场、发令、施压、稳态、高质互动、策略性靠近、仪式感极强、端庄定点、克制讨关注。
 - 标题必须像一个人格名称，不要只是形容词短语。优先 “XX型/派/系”“XX的XX者”，或“主动亲近，但很有边界”这类轻句式。
-- 优先 4-10 个中文字符；句式标题最多 12-14 字；如果超过 14 字必须改短；普通养猫人第一次看到就懂。
+- 优先 4-10 个中文字符，最多 12 字；如果超过 12 字必须改短；普通养猫人第一次看到就懂。
 - 避免“亲近有边界”“按自己节奏营业的互动控”这类不自然标题；可改为“边界感亲近派”“慢热观察型”。
 
 【三个洞察】
 - 必须完整输出 misunderstanding、affection、relationship。
 - title 固定使用给定语义，不创造第四种洞察。
-- conclusion 每条 25-50 个中文字符，最多 60 字，一句话讲清楚。
+- conclusion 每条严格 28-45 个中文字符，一句话讲清楚。
+- misunderstanding 必须明确写成“不是 A，而是 B”的认知反差，必须同时出现“不是”和“而是”。
+- affection 必须描述具体可理解的亲近表达方式，例如靠近、待在附近、看着、蹭、回应或一起玩；不能只写抽象的“信任”“喜欢”。
+- relationship 必须描述主人在猫咪生活中的角色，明确说明“你”是怎样的参照、依靠、伙伴、归处或重要的人。
 - 三条必须提供不同信息，不允许把同一人格特点换三种说法重复。
 
 【关系总结】
 - bondSummary 只负责情绪总结，不重复 dimensions 或 insights，也不继续分析人格。
-- quote 20-40 个中文字符，自然、温暖、不肉麻。
+- quote 严格 20-35 个中文字符，自然、温暖、不肉麻；不要出现“倾向、维度、行为模式、意味着、表明、因为、所以”等分析语气。
+
+【信息增量检查】
+- misunderstanding、affection、relationship、bondSummary 四项各自承担不同职责。
+- 任意两项不得复述同一个核心结论，也不得只替换同义词。
+- 输出前逐对比较四项；只要语义高度相似，必须重新改写后再输出。
+- 超长、过短、空泛、职责不符或语义重复都属于 invalid，不能依赖 UI 省略号处理。
 
 【证据约束】
 - 所有结论只能基于输入。禁止根据单张照片推断长期习惯，禁止编造固定路线、固定时间、每天发生的行为。
@@ -3908,7 +4257,7 @@ ${data.scene || "无补充场景"}
 - 没有人格档案时照常生成，不得凭空补人格。
 
 第四步 voiceLine：
-- 第一人称猫咪口吻，优先 15–35 个中文字，最多 2 句。
+- 第一人称猫咪口吻，优先 14–24 个中文字，最长 28 个中文字，最多 2 句。
 - 必须回应画面中的具体对象或动作；自然、口语、轻幽默、有一点猫自己的脾气。
 - 不要复述 MBTI 或人格名称，不要写分析报告。
 - 禁止泛泛的“我喜欢你、我要陪着你、我很开心、有你在我就安心”。
@@ -3920,8 +4269,12 @@ ${data.scene || "无补充场景"}
 - analysis 是页面的「AI 解读」正文：observation 与 personalityInterpretation 两项合计不超过 ${VOICE_ANALYSIS_GENERATION_MAX_CHARACTERS} 个字符（含标点和两项之间的一个空格），不是每项各 ${VOICE_ANALYSIS_GENERATION_MAX_CHARACTERS} 字。用完整自然的句子，不设最低字数；超长时重新精简表达，禁止截掉句尾或用省略号凑字数。
 - analysis.observation：用一句自然中文串起最关键可见事实，不扩写背景。
 - analysis.personalityInterpretation：只做克制联系；没有人格或证据冲突时明确保守，不强行贴标签。
+- 两段 AI 解读不得复述或改写 voiceLine。
 - mood：2–6 字，描述当前行为状态。
-- tags：严格 3 个、不带 #，依次是当前行为、行为方式、轻反差；每个 4–10 字，必须一眼能懂。
+- sceneTags：严格 3 个、不带 #。前 2 个只描述图片中可见的当前动作或姿态，第 3 个是由当下画面合理支持的轻度拟人状态。
+- 每个 sceneTag 为 4–8 个中文字符，最多 10 字；只能是短标签，禁止完整句。
+- 禁止长期人格、MBTI、空泛性格词；三个标签不得语义重复，也不得复述 AI 解读。
+- 必须能从当前图片直接确认或克制推断，不允许为了有趣补写画面里没有的动作、物体或心理。
 
 严格返回符合 schema 的 JSON，不要 Markdown。输出前自检：意图是否有可见证据、心声是否换只猫也成立、是否把人格写成事实、是否出现 AI 造词、AI 解读合计是否超过 ${VOICE_ANALYSIS_GENERATION_MAX_CHARACTERS} 字；任一不合格就重写。`;
   try {
@@ -3947,6 +4300,7 @@ ${data.scene || "无补充场景"}
             generationId,
             totalDurationMs: Date.now() - startedAt,
           }),
+        validationReasons: (parsed) => inspectVoiceGenerationOutput(parsed, data.persona).reasons,
       },
     );
     const parsed = result.parsed;

@@ -334,25 +334,25 @@ const personaStage3Fixture = {
   persona: {
     personaTitle: "会先看清楚",
     mbti: "INTJ-A",
-    summary: "它习惯先看清楚眼前变化，再按自己的节奏靠近互动。",
+    summary: "它习惯先看清眼前变化，再按自己的节奏决定是否靠近和参与互动。",
   },
   insights: {
     misunderstanding: {
       title: "你可能一直误会它的一件事",
-      conclusion: "它不是对互动没兴趣，只是常常先停下来确认，再决定要不要靠近。",
+      conclusion: "它不是对互动没有兴趣，而是习惯先停下来确认安全和节奏再靠近。",
     },
     affection: {
       title: "它表达喜欢的方式",
-      conclusion: "它表达喜欢不一定靠一直贴着你，更像是把注意力放在你身上再慢慢回应。",
+      conclusion: "它会用待在你附近、留意你的动向和慢慢回应，表达对你的亲近。",
     },
     relationship: {
       title: "在它眼里，你的位置",
-      conclusion: "你像它可以放心观察的参照，它会保留自己的节奏，也愿意在你附近。",
+      conclusion: "你是它生活里稳定而熟悉的重要参照，也是它愿意安心靠近的人。",
     },
   },
   bondSummary: {
     title: "团子和你的关系",
-    quote: "你是它可以放心观察，也愿意回到附近的人。",
+    quote: "不用时时靠得很近，它知道你一直是可以安心回来的地方。",
   },
 };
 
@@ -391,7 +391,7 @@ test("persona result protocol rejects missing, duplicate and invalid dimensions"
   assert.equal(api.validatePersonaResultProtocol(invalidStrength), false);
 });
 
-test("persona result protocol rejects missing insights, missing bond and excess copy", () => {
+test("persona result protocol rejects missing fields and copy outside strict lengths", () => {
   const api = loadAIServer("neko-ai", {
     internals: ["validatePersonaResultProtocol", "personaDimensionsFromBehavior"],
   });
@@ -404,20 +404,53 @@ test("persona result protocol rejects missing insights, missing bond and excess 
   assert.equal(api.validatePersonaResultProtocol(missingBond), false);
 
   const longTitle = canonicalPersonaResult(api);
-  longTitle.persona.personaTitle = "这是一个明显超过十四个中文字符的人格标题";
+  longTitle.persona.personaTitle = "这是一个明显超过十二字的人格标题";
   assert.equal(api.validatePersonaResultProtocol(longTitle), false);
 
   const longSummary = canonicalPersonaResult(api);
-  longSummary.persona.summary = "它".repeat(51);
+  longSummary.persona.summary = "它".repeat(43);
   assert.equal(api.validatePersonaResultProtocol(longSummary), false);
 
   const longInsight = canonicalPersonaResult(api);
-  longInsight.insights.relationship.conclusion = "它".repeat(61);
+  longInsight.insights.relationship.conclusion = "它".repeat(46);
   assert.equal(api.validatePersonaResultProtocol(longInsight), false);
 
   const longQuote = canonicalPersonaResult(api);
-  longQuote.bondSummary.quote = "它".repeat(41);
+  longQuote.bondSummary.quote = "它".repeat(36);
   assert.equal(api.validatePersonaResultProtocol(longQuote), false);
+
+  const shortSummary = canonicalPersonaResult(api);
+  shortSummary.persona.summary = "它习惯先观察再行动。";
+  assert.equal(api.validatePersonaResultProtocol(shortSummary), false);
+});
+
+test("persona result protocol enforces information-increment roles", () => {
+  const api = loadAIServer("neko-ai", {
+    internals: ["validatePersonaResultProtocol", "personaDimensionsFromBehavior"],
+  });
+
+  const noContrast = canonicalPersonaResult(api);
+  noContrast.insights.misunderstanding.conclusion =
+    "它面对互动时习惯先确认安全和节奏，然后才会决定是否靠近。";
+  assert.equal(api.validatePersonaResultProtocol(noContrast), false);
+
+  const abstractAffection = canonicalPersonaResult(api);
+  abstractAffection.insights.affection.conclusion =
+    "它对你的信任安静又稳定，这份喜欢一直藏在自己的节奏里面。";
+  assert.equal(api.validatePersonaResultProtocol(abstractAffection), false);
+
+  const missingOwnerRole = canonicalPersonaResult(api);
+  missingOwnerRole.insights.relationship.conclusion =
+    "它会在熟悉环境里保持稳定，也愿意按照自己的节奏继续探索。";
+  assert.equal(api.validatePersonaResultProtocol(missingOwnerRole), false);
+
+  const analyticalBond = canonicalPersonaResult(api);
+  analyticalBond.bondSummary.quote = "这说明它的陪伴倾向稳定，也意味着它很信任你。";
+  assert.equal(api.validatePersonaResultProtocol(analyticalBond), false);
+
+  const duplicatedBond = canonicalPersonaResult(api);
+  duplicatedBond.bondSummary.quote = duplicatedBond.insights.relationship.conclusion;
+  assert.equal(api.validatePersonaResultProtocol(duplicatedBond), false);
 });
 
 test("persona result protocol rejects provider extra fields", () => {
@@ -688,14 +721,14 @@ test("merged persona preserves four traits and the updated generation settings",
         persona: {
           personaTitle: "谨慎小探长",
           mbti: "INTJ-A",
-          summary: "它习惯先确认情况，再按自己的节奏靠近。",
+          summary: "它习惯先看清眼前变化，再按自己的节奏决定是否靠近和参与互动。",
         },
         insights: {
-          misunderstanding: { title: "你可能一直误会它的一件事", conclusion: "它不是不想参与，只是习惯先把局面看明白；坐着不动时，注意力可能早已放在眼前。" },
-          affection: { title: "它表达喜欢的方式", conclusion: "如果它平时也经常这样，它可能更习惯把你放在视线里，用关注而不是紧贴表达亲近。" },
-          relationship: { title: "在它眼里，你的位置", conclusion: "你可能不是它时时刻刻都要黏着的人，但很可能是它默认会在、可以放心观察周围的人。" },
+          misunderstanding: { title: "你可能一直误会它的一件事", conclusion: "它不是不想参与互动，而是习惯先看清局面和节奏再决定靠近。" },
+          affection: { title: "它表达喜欢的方式", conclusion: "它会用待在你附近、看着你的反应和慢慢回应这些小动作来表达亲近。" },
+          relationship: { title: "在它眼里，你的位置", conclusion: "你是它生活里稳定而熟悉的重要参照，也是它愿意安心靠近的人。" },
         },
-        bondSummary: { title: "团子和你的关系", quote: "你是它可以放心观察，也愿意回到附近的人。" },
+        bondSummary: { title: "团子和你的关系", quote: "不用时时靠得很近，它知道你一直是可以安心回来的地方。" },
       };
       return Response.json({
         choices: [
@@ -789,14 +822,14 @@ test("persona uses video observations as text and does not resend video frames",
         persona: {
           personaTitle: "先看再动",
           mbti: "INFP-A",
-          summary: "它遇到想玩的东西时，会先看清楚再行动。",
+          summary: "它习惯先看清眼前变化，再按自己的节奏决定是否靠近和参与互动。",
         },
         insights: {
-          misunderstanding: { title: "你可能一直误会它的一件事", conclusion: "它不是对互动没兴趣，只是常常先停下来观察，确认安全和节奏后才会把注意力真正放出来。" },
-          affection: { title: "它表达喜欢的方式", conclusion: "它表达亲近不一定靠一直贴着你，更像是把注意力放在你和眼前互动上，等时机合适再靠近。" },
-          relationship: { title: "在它眼里，你的位置", conclusion: "你对它来说可能是那个可以让它安心观察的人，它会保留自己的节奏，但也会回应你制造的小互动。" },
+          misunderstanding: { title: "你可能一直误会它的一件事", conclusion: "它不是对互动没有兴趣，而是习惯先确认安全和节奏再靠近。" },
+          affection: { title: "它表达喜欢的方式", conclusion: "它会用待在你附近、留意互动和适时回应来表达自己的真实亲近。" },
+          relationship: { title: "在它眼里，你的位置", conclusion: "你是它生活里稳定而熟悉的重要参照，也是它愿意安心靠近的人。" },
         },
-        bondSummary: { title: "团子和你的关系", quote: "你是它可以安心观察，也愿意回应互动的人。" },
+        bondSummary: { title: "团子和你的关系", quote: "不用时时靠得很近，它知道你一直是可以安心回来的地方。" },
       };
       return Response.json({
         choices: [
@@ -943,14 +976,14 @@ test("persona drift check keeps 六六 stable across five same-input runs", asyn
                   persona: {
                     personaTitle: variant.personaTitle,
                     mbti: variant.mbti,
-                    summary: "它愿意靠近熟悉的人，也希望自己决定互动距离。",
+                    summary: "它习惯先观察环境变化，再按自己的节奏决定是否靠近或参与互动。",
                   },
                   insights: {
-                    misunderstanding: { title: "你可能一直误会它的一件事", conclusion: "它不是不亲人，只是更希望自己决定距离；靠近你和保留边界可以同时存在。" },
-                    affection: { title: "它表达喜欢的方式", conclusion: "它表达喜欢时，会待在你附近看你的反应，也会选择自己舒服的接触方式。" },
-                    relationship: { title: "在它眼里，你的位置", conclusion: "你像一个让它安心的人，它愿意回到你附近，也希望你尊重它的节奏。" },
+                    misunderstanding: { title: "你可能一直误会它的一件事", conclusion: "它不是不愿意亲近，而是希望由自己决定靠近的合适距离和时机。" },
+                    affection: { title: "它表达喜欢的方式", conclusion: "它会用待在你附近、看着你的反应和选择舒服的接触来表达亲近。" },
+                    relationship: { title: "在它眼里，你的位置", conclusion: "你是它生活里稳定而熟悉的重要参照，也是它愿意放心靠近的人。" },
                   },
-                  bondSummary: { title: "六六和你的关系", quote: "你是它愿意靠近，也能尊重它节奏的人。" },
+                  bondSummary: { title: "六六和你的关系", quote: "不用时时靠得很近，它知道你一直是可以安心回来的地方。" },
                 }),
               },
             },
@@ -1162,7 +1195,7 @@ test("voice validator covers intent evidence, persona tone, missing persona and 
             personalityInterpretation: "暂以当前画面为准。",
           },
           mood: currentIntent,
-          tags: ["看着眼前", "按自己节奏", "还没着急"],
+          sceneTags: ["视线停留", "身体停稳", "还在评估中"],
         },
         persona,
       ),
@@ -1178,7 +1211,7 @@ test("voice validator covers intent evidence, persona tone, missing persona and 
     subtext: "它正在观察。",
     analysis: { observation: "猫坐着。", personalityInterpretation: "它很谨慎。" },
     mood: "观察中",
-    tags: ["观察", "谨慎", "独立"],
+    sceneTags: ["观察", "谨慎", "独立"],
   };
   assert.equal(api.validateVoiceGenerationOutput(invalid, voicePersonaFixture), false);
 });
@@ -1205,7 +1238,7 @@ test("same cat voice candidates keep a stable independent tone across five gener
             personalityInterpretation: "它似乎想先自己试试。",
           },
           mood: "自己研究",
-          tags: ["拍着小球", "自己先试", "暂时不求助"],
+          sceneTags: ["前爪朝前", "视线随球", "准备再出手"],
         },
         voicePersonaFixture,
       ),
@@ -1220,13 +1253,16 @@ test("voice diagnostics identify each rule without changing acceptance or exposi
     internals: ["inspectVoiceGenerationOutput", "validateVoiceGenerationOutput"],
   });
   const valid = {
-    visibleObservations: ["猫坐着看向镜头"],
+    visibleObservations: ["猫坐着看向镜头", "两只爪子收在身前", "尾巴保持不动"],
     currentIntent: "想观察",
     voiceLine: "这个箱子先放着，我要再看清楚一点。",
     subtext: "它先留意眼前的东西，没有急着行动。",
-    analysis: { observation: "猫坐着看向镜头。", personalityInterpretation: "以当前画面为准。" },
+    analysis: {
+      observation: "猫保持坐姿，头部朝向镜头，两只爪子收在身前。",
+      personalityInterpretation: "只根据眼前动作，它更像是在等待下一步变化。",
+    },
     mood: "观察中",
-    tags: ["看着眼前", "先看再动", "还没着急"],
+    sceneTags: ["前爪收着", "尾部停稳", "还在评估中"],
   };
   const cases = [
     ["visible_observations_missing", { visibleObservations: ["猫很谨慎"] }],
@@ -1243,8 +1279,8 @@ test("voice diagnostics identify each rule without changing acceptance or exposi
     ["analysis_observation_missing", { analysis: { ...valid.analysis, observation: "" } }],
     ["analysis_personality_interpretation_missing", { analysis: { ...valid.analysis, personalityInterpretation: "" } }],
     ["analysis_too_long", { analysis: { observation: "看".repeat(40), personalityInterpretation: "想".repeat(40) } }],
-    ["tags_not_array", { tags: "private-tags" }],
-    ["tag_count_not_three", { tags: ["一个标签"] }],
+    ["scene_tags_not_array", { sceneTags: "private-tags" }],
+    ["scene_tag_count_not_three", { sceneTags: ["一个标签"] }],
   ];
 
   assert.equal(api.inspectVoiceGenerationOutput(valid, null).valid, true);
@@ -1261,17 +1297,17 @@ test("voice diagnostics identify each rule without changing acceptance or exposi
     ...valid,
     visibleObservations: ["猫很谨慎"],
     voiceLine: "我很开心。",
-    tags: [],
+    sceneTags: [],
   }, null);
   assert.deepEqual(Array.from(multiple.reasons), [
     "visible_observations_missing",
     "voice_line_too_short",
     "voice_line_generic_template",
-    "tag_count_not_three",
+    "scene_tag_count_not_three",
   ]);
   assert.equal(multiple.metrics.observationInputCount, 1);
   assert.equal(multiple.metrics.observationAcceptedCount, 0);
-  assert.equal(multiple.metrics.tagCount, 0);
+  assert.equal(multiple.metrics.sceneTagCount, 0);
 });
 
 test("voice generation accepts intent without literal evidence keywords on the first model", async () => {
@@ -1282,9 +1318,12 @@ test("voice generation accepts intent without literal evidence keywords on the f
     currentIntent: "想抓",
     voiceLine: "先别动，我已经瞄准了，等我够到你。",
     subtext: "它还没有碰到目标，身体已经向前探了。",
-    analysis: { observation: "前肢抬起，身体向前倾。", personalityInterpretation: "以当前画面为准。" },
+    analysis: {
+      observation: "猫把一只前肢抬向目标，身体也略微向前探。",
+      personalityInterpretation: "现有动作更支持它正在判断距离和出爪时机。",
+    },
     mood: "准备行动",
-    tags: ["抬起前肢", "先瞄准再动", "就差一点"],
+    sceneTags: ["前爪朝前", "身体前倾", "准备再出手"],
   };
   const api = loadAIServer("neko-ai", {
     env: { ...env, BYTECAT_VISION_MODEL: "gemini-3.7-flash" },
@@ -1329,7 +1368,7 @@ test("invalid voice semantics retry with correlated privacy-safe validation logs
               subtext: "它很开心。",
               analysis: { observation: "猫很谨慎。", personalityInterpretation: "它很谨慎。" },
               mood: "开心",
-              tags: ["可爱", "萌宠", "治愈"],
+              sceneTags: ["视线停留", "身体停稳", "还在评估中"],
             }
           : {
               visibleObservations: ["猫盯着羽毛玩具", "前爪抬起"],
@@ -1341,7 +1380,7 @@ test("invalid voice semantics retry with correlated privacy-safe validation logs
                 personalityInterpretation: "它更像在等自己觉得合适的时机再行动。",
               },
               mood: "准备出爪",
-              tags: ["盯着羽毛", "先看再出手", "想玩但没扑"],
+              sceneTags: ["视线随羽", "前肢抬着", "想玩先等等"],
             };
       return calls === 1
         ? Response.json({ choices: [{ message: { content: JSON.stringify(content) } }] })
@@ -1365,7 +1404,12 @@ test("invalid voice semantics retry with correlated privacy-safe validation logs
   assert.deepEqual(events.map(({ attempt }) => attempt), [1, 2]);
   assert.deepEqual(events.map(({ valid }) => valid), [false, true]);
   assert.deepEqual(events.map(({ model }) => model), ["gpt-5.6-terra", "gemini-3.7-flash"]);
-  assert.deepEqual(events[0].reasons, ["visible_observations_missing", "voice_line_generic_template"]);
+  assert.deepEqual(events[0].reasons, [
+    "visible_observations_missing",
+    "voice_line_too_short",
+    "voice_line_generic_template",
+    "analysis_too_short",
+  ]);
   assert.deepEqual(events[1].reasons, []);
   assert.equal(events[0].metrics.observationAcceptedCount, 0);
   for (const event of events) {
@@ -1405,11 +1449,11 @@ for (const personaMode of ["without persona", "with persona"]) {
                   voiceLine: "你举着那个小方块，我先坐好看看。",
                   subtext: "它没有急着靠近，还在观察眼前的变化。",
                   analysis: {
-                    observation: "前爪并拢，眼睛看向镜头。",
-                    personalityInterpretation: "可能习惯先看清楚再行动。",
+                    observation: "猫端坐在原地，两只前爪收拢，眼睛正看向镜头。",
+                    personalityInterpretation: "现有动作更支持它正在观察眼前变化。",
                   },
                   mood: "正在观察",
-                  tags: ["先看清楚", "端正坐好", "暂不靠近"],
+                  sceneTags: ["视线朝前", "前爪并拢", "正在观望中"],
                 }),
               },
             },
@@ -1423,8 +1467,9 @@ for (const personaMode of ["without persona", "with persona"]) {
       imageDataUrl,
     });
     assert.equal(calls, 1);
-    assert.equal(result.tags.length, 3);
-    assert.deepEqual(Array.from(result.tags), ["先看清楚", "安静坐着", "先不靠近"]);
+    assert.equal(result.sceneTags.length, 3);
+    assert.deepEqual(Array.from(result.sceneTags), ["视线朝前", "前爪并拢", "正在观望中"]);
+    assert.deepEqual(Array.from(result.tags), Array.from(result.sceneTags));
     assert.ok(result.analysis.observation);
     assert.ok(result.analysis.personalityInterpretation);
     assert.ok(result.share.headline && result.share.insight && result.share.tags.length);
@@ -1583,12 +1628,12 @@ test("updated voice uses Preview after upstream failure and a thought-only Gemin
           currentIntent: "想观察",
           voiceLine: "你举着那个小方块，我先坐好看看。",
           analysis: {
-            observation: "前爪并拢，眼睛看向镜头。",
-            personalityInterpretation: "可能习惯先看清楚再行动。",
+            observation: "猫端坐在原地，两只前爪收拢，眼睛正看向镜头。",
+            personalityInterpretation: "现有动作更支持它正在观察眼前变化。",
           },
           subtext: "它还没有急着行动，像是在等你先回应。",
           mood: "正在观察",
-          tags: ["端正坐好", "关注镜头", "还没行动"],
+          sceneTags: ["保持坐姿", "视线朝前", "正在观望中"],
         }),
       );
     },

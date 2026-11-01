@@ -409,6 +409,7 @@ function mapPersonaRow(row: PersonaRow | null | undefined) {
 }
 
 async function mapVoiceRow(row: VoiceRow, env: unknown, requestOrigin: string) {
+  const sceneTags = row.tags ?? row.share_tags ?? [];
   return {
     cloudId: row.id,
     time: row.local_time_label || formatTimeLabel(row.created_at),
@@ -416,7 +417,8 @@ async function mapVoiceRow(row: VoiceRow, env: unknown, requestOrigin: string) {
     text: row.text,
     subtext: row.subtext ?? undefined,
     location: row.location ?? undefined,
-    tags: row.tags ?? [],
+    sceneTags,
+    tags: sceneTags,
     createdAt: isoToMs(row.created_at),
     mediaObjectKey: row.media_object_key ?? undefined,
     mediaType: row.media_type ?? "photo",
@@ -434,7 +436,7 @@ async function mapVoiceRow(row: VoiceRow, env: unknown, requestOrigin: string) {
         ? {
             headline: row.share_headline ?? row.text,
             insight: row.share_insight ?? row.personality_interpretation ?? row.analysis ?? "",
-            tags: row.share_tags ?? row.tags ?? [],
+            tags: sceneTags,
           }
         : undefined,
     mediaURL: await mediaDownloadUrl(env, requestOrigin, row.media_object_key, row.created_at),
@@ -838,6 +840,7 @@ async function saveVoice(
   );
   const createdAt = msToIso(voice.createdAt);
   const share = voice.share && typeof voice.share === "object" ? (voice.share as JsonRecord) : {};
+  const sceneTags = cleanStringList(voice.sceneTags ?? voice.tags).slice(0, 3);
   const { data, error } = await client
     .from("cat_voices")
     .upsert(
@@ -850,9 +853,9 @@ async function saveVoice(
         ...voiceAnalysisStorageFields(voice.analysis),
         share_headline: cleanString(share.headline) || null,
         share_insight: cleanString(share.insight) || null,
-        share_tags: cleanStringList(share.tags),
+        share_tags: sceneTags,
         location: cleanString(voice.location) || null,
-        tags: cleanStringList(voice.tags),
+        tags: sceneTags,
         media_object_key: mediaObjectKey ?? null,
         media_type: cleanString(voice.mediaType, "photo"),
         aspect: cleanString(voice.aspect, "3:4"),

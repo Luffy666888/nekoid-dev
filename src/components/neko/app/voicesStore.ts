@@ -8,6 +8,7 @@ export type Voice = {
   text: string;
   subtext?: string;
   location?: string;
+  sceneTags?: string[];
   tags?: string[];
   createdAt?: number;
   media?: string;

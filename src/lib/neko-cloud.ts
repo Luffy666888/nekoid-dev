@@ -708,6 +708,7 @@ async function saveVoice(client: SupabaseClient, user: User, catId: string, voic
   );
 
   const createdAt = msToIso(voice.createdAt);
+  const sceneTags = cleanStringList(voice.sceneTags ?? voice.tags).slice(0, 3);
   const { error } = await client.from("cat_voices").upsert(
     {
       id: voiceId,
@@ -718,9 +719,9 @@ async function saveVoice(client: SupabaseClient, user: User, catId: string, voic
       ...voiceAnalysisStorageFields(voice.analysis),
       share_headline: voice.share?.headline ?? null,
       share_insight: voice.share?.insight ?? null,
-      share_tags: cleanStringList(voice.share?.tags),
+      share_tags: sceneTags,
       location: voice.location ?? null,
-      tags: cleanStringList(voice.tags),
+      tags: sceneTags,
       media_object_key: mediaObjectKey ?? null,
       media_type: voice.mediaType ?? null,
       aspect: voice.aspect ?? null,
@@ -841,14 +842,17 @@ export async function loadNekoFromCloud() {
 
   const voiceRows = (voiceData ?? []) as VoiceRow[];
   const voices: Voice[] = await Promise.all(
-    voiceRows.map(async (row) => ({
+    voiceRows.map(async (row) => {
+      const sceneTags = row.tags ?? row.share_tags ?? [];
+      return {
       cloudId: row.id,
       time: row.local_time_label || formatTimeLabel(row.created_at),
       grad: row.grad || "linear-gradient(135deg, oklch(0.9 0.06 280), oklch(0.92 0.05 320))",
       text: row.text,
       subtext: row.subtext ?? undefined,
       location: row.location ?? undefined,
-      tags: row.tags ?? undefined,
+      sceneTags,
+      tags: sceneTags,
       createdAt: isoToMs(row.created_at),
       media: await signedMediaUrl(client, row.media_object_key),
       mediaObjectKey: row.media_object_key ?? undefined,
@@ -867,10 +871,11 @@ export async function loadNekoFromCloud() {
           ? {
               headline: row.share_headline ?? row.text,
               insight: row.share_insight ?? row.personality_interpretation ?? row.analysis ?? "",
-              tags: row.share_tags ?? row.tags ?? [],
+              tags: sceneTags,
             }
           : undefined,
-    })),
+      };
+    }),
   );
 
   hydratePersistedCatResult(profile, persona);
