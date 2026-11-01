@@ -76,6 +76,127 @@ function requireOtpToken(value: unknown) {
   return value.trim();
 }
 
+type ReviewLoginConfig = {
+  phone: string;
+  code: string;
+  password: string;
+  userId: string;
+};
+
+// Server-only, opt-in, single-account configuration. Never accept any of these
+// values from the request, user_metadata or a client-side feature flag.
+function reviewLoginConfig(env: unknown, phone: string): ReviewLoginConfig | null {
+  if (getEnvValue(env, "NEKO_REVIEW_LOGIN_ENABLED") !== "true") return null;
+  const configuredPhone = getEnvValue(env, "NEKO_REVIEW_LOGIN_PHONE")?.trim();
+  if (!configuredPhone || phone !== configuredPhone) return null;
+
+  const code = getEnvValue(env, "NEKO_REVIEW_LOGIN_CODE")?.trim() ?? "";
+  const password = getEnvValue(env, "NEKO_REVIEW_LOGIN_PASSWORD") ?? "";
+  const userId = getEnvValue(env, "NEKO_REVIEW_LOGIN_USER_ID")?.trim() ?? "";
+  const expiry = getEnvValue(env, "NEKO_REVIEW_LOGIN_EXPIRES_AT") ?? "";
+  const expiresAt = Date.parse(expiry);
+  if (
+    !/^\+861\d{10}$/.test(configuredPhone) ||
+    !/^\d{6}$/.test(code) ||
+    password.length < 32 ||
+    !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(userId) ||
+    !Number.isFinite(expiresAt)
+  ) {
+    throw new IOSAuthError(
+      503,
+      "review_login_not_configured",
+      "测试登录暂时不可用，请联系开发者。",
+    );
+  }
+  // Once the review window ends, this phone goes back to normal SMS login.
+  if (expiresAt <= Date.now()) return null;
+  return { phone, code, password, userId };
+}
+
+// One bounded bucket for the only configured review account, not a map keyed
+// by attacker-supplied IPs. This process-local guard is for the single-process
+// China service; multi-replica deployments must use a shared limiter.
+let reviewAttempts = {
+  userId: "",
+  sentAt: -Infinity,
+  windowStartedAt: 0,
+  failures: 0,
+  inFlight: false,
+};
+const REVIEW_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
+
+function reviewAttemptState(config: ReviewLoginConfig) {
+  if (reviewAttempts.userId !== config.userId) {
+    reviewAttempts = {
+      userId: config.userId,
+      sentAt: -Infinity,
+      windowStartedAt: Date.now(),
+      failures: 0,
+      inFlight: false,
+    };
+  }
+  if (Date.now() - reviewAttempts.windowStartedAt >= REVIEW_ATTEMPT_WINDOW_MS) {
+    reviewAttempts.windowStartedAt = Date.now();
+    reviewAttempts.failures = 0;
+  }
+  return reviewAttempts;
+}
+
+function reviewRateLimitError() {
+  return new IOSAuthError(429, "review_login_rate_limited", "登录尝试太频繁了，请稍后再试。");
+}
+
+function sameReviewCode(actual: string, expected: string) {
+  let difference = actual.length ^ expected.length;
+  for (let index = 0; index < expected.length; index++) {
+    difference |= (actual.charCodeAt(index) || 0) ^ expected.charCodeAt(index);
+  }
+  return difference === 0;
+}
+
+async function verifyReviewLogin(env: unknown, config: ReviewLoginConfig, value: unknown) {
+  const state = reviewAttemptState(config);
+  if (state.inFlight || state.failures >= 5) throw reviewRateLimitError();
+  state.inFlight = true;
+  state.failures += 1; // Count malformed codes too, before any asynchronous work.
+  try {
+    const code = requireOtpToken(value);
+    if (!sameReviewCode(code, config.code)) {
+      throw new IOSAuthError(400, "invalid_otp", "验证码不正确或已过期，请重新获取。");
+    }
+    const { url, publishableKey } = requireSupabaseConfig(env);
+    const client = createClient(url, publishableKey, {
+      auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
+      global: {
+        fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(10000) }),
+      },
+    });
+    // The fixed six-digit code is NOT the account's Supabase password. Exchange
+    // a random server-only password for a real, ordinary authenticated session.
+    const { data, error } = await client.auth.signInWithPassword({
+      phone: config.phone,
+      password: config.password,
+    });
+    if (
+      error ||
+      data.user?.id !== config.userId ||
+      data.user.phone?.replace(/^\+/, "") !== config.phone.slice(1) ||
+      data.user.role !== "authenticated" ||
+      data.user.app_metadata?.neko_app_review !== true ||
+      data.user.app_metadata?.neko_account_deletion_pending === true
+    ) {
+      // Do not log provider error messages: they may contain login credentials.
+      console.error("NEKO review login failed", { status: error?.status ?? null });
+      throw new IOSAuthError(503, "review_login_unavailable", "测试登录暂时不可用，请联系开发者。");
+    }
+    const session = mapSession(data);
+    state.failures = 0;
+    return session;
+  } finally {
+    state.inFlight = false;
+  }
+}
+
 function requireRefreshToken(value: unknown) {
   if (typeof value !== "string" || !value.trim()) {
     throw new IOSAuthError(400, "invalid_refresh_token", "登录状态已过期，请重新登录。");
@@ -166,6 +287,14 @@ export async function handleIOSAuthRequest(pathname: string, body: unknown, env:
 
   if (pathname === "/api/ios/auth/phone-otp") {
     const phone = normalizeMainlandPhone(payload.phone);
+    const review = reviewLoginConfig(env, phone);
+    if (review) {
+      const state = reviewAttemptState(review);
+      if (state.failures >= 5 || Date.now() - state.sentAt < 60000) throw reviewRateLimitError();
+      state.sentAt = Date.now();
+      // Preserve the current iOS response contract without sending a real SMS.
+      return { sent: true };
+    }
     const { error } = await client.auth.signInWithOtp({
       phone,
       options: {
@@ -180,6 +309,8 @@ export async function handleIOSAuthRequest(pathname: string, body: unknown, env:
 
   if (pathname === "/api/ios/auth/phone-verify") {
     const phone = normalizeMainlandPhone(payload.phone);
+    const review = reviewLoginConfig(env, phone);
+    if (review) return verifyReviewLogin(env, review, payload.token);
     const token = requireOtpToken(payload.token);
     const { data, error } = await client.auth.verifyOtp({
       phone,

@@ -135,6 +135,61 @@ script can still request a certificate without it.
 
 ## Verify
 
+### Dedicated App Review phone login
+
+The existing iOS phone/OTP endpoints support **one opt-in review account**. Normal
+phone numbers keep using Supabase SMS OTP. No iOS rebuild is needed for this feature.
+The fixed review code is checked only on the server; it is not the Supabase password.
+A separate random password exchanges for a normal Supabase session, preserving RLS,
+refresh tokens, real AI requests and account deletion. The runtime requires the exact
+phone, pinned UUID, `authenticated` role and server-owned `app_metadata.neko_app_review`.
+It never creates users or uses the admin key to log a user in.
+
+Keep all six `NEKO_REVIEW_LOGIN_*` variables out of git and client bundles. The default
+is disabled. `NEKO_REVIEW_LOGIN_EXPIRES_AT` is required; after that deadline the number
+returns to normal SMS login. Do not use an account with private personal data: anyone
+knowing the review phone and fixed code can access that account. Use a random review
+code where possible and disable it when review no longer needs access.
+
+To provision, load the server's Supabase credentials plus the exact review phone,
+six-digit code and review expiry from protected environment files (not CLI arguments).
+From a release with dependencies installed, first run the dry-run:
+
+```sh
+node --env-file=/etc/nekoid/nekoid.env --env-file=/path/to/review-input.env \
+  scripts/configure-review-login.mjs
+```
+
+The dry-run prints only the target UUID, whether it exists, and expiry. If this is an
+existing account, confirm it is the intended test account. Applying changes rotates
+only this account's password and adds its review marker; it does not clear its data.
+Pass that exact UUID with `--existing-user-id=<UUID>` (omit for a new account):
+
+```sh
+node --env-file=/etc/nekoid/nekoid.env --env-file=/path/to/review-input.env \
+  scripts/configure-review-login.mjs --apply --existing-user-id=<UUID> \
+  --output=/etc/nekoid/review-login.env
+```
+
+Output is a new mode-0600 file and still has `NEKO_REVIEW_LOGIN_ENABLED=false`. Test
+with the new backend, then merge these six fields into the existing service environment
+and set `NEKO_REVIEW_LOGIN_ENABLED=true` during the scoped domestic deployment. Never
+replace the whole production env file or upload a local `.env.local`. Do not print the
+password, code, access tokens or refresh tokens to logs. Verify login, refresh and an
+authenticated read against the real Supabase instance before inviting reviewers.
+
+The current single-process China backend permits one send per 60 seconds and blocks
+this review account after five failed/malformed attempts within 15 minutes. Requests
+cannot reset this counter by asking for another code; concurrent verification is
+serialized. The limiter is **process-local** and resets on restart: before deploying
+multiple instances/Workers, replace it with a shared durable limiter. Supabase's normal
+password-grant limits also remain in place. Disabling the feature stops new fixed-code
+logins but does not revoke already issued sessions; explicitly revoke those if needed.
+Deleting the account is real and invalidates the pinned UUID; re-provision deliberately
+instead of auto-recreating it during login.
+
+Run `node --test scripts/test-ios-auth.mjs` for isolation and regression checks.
+
 ### Account deletion
 
 The native app uses `POST /api/ios/cloud/account/delete` with a user bearer token

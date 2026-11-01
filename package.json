@@ -15,6 +15,7 @@
     "format": "prettier --write .",
     "test:ai": "node --test scripts/test-bytecat.mjs",
     "test:voice": "node --test scripts/test-voice-analysis.mjs",
+    "test:auth": "node --test scripts/test-ios-auth.mjs scripts/test-review-provisioning.mjs",
     "test:ai:live": "node scripts/test-bytecat-live.mjs",
     "test:persona": "node scripts/evaluate-persona-cases.mjs"
   },
