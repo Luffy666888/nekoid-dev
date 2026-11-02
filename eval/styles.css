@@ -1,0 +1,286 @@
+@import "../src/styles.css";
+@source ".";
+
+/* Layout sizes below are responsive containers, not new typography or spacing tokens. */
+.eval-page {
+  max-width: 1600px;
+  margin-inline: auto;
+  padding: max(var(--miao-space-6), env(safe-area-inset-top))
+    max(var(--miao-page-margin), env(safe-area-inset-right))
+    max(var(--miao-space-10), env(safe-area-inset-bottom))
+    max(var(--miao-page-margin), env(safe-area-inset-left));
+  color: var(--miao-text-primary);
+}
+.eval-page h1,
+.eval-page h2,
+.eval-page h3,
+.eval-page h4 {
+  margin: 0;
+}
+.eval-page p {
+  margin-block: var(--miao-space-3);
+  overflow-wrap: anywhere;
+}
+.eval-page ul {
+  list-style: disc;
+  padding-left: var(--miao-space-6);
+  margin-block: var(--miao-space-3);
+}
+.eval-page li + li {
+  margin-top: var(--miao-space-2);
+}
+.eval-page button {
+  cursor: pointer;
+}
+.eval-page button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.eval-page :is(button, select, input, textarea, summary, a):focus-visible {
+  outline: 2px solid var(--miao-brand);
+  outline-offset: var(--miao-space-1);
+}
+.eval-page :is(input, select, textarea) {
+  min-width: 0;
+  max-width: 100%;
+  padding: var(--miao-space-2) var(--miao-space-3);
+  border: 1px solid var(--miao-border);
+  border-radius: var(--miao-radius-chip);
+  background: var(--miao-surface);
+  color: var(--miao-text-primary);
+  font: inherit;
+}
+.eval-page :is(input, textarea) {
+  display: block;
+  width: 100%;
+  margin-top: var(--miao-space-2);
+}
+.eval-page textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+.eval-page label {
+  display: block;
+}
+.eval-page a {
+  color: var(--miao-brand);
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}
+.eval-page details {
+  padding-block: var(--miao-space-4);
+  border-top: 1px solid var(--miao-border);
+}
+.eval-page summary {
+  cursor: pointer;
+}
+.eval-page pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--font-neko-ui);
+  max-height: 480px;
+  overflow: auto;
+  margin-top: var(--miao-space-4);
+}
+.eval-page fieldset {
+  border: 1px solid var(--miao-border);
+  border-radius: var(--miao-radius-chip);
+  padding: var(--miao-space-4);
+}
+.eval-secondary {
+  color: var(--miao-text-secondary);
+}
+.eval-danger {
+  color: var(--miao-danger);
+}
+.eval-section {
+  margin-bottom: var(--miao-space-8);
+}
+.eval-page .miao-card {
+  padding: var(--miao-space-5);
+  box-shadow: none;
+}
+.eval-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--miao-space-3);
+  flex-wrap: wrap;
+}
+.eval-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--miao-space-3);
+  margin-block: var(--miao-space-4);
+}
+.eval-page :is(.miao-primary-button, .miao-secondary-button) {
+  padding-inline: var(--miao-space-5);
+}
+.eval-workspace {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: var(--miao-space-6);
+  align-items: start;
+}
+.eval-case-list {
+  position: sticky;
+  top: var(--miao-space-6);
+  max-height: calc(100dvh - var(--miao-space-6) * 2);
+  overflow: auto;
+}
+.eval-case-list select {
+  width: 100%;
+  margin-block: var(--miao-space-3);
+}
+.eval-case {
+  display: flex;
+  flex-direction: column;
+  gap: var(--miao-space-1);
+  width: 100%;
+  text-align: left;
+  padding: var(--miao-space-3);
+  border: 1px solid transparent;
+  border-radius: var(--miao-radius-chip);
+}
+.eval-case + .eval-case {
+  margin-top: var(--miao-space-2);
+}
+.eval-case[aria-current="true"] {
+  border-color: var(--miao-brand);
+  background: var(--miao-surface-muted);
+}
+.eval-detail {
+  min-width: 0;
+}
+.eval-input-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--miao-space-6);
+  margin-block: var(--miao-space-5);
+}
+.eval-input-grid figure {
+  margin: 0;
+  min-width: 0;
+}
+.eval-input-grid img {
+  width: 100%;
+  height: 320px;
+  object-fit: contain;
+  background: var(--miao-surface-muted);
+  border-radius: var(--miao-radius-chip);
+}
+.eval-input-grid figcaption {
+  margin-top: var(--miao-space-2);
+}
+.eval-result-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--miao-space-6);
+  margin-top: var(--miao-space-5);
+}
+.eval-result-grid > * {
+  min-width: 0;
+}
+.eval-output {
+  padding-block: var(--miao-space-4);
+  border-bottom: 1px solid var(--miao-border);
+}
+.eval-review {
+  display: flex;
+  flex-direction: column;
+  gap: var(--miao-space-4);
+}
+.eval-rubric {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.eval-rubric li {
+  padding-block: var(--miao-space-3);
+  border-top: 1px solid var(--miao-border);
+}
+.eval-score-row {
+  display: flex !important;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--miao-space-3);
+  margin-bottom: var(--miao-space-2);
+}
+.eval-score-row select {
+  flex-shrink: 0;
+}
+.eval-comparison {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--miao-space-5);
+  margin-block: var(--miao-space-5);
+}
+.eval-comparison article {
+  min-width: 0;
+  border-top: 1px solid var(--miao-border);
+  padding-top: var(--miao-space-4);
+}
+.eval-comparison article > div {
+  margin-top: var(--miao-space-4);
+}
+.eval-stability-scores {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--miao-space-4);
+}
+@media (max-width: 1100px) {
+  .eval-result-grid {
+    grid-template-columns: 1fr;
+  }
+  .eval-workspace {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+}
+@media (max-width: 760px) {
+  .eval-workspace,
+  .eval-input-grid,
+  .eval-stability-scores {
+    grid-template-columns: 1fr;
+  }
+  .eval-case-list {
+    position: static;
+    max-height: none;
+  }
+  .eval-case-list nav {
+    display: flex;
+    overflow-x: auto;
+    gap: var(--miao-space-2);
+    padding-bottom: var(--miao-space-2);
+  }
+  .eval-case {
+    flex: 0 0 200px;
+  }
+  .eval-case + .eval-case {
+    margin-top: 0;
+  }
+  .eval-input-grid img {
+    height: 280px;
+  }
+  .eval-actions {
+    flex-direction: column;
+  }
+  .eval-score-row {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 380px) {
+  .eval-page {
+    padding-inline: var(--miao-page-margin-compact);
+  }
+  .eval-page .miao-card {
+    padding: var(--miao-space-4);
+  }
+}
+/* The production app locks scrolling inside phone screens; this standalone workbench scrolls the document. */
+html,
+body,
+#root {
+  height: auto;
+  min-height: 100%;
+  overflow: visible;
+}

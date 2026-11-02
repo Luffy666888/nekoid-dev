@@ -17,7 +17,10 @@
     "test:voice": "node --test scripts/test-voice-analysis.mjs",
     "test:auth": "node --test scripts/test-ios-auth.mjs scripts/test-review-provisioning.mjs",
     "test:ai:live": "node scripts/test-bytecat-live.mjs",
-    "test:persona": "node scripts/evaluate-persona-cases.mjs"
+    "test:persona": "node scripts/evaluate-persona-cases.mjs",
+    "eval:persona": "node eval/server.mjs",
+    "eval:persona:live": "node eval/runner.mjs",
+    "test:persona:eval": "node --test eval/core.test.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
