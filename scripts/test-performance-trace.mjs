@@ -5,7 +5,7 @@ import { webcrypto } from "node:crypto";
 import vm from "node:vm";
 import ts from "typescript";
 
-function loadAPI({ logs = [], authFetch, cloud = () => ({ saved: true }) } = {}) {
+function loadAPI({ logs = [], authFetch, cloud = () => ({ saved: true }), personaInput = () => {} } = {}) {
   const cache = new Map();
   const load = (name) => {
     if (cache.has(name)) return cache.get(name);
@@ -44,6 +44,7 @@ function loadAPI({ logs = [], authFetch, cloud = () => ({ saved: true }) } = {})
             return {
               setNekoAIWorkerEnv() {},
               generateCatPersonaServer: async (_body, trace) => {
+                personaInput(_body);
                 trace.log("persona_test_handler");
                 return { mbti: "ISFP-A" };
               },
@@ -97,6 +98,21 @@ test("HTTP IDs correlate with generation, duration headers and JSON shape remain
   assert.ok(logs.some((event) => event.event === "persona_test_handler"));
   assert.equal(logs.at(-1).event, "http_end");
   assert.doesNotMatch(JSON.stringify(logs), /secret-cat|base64-secret|privateName|quiz/);
+});
+
+test("native persona endpoint selects iOS questionnaire semantics for old and new request bodies", async () => {
+  const inputs = [];
+  const { api } = loadAPI({ personaInput: (body) => inputs.push(body) });
+  for (const version of [undefined, "web-v1", "ios-v1"]) {
+    const response = await api.handleIOSAPIRequest(new Request("https://neko.test/api/ios/onboarding/persona", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ profile: { quiz: { 6: "b" } }, questionnaireVersion: version }),
+    }), {});
+    assert.equal(response.status, 200);
+    assert.equal(inputs.at(-1).questionnaireVersion, "ios-v1");
+    assert.equal(inputs.at(-1).profile.quiz[6], "b");
+  }
 });
 
 test("old clients, unsafe IDs, invalid JSON and missing authentication all receive bounded diagnostics", async () => {

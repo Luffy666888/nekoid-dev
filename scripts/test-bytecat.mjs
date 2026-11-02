@@ -825,7 +825,7 @@ test("persona uses video observations as text and does not resend video frames",
           summary: "它习惯先看清眼前变化，再按自己的节奏决定是否靠近和参与互动。",
         },
         insights: {
-          misunderstanding: { title: "你可能一直误会它的一件事", conclusion: "它不是对互动没有兴趣，而是习惯先确认安全和节奏再靠近。" },
+          misunderstanding: { title: "你可能一直误会它的一件事", conclusion: "它不是对互动没有兴趣，而是习惯先确认安全和节奏再慢慢靠近。" },
           affection: { title: "它表达喜欢的方式", conclusion: "它会用待在你附近、留意互动和适时回应来表达自己的真实亲近。" },
           relationship: { title: "在它眼里，你的位置", conclusion: "你是它生活里稳定而熟悉的重要参照，也是它愿意安心靠近的人。" },
         },
@@ -1137,11 +1137,12 @@ test("persona and voice labels rewrite AI-ish phrases into plain cat-owner langu
     mergedProfile,
   );
   assert.deepEqual(Array.from(voice.tags), [
-    "会用眼神表达",
-    "安静坐着等你",
-    "不常主动但会认真回应",
+    "眼神示意",
+    "坐着等你",
+    "认真回应",
   ]);
-  assert.deepEqual(Array.from(voice.share.tags), ["安静等你发现", "先观察再靠近", "表达得很清楚"]);
+  assert.deepEqual(Array.from(voice.sceneTags), Array.from(voice.tags));
+  assert.deepEqual(Array.from(voice.share.tags), Array.from(voice.sceneTags));
   assertPlainNekoCopy([
     ...voice.tags,
     ...voice.share.tags,
@@ -1269,8 +1270,8 @@ test("voice diagnostics identify each rule without changing acceptance or exposi
     ["current_intent_invalid", { currentIntent: "private-invalid-intent" }],
     ["voice_line_too_short", { voiceLine: "看看" }],
     ["voice_line_too_long", { voiceLine: "看".repeat(36) }],
-    ["voice_line_too_many_sentences", { voiceLine: "先看看。再等等。等你过来。" }],
-    ["voice_line_forbidden_terms", { voiceLine: "让我先控制一下营业的节奏。" }],
+    ["voice_line_too_many_sentences", { voiceLine: "让我先看看。还得再等等。等你过来。" }],
+    ["voice_line_forbidden_terms", { voiceLine: "让我先控制一下今天营业的节奏。" }],
     ["voice_line_generic_template", { voiceLine: "有你在我就安心，继续坐这里吧。" }],
     ["voice_line_contains_mbti", { voiceLine: "我是ISTP-A，先把箱子放着吧。" }, voicePersonaFixture],
     ["voice_line_contains_persona_title", { voiceLine: "我是独立探索型，先把箱子放着吧。" }, voicePersonaFixture],
@@ -1279,8 +1280,7 @@ test("voice diagnostics identify each rule without changing acceptance or exposi
     ["analysis_observation_missing", { analysis: { ...valid.analysis, observation: "" } }],
     ["analysis_personality_interpretation_missing", { analysis: { ...valid.analysis, personalityInterpretation: "" } }],
     ["analysis_too_long", { analysis: { observation: "看".repeat(40), personalityInterpretation: "想".repeat(40) } }],
-    ["scene_tags_not_array", { sceneTags: "private-tags" }],
-    ["scene_tag_count_not_three", { sceneTags: ["一个标签"] }],
+    ["analysis_repeats_voice_line", { analysis: { ...valid.analysis, observation: valid.voiceLine } }],
   ];
 
   assert.equal(api.inspectVoiceGenerationOutput(valid, null).valid, true);
@@ -1303,11 +1303,17 @@ test("voice diagnostics identify each rule without changing acceptance or exposi
     "visible_observations_missing",
     "voice_line_too_short",
     "voice_line_generic_template",
-    "scene_tag_count_not_three",
   ]);
   assert.equal(multiple.metrics.observationInputCount, 1);
   assert.equal(multiple.metrics.observationAcceptedCount, 0);
   assert.equal(multiple.metrics.sceneTagCount, 0);
+  for (const sceneTags of [undefined, "private-tags", [], ["观察"], ["前爪收着", "前爪收着", "超长的标签要在本地处理"]]) {
+    const report = api.inspectVoiceGenerationOutput({ ...valid, sceneTags }, null);
+    assert.equal(report.valid, true, "Tag-only issues must not enter retry validation");
+    assert.deepEqual(Array.from(report.reasons), []);
+    assert.equal(report.metrics.sceneTagCount, Array.isArray(sceneTags) ? sceneTags.length : null);
+    assert.doesNotMatch(JSON.stringify(report), /private-tags|前爪收着|超长的标签/);
+  }
 });
 
 test("voice generation accepts intent without literal evidence keywords on the first model", async () => {
@@ -1408,7 +1414,6 @@ test("invalid voice semantics retry with correlated privacy-safe validation logs
     "visible_observations_missing",
     "voice_line_too_short",
     "voice_line_generic_template",
-    "analysis_too_short",
   ]);
   assert.deepEqual(events[1].reasons, []);
   assert.equal(events[0].metrics.observationAcceptedCount, 0);

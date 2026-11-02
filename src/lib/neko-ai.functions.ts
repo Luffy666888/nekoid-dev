@@ -12,7 +12,13 @@ import type {
   PersonaSummary,
 } from "@/components/neko/catProfileStore";
 import type { Voice } from "@/components/neko/app/voicesStore";
-import { buildBehaviorProfile, buildCombinationInsights } from "@/lib/neko-behavior-profile";
+import {
+  buildBehaviorProfile,
+  buildCombinationInsights,
+  questionnaireAnswersForPrompt,
+  type QuestionnaireVersion,
+  type QuizAnswer,
+} from "@/lib/neko-behavior-profile";
 import { PerformanceTrace, elapsedMs, monotonicNow, performanceErrorCategory, performanceNetworkCode } from "./performance-trace";
 import { joinVoiceAnalysis, limitVoiceAnalysis, VOICE_ANALYSIS_GENERATION_MAX_CHARACTERS } from "./voice-analysis";
 import { buildVoiceAnalysisStylePrompt, selectVoiceAnalysisStyleExamples, VOICE_ANALYSIS_STYLE_VERSION } from "./voice-analysis-style";
@@ -23,6 +29,7 @@ import {
 
 export type PersonaInput = {
   profile: CatProfile;
+  questionnaireVersion?: QuestionnaireVersion;
   imageDataUrl?: string | null;
   videoObservations?: CatVideoObservation[] | null;
   previousPersona?: CatPersona | null;
@@ -58,6 +65,7 @@ type VoiceGenerationOutput = {
   };
   mood: string;
   sceneTags: string[];
+  tags?: string[]; // Legacy responses remain readable; the schema emits sceneTags.
 };
 
 const VOICE_CURRENT_INTENTS: VoiceCurrentIntent[] = [
@@ -72,6 +80,8 @@ const VOICE_CURRENT_INTENTS: VoiceCurrentIntent[] = [
   "想休息",
   "想获得关注",
 ];
+
+const VOICE_TAG_MAX_CHARACTERS = 5;
 
 const VOICE_JSON_SCHEMA = {
   type: "object",
@@ -109,7 +119,7 @@ const VOICE_JSON_SCHEMA = {
       type: "array",
       minItems: 3,
       maxItems: 3,
-      items: { type: "string", minLength: 4, maxLength: 10 },
+      items: { type: "string", minLength: 2, maxLength: VOICE_TAG_MAX_CHARACTERS },
     },
   },
 } as const;
@@ -149,7 +159,7 @@ type PersonaAIResponse = Omit<CatPersona, "misunderstanding" | "loveLanguage" | 
 };
 
 export const PERSONA_PROMPT_VERSIONS = {
-  stage1: "persona_stage1_v3",
+  stage1: "persona_stage1_v4_questionnaire_evidence",
   stage2: "persona_stage2_v1",
   stage3: "persona_stage3_protocol_v2",
 } as const;
@@ -866,8 +876,11 @@ function isSpecificPersonaType(value: unknown): value is string {
   );
 }
 
-function buildStablePersona(profile: CatProfile): CatPersona {
-  const behavior = buildBehaviorProfile(profile.quiz);
+function buildStablePersona(
+  profile: CatProfile,
+  questionnaireVersion?: QuestionnaireVersion,
+): CatPersona {
+  const behavior = buildBehaviorProfile(profile.quiz, questionnaireVersion);
   if (behavior.answeredCount === 0) {
     return normalizePersonaForProfile(
       {
@@ -1016,9 +1029,9 @@ const fatalUnsupportedClaimPatterns = [
 
 const genericPersonaWords = ["温柔", "治愈", "可爱", "快乐", "陪伴", "守护", "观察者"];
 
-function getQuizSignal(profile: CatProfile, index: number) {
+function getQuizSignal(profile: CatProfile, index: number, supportedChoices: readonly QuizAnswer[]) {
   const answer = profile.quiz?.[index];
-  return answer === "a" || answer === "b" || answer === "c"
+  return (answer === "a" || answer === "b" || answer === "c") && supportedChoices.includes(answer)
     ? `Q${index + 1}:${answer.toUpperCase()}`
     : null;
 }
@@ -1029,8 +1042,11 @@ function uniqueSignals(values: Array<string | null | undefined>) {
   );
 }
 
-function toPersonaBehaviorProfile(profile: CatProfile): PersonaBehaviorProfile {
-  const behavior = buildBehaviorProfile(profile.quiz);
+function toPersonaBehaviorProfile(
+  profile: CatProfile,
+  questionnaireVersion?: QuestionnaireVersion,
+): PersonaBehaviorProfile {
+  const behavior = buildBehaviorProfile(profile.quiz, questionnaireVersion);
   const score = (value: number | null | undefined, fallback = 50) =>
     value === null || value === undefined ? fallback : value;
   const attachment = score(behavior.attachment);
@@ -1079,35 +1095,69 @@ function identifyUnsupportedClaimsInText(text: string): PersonaUnsupportedClaim[
 
 function buildStableStage1(data: PersonaInput): PersonaStage1Output {
   const profile = data.profile;
-  const behavior = buildBehaviorProfile(profile.quiz);
-  const behaviorProfile = toPersonaBehaviorProfile(profile);
+  const ios = data.questionnaireVersion === "ios-v1";
+  const behavior = buildBehaviorProfile(profile.quiz, data.questionnaireVersion);
+  const behaviorProfile = toPersonaBehaviorProfile(profile, data.questionnaireVersion);
   const traits: PersonaCoreTrait[] = [];
+  const signal = (index: number, choices: readonly QuizAnswer[]) =>
+    getQuizSignal(profile, index, choices);
+  const contactSignals = uniqueSignals([
+    signal(2, ios ? ["a", "b"] : ["a", "c"]),
+    signal(3, ["a", "b"]),
+    signal(6, ios ? ["a"] : ["a", "b"]),
+    signal(7, ios ? ["a", "b"] : ["a", "b", "c"]),
+  ]);
+  const boundarySignal = signal(5, ["a", "b"]);
+  const curiositySignals = uniqueSignals([
+    signal(1, ["a", "b"]),
+    // Only the web option explicitly describes playing together.
+    ios ? null : signal(7, ["b"]),
+  ]);
+  const cautionSignals = uniqueSignals([
+    signal(0, ["b", "c"]),
+    signal(1, ["b"]),
+    signal(4, ios ? ["a", "b"] : ["a"]),
+  ]);
 
   addTraitIfSupported(traits, {
     trait: "主动亲近",
-    description: "它会主动靠近熟悉的人，但不代表愿意一直被抱着。",
-    supportedBy: [getQuizSignal(profile, 2), getQuizSignal(profile, 3), getQuizSignal(profile, 6)],
+    description: "它会通过主动迎接、寻找互动或直接表达需求来和你交流。",
+    supportedBy: [
+      signal(2, ["a"]),
+      signal(3, ["a"]),
+      ios ? signal(7, ["a"]) : signal(6, ["a"]),
+    ],
     confidence: behaviorProfile.attachmentExpression >= 64 ? 0.82 : 0.62,
   });
 
-  addTraitIfSupported(traits, {
-    trait: "亲近但有边界",
-    description: "它在意和人的关系，同时希望自己决定靠近和接触的距离。",
-    supportedBy: [getQuizSignal(profile, 5), getQuizSignal(profile, 6), getQuizSignal(profile, 7)],
-    confidence: behaviorProfile.boundary >= 60 ? 0.84 : 0.64,
-  });
+  // A compound trait needs evidence for both halves, not just any two answers.
+  if (contactSignals.length && boundarySignal) {
+    addTraitIfSupported(traits, {
+      trait: "亲近但有边界",
+      description: "它愿意靠近或一起待着，遇到不喜欢的互动也会表达边界。",
+      supportedBy: [...contactSignals, boundarySignal],
+      confidence: behaviorProfile.boundary >= 60 ? 0.84 : 0.64,
+    });
+  }
 
-  addTraitIfSupported(traits, {
-    trait: "好奇但谨慎",
-    description: "它对新东西有兴趣，但通常会先确认安全再靠近。",
-    supportedBy: [getQuizSignal(profile, 1), getQuizSignal(profile, 4), getQuizSignal(profile, 7)],
-    confidence: behaviorProfile.curiosity >= 60 && behaviorProfile.caution >= 60 ? 0.86 : 0.66,
-  });
+  if (curiositySignals.length && cautionSignals.length) {
+    addTraitIfSupported(traits, {
+      trait: "好奇但谨慎",
+      description: "它有探索或玩耍的兴趣，遇到陌生情况或动静时也会先确认。",
+      supportedBy: [...curiositySignals, ...cautionSignals],
+      confidence: behaviorProfile.curiosity >= 60 && behaviorProfile.caution >= 60 ? 0.86 : 0.66,
+    });
+  }
 
   addTraitIfSupported(traits, {
     trait: "安静表达亲近",
-    description: "它可能很在意主人，但表达方式偏安静，不一定会大声索取关注。",
-    supportedBy: [getQuizSignal(profile, 2), getQuizSignal(profile, 3), getQuizSignal(profile, 6)],
+    description: "它会用淡定地出现、在附近等待或安静共处来表达亲近。",
+    supportedBy: [
+      signal(2, ios ? ["b"] : ["c"]),
+      signal(3, ["b"]),
+      ios ? null : signal(6, ["b"]),
+      signal(7, ios ? ["b"] : ["c"]),
+    ],
     confidence:
       (behavior.attachment ?? 50) >= 60 && (behavior.expressiveness ?? 50) <= 46 ? 0.82 : 0.63,
   });
@@ -1115,24 +1165,25 @@ function buildStableStage1(data: PersonaInput): PersonaStage1Output {
   addTraitIfSupported(traits, {
     trait: "先观察再行动",
     description: "遇到变化或互动时，它更习惯先看清楚，再决定下一步。",
-    supportedBy: [getQuizSignal(profile, 1), getQuizSignal(profile, 4), getQuizSignal(profile, 5)],
+    supportedBy: [signal(0, ["b"]), signal(1, ["b"]), signal(4, ios ? ["b"] : ["a"])],
     confidence: behaviorProfile.environmentalSensitivity >= 60 ? 0.8 : 0.62,
   });
 
-  for (const observation of data.videoObservations ?? []) {
-    const fact = observation.personalityEvidence[0]?.fact || observation.summary;
-    if (!fact) continue;
+  if (ios) {
     addTraitIfSupported(traits, {
-      trait: "视频里也会先观察",
-      description: "视频线索显示它会把注意力放在目标上，再慢慢决定动作。",
+      trait: "喜欢自己安排",
+      description: "它常会先做自己的事或自己解决需求，互动更看当下的需要。",
       supportedBy: [
-        `video:${observation.clipId ?? observation.label ?? "clip"}`,
-        getQuizSignal(profile, 1),
-        getQuizSignal(profile, 4),
+        signal(2, ["c"]),
+        signal(3, ["c"]),
+        signal(6, ["b", "c"]),
+        signal(7, ["c"]),
       ],
-      confidence: observation.confidence === "high" ? 0.78 : 0.62,
+      confidence: 0.72,
     });
   }
+  // Video observations still go to Stage 1. Their presence alone is not evidence
+  // of "observing first"; this deterministic fallback must not invent that trait.
 
   return {
     behaviorProfile,
@@ -2482,59 +2533,6 @@ function hasMeaningfulTextOverlap(first: string, second: string) {
   return false;
 }
 
-const sceneTagVisibleActionPattern =
-  /看|盯|望|坐|蹲|趴|躺|站|靠|贴|抬|伸|缩|蜷|闻|舔|抓|扑|踩|蹭|歪|竖|垂|张|闭|停|回头|侧身|并拢|前倾|朝向|窝|扒|抱|视线|身体|前爪|耳朵|尾巴/;
-
-const sceneTagStatePattern =
-  /想|等|端着|假装|忍住|盘算|犹豫|不急|认真|好奇|专注|跃跃|准备|待机|观望|淡定|克制|评估/;
-
-const sceneTagForbiddenTerms = [
-  "MBTI",
-  "人格",
-  "性格",
-  "长期",
-  "每天",
-  "总是",
-  "经常",
-  "平时",
-  "习惯",
-  "慢热",
-  "温柔",
-  "可爱",
-  "治愈",
-  "高冷",
-  "独立",
-  "乖巧",
-  "敏感",
-  "谨慎",
-  "稳重",
-  "亲人",
-  "黏人",
-  "社恐",
-];
-
-function sceneTagsRepeat(first: string, second: string) {
-  const source = normalizedComparableText(first);
-  const target = normalizedComparableText(second);
-  if (!source || !target) return false;
-  if (source === target || source.includes(target) || target.includes(source)) return true;
-  const shorter = source.length <= target.length ? source : target;
-  const longer = source.length <= target.length ? target : source;
-  for (let index = 0; index <= shorter.length - 3; index += 1) {
-    if (longer.includes(shorter.slice(index, index + 3))) return true;
-  }
-  return false;
-}
-
-function normalizeSceneTags(value: unknown) {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => asText(item).replace(/^#+/, "").trim())
-    .filter(Boolean)
-    .filter((tag, index, tags) => tags.findIndex((candidate) => candidate === tag) === index)
-    .slice(0, 3);
-}
-
 function voiceStyleConflictsWithPersona(
   voiceLine: string,
   intent: VoiceCurrentIntent,
@@ -2580,21 +2578,7 @@ function inspectVoiceGenerationOutput(parsed: VoiceGenerationOutput, persona: Ca
   const validIntent = VOICE_CURRENT_INTENTS.includes(currentIntent);
   const voiceLineLength = charLength(voiceLine);
   const voiceLineSentences = sentenceCount(voiceLine);
-  const sceneTags = normalizeSceneTags(parsed.sceneTags);
-  const sceneTagsHaveValidLength = sceneTags.every((tag) => {
-    const length = charLength(tag);
-    return length >= 4 && length <= 10;
-  });
-  const sceneTagsAreShortChineseLabels = sceneTags.every((tag) => /^[\p{Script=Han}]{4,10}$/u.test(tag));
-  const sceneTagsHaveForbiddenContent = sceneTags.some((tag) =>
-    sceneTagForbiddenTerms.some((term) => tag.includes(term)),
-  );
-  const sceneTagsHaveDistinctMeaning = sceneTags.every(
-    (tag, index) => !sceneTags.slice(index + 1).some((candidate) => sceneTagsRepeat(tag, candidate)),
-  );
-  const sceneTagsRepeatAnalysis = sceneTags.some((tag) =>
-    hasMeaningfulTextOverlap(tag, `${analysisObservation}${analysisInterpretation}`),
-  );
+  const sceneTags = Array.isArray(parsed.sceneTags) ? parsed.sceneTags : parsed.tags;
 
   // Report every applicable failure, without requiring literal intent keywords.
   // Dependent checks are skipped when their prerequisites are already invalid.
@@ -2620,21 +2604,8 @@ function inspectVoiceGenerationOutput(parsed: VoiceGenerationOutput, persona: Ca
       voiceLine,
       `${analysisObservation}${analysisInterpretation}`,
     ),
-    scene_tags_not_array: !Array.isArray(parsed.sceneTags),
-    scene_tag_count_not_three: Array.isArray(parsed.sceneTags) && sceneTags.length !== 3,
-    scene_tag_length_invalid: sceneTags.length === 3 && !sceneTagsHaveValidLength,
-    scene_tag_not_short_chinese_label:
-      sceneTags.length === 3 && !sceneTagsAreShortChineseLabels,
-    scene_tag_forbidden_content: sceneTags.length === 3 && sceneTagsHaveForbiddenContent,
-    scene_tag_visible_slots_invalid:
-      sceneTags.length === 3 &&
-      (!sceneTagVisibleActionPattern.test(sceneTags[0] ?? "") ||
-        !sceneTagVisibleActionPattern.test(sceneTags[1] ?? "")),
-    scene_tag_state_slot_invalid:
-      sceneTags.length === 3 && !sceneTagStatePattern.test(sceneTags[2] ?? ""),
-    scene_tags_semantically_repeated:
-      sceneTags.length === 3 && !sceneTagsHaveDistinctMeaning,
-    scene_tags_repeat_analysis: sceneTags.length === 3 && sceneTagsRepeatAnalysis,
+    // Tags are normalized/deduplicated locally after generation. A label issue
+    // must not reject an otherwise valid voice and trigger another model call.
   };
   const reasons = Object.entries(failedChecks)
     .filter(([, failed]) => failed)
@@ -2653,7 +2624,7 @@ function inspectVoiceGenerationOutput(parsed: VoiceGenerationOutput, persona: Ca
       voiceLineLength,
       voiceLineSentences,
       analysisLength,
-      sceneTagCount: Array.isArray(parsed.sceneTags) ? parsed.sceneTags.length : null,
+      sceneTagCount: Array.isArray(sceneTags) ? sceneTags.length : null,
       hasPersona: Boolean(persona),
     },
   };
@@ -2674,6 +2645,62 @@ function validateVoiceGenerationOutput(
   return report.valid;
 }
 
+// Keep the shared persona wording rules intact. Heart-voice chips have a
+// smaller budget, so shorten known rewrites as complete phrases, never slices.
+const shortVoiceTagReplacements: Record<string, string> = {
+  "会用眼神表达": "眼神示意",
+  "待在你看得见的地方": "待在附近",
+  "安静坐着等你": "坐着等你",
+  "安静等你发现": "等你发现",
+  "喜欢待在附近": "爱待在附近",
+  "不常主动但会回应": "偶尔回应",
+  "不常主动但会认真回应": "认真回应",
+  "次数不多但会回应": "偶尔回应",
+  "先观察再靠近": "先看再靠近",
+  "很会观察动静": "留意动静",
+  "按自己想法来": "有小主意",
+  "想靠近又犹豫": "还在犹豫",
+  "先观察再回应": "先看再回应",
+  "表达得很清楚": "直接表达",
+};
+
+const voiceIntentTagFallbacks: Record<VoiceCurrentIntent, string[]> = {
+  "想靠近": ["想凑近", "靠近一点", "慢慢来"],
+  "想观察": ["先看看", "还在观察", "不着急"],
+  "想玩": ["想玩了", "玩心上来了", "有点好奇"],
+  "想抓": ["想伸爪", "准备出爪", "盯着目标"],
+  "想等待": ["等一等", "还在等", "不着急"],
+  "想让主人参与": ["等你回应", "叫你加入", "想和你一起"],
+  "想自己处理": ["自己来", "先让我试试", "有小主意"],
+  "想保持距离": ["先别靠近", "留点距离", "慢慢来"],
+  "想休息": ["想歇会儿", "休息一下", "先不打扰"],
+  "想获得关注": ["看看我", "等你理我", "求关注"],
+};
+
+function normalizeVoiceTags(values: unknown[], profile: CatProfile) {
+  return values
+    .filter((value): value is string => typeof value === "string")
+    .map((value) => {
+      const cleaned = cleanLabelText(simplifyNekoCopy(normalizeCatFacts(value, profile)));
+      // Preserve already-natural short scene facts. Persona-oriented rewrites
+      // would otherwise turn e.g. “视线朝前” into the unrelated “待在附近”.
+      if (
+        charLength(cleaned) >= 2 &&
+        charLength(cleaned) <= VOICE_TAG_MAX_CHARACTERS &&
+        !hasJargonLabel(cleaned)
+      ) {
+        return cleaned;
+      }
+      return normalizeNaturalLabel(value, profile, Number.MAX_SAFE_INTEGER);
+    })
+    .map((value) => shortVoiceTagReplacements[value] ?? value)
+    .filter((value, index, list) =>
+      charLength(value) >= 2 &&
+      charLength(value) <= VOICE_TAG_MAX_CHARACTERS &&
+      list.indexOf(value) === index,
+    );
+}
+
 function normalizeVoiceForProfile(
   input: {
     text?: unknown;
@@ -2685,16 +2712,23 @@ function normalizeVoiceForProfile(
     location?: unknown;
     sceneTags?: unknown;
     tags?: unknown;
+    currentIntent?: unknown;
   },
   profile: CatProfile,
   imageDataUrl?: string | null,
 ): Voice {
-  const generatedSceneTags = normalizeSceneTags(input.sceneTags ?? input.tags);
-  const mood = normalizeCatFacts(input.mood, profile, "想被关注");
-  const sceneTags =
-    generatedSceneTags.length === 3
-      ? generatedSceneTags
-      : ["看着眼前", "保持原位", "正在观望中"];
+  const intent = asText(input.currentIntent ?? input.mood) as VoiceCurrentIntent;
+  const fallbackTags = VOICE_CURRENT_INTENTS.includes(intent)
+    ? voiceIntentTagFallbacks[intent]
+    : [];
+  // An overlong tag must not cause another model call or become half a phrase.
+  // Use the already inferred intent; legacy/missing intent gets neutral labels.
+  const generatedTags = Array.isArray(input.sceneTags) ? input.sceneTags : input.tags;
+  const sceneTags = normalizeVoiceTags([
+    ...(Array.isArray(generatedTags) ? generatedTags : []),
+    ...fallbackTags,
+    "这一刻", "日常片段", "随手记录",
+  ], profile).slice(0, 3);
   const rawAnalysis =
     input.analysis && typeof input.analysis === "object"
       ? (input.analysis as Record<string, unknown>)
@@ -3403,6 +3437,7 @@ function validatePersonaInput(input: unknown): PersonaInput {
   if (data.imageDataUrl && data.imageDataUrl.length > 8_000_000) throw new Error("image too large");
   return {
     ...data,
+    questionnaireVersion: data.questionnaireVersion === "ios-v1" ? "ios-v1" : "web-v1",
     // Filter before constructing either prompt, not merely after generation.
     previousPersona: previousPersonaForIdenticalQuiz(data),
     videoObservations: normalizeVideoObservationsInput(data.videoObservations, data.profile),
@@ -3575,6 +3610,7 @@ function personaInputSnapshot(
 ): JsonValue {
   return toJsonValue({
     profile: data.profile,
+    questionnaireVersion: data.questionnaireVersion ?? "web-v1",
     questionnaireAnswers: data.profile.quiz ?? {},
     behaviorProfile,
     imageObservations: {
@@ -3616,6 +3652,8 @@ function stage1Prompt(data: PersonaInput, behaviorProfile: PersonaBehaviorProfil
 输入：
 猫咪资料：${JSON.stringify(data.profile)}
 原始问卷答案：${JSON.stringify(data.profile.quiz ?? {})}
+问卷版本：${data.questionnaireVersion ?? "web-v1"}
+问卷题目与所选答案（这是选项含义的唯一依据）：${JSON.stringify(questionnaireAnswersForPrompt(data.profile.quiz, data.questionnaireVersion))}
 规则化 Behavior Profile：${JSON.stringify(behaviorProfile)}
 照片状态：${data.imageDataUrl ? "已提供；只能支持当下可见事实，不能支持长期习惯" : "未提供"}
 结构化视频观察：${JSON.stringify(data.videoObservations ?? [])}
@@ -3637,6 +3675,8 @@ function stage1Prompt(data: PersonaInput, behaviorProfile: PersonaBehaviorProfil
 4. 不要为了凑完整人格而创造 trait。
 5. 禁止把固定时间、固定路线、每天按点、生活秩序严格、主人不在时一定怎样等长期频率事实写成结论；出现这类内容必须进入 unsupportedClaims。
 6. previousPersona 仅在两次问卷答案完全一致时提供；提供时保持上一版 MBTI。未提供时必须独立判断，不猜测或沿用历史人格。
+7. 原始问卷键从 0 开始，证据引用统一使用上方 reference（Q1 对应键 0）。只引用真实已选答案；answer/reference 为 null 表示未回答，不能作为证据，也不能猜测选项含义。
+8. 判断依据是所选答案的具体意思，不是“回答过这道题”。同一题及其派生分数只算一个信号；“亲近但有边界”等复合特征必须分别有支持两部分的证据。不要把“独自待着”解释为高依恋，不要把“安静共处”解释为互动玩耍。
 
 输出严格 JSON，不要 Markdown：
 {
@@ -3652,9 +3692,9 @@ function stage1Prompt(data: PersonaInput, behaviorProfile: PersonaBehaviorProfil
   },
   "coreTraits": [
     {
-      "trait": "主动亲近",
-      "description": "它会主动靠近主人，但不一定喜欢持续身体接触",
-      "supportedBy": ["Q3:A", "Q6:A"],
+      "trait": "有证据支持的特征",
+      "description": "只解释所引用证据真正支持的含义",
+      "supportedBy": ["复制第一条实际 reference 或视频证据编号", "复制另一独立信号的实际 reference 或视频证据编号"],
       "confidence": 0.86
     }
   ],
@@ -4180,7 +4220,7 @@ export async function generateCatPersonaServer(input: PersonaInput, trace = new 
       modelAttempts: trace.modelAttempts, completedStages: stageLogs.length, errorCategory: performanceErrorCategory(error) });
     console.error("NEKO persona pipeline failed", error);
     if (await shouldRequireRealAI()) throw new Error(getUserFacingAIMessage("persona", error));
-    const fallback = buildStablePersona(data.profile);
+    const fallback = buildStablePersona(data.profile, data.questionnaireVersion);
     fallback.questionnaireAnswers = quizAnswersFromJson(data.profile.quiz ?? {}) ?? undefined;
     if (await shouldExposePersonaDebug()) {
       fallback.generation = {
@@ -4271,12 +4311,11 @@ ${data.scene || "无补充场景"}
 - analysis.personalityInterpretation：只做克制联系；没有人格或证据冲突时明确保守，不强行贴标签。
 - 两段 AI 解读不得复述或改写 voiceLine。
 - mood：2–6 字，描述当前行为状态。
-- sceneTags：严格 3 个、不带 #。前 2 个只描述图片中可见的当前动作或姿态，第 3 个是由当下画面合理支持的轻度拟人状态。
-- 每个 sceneTag 为 4–8 个中文字符，最多 10 字；只能是短标签，禁止完整句。
-- 禁止长期人格、MBTI、空泛性格词；三个标签不得语义重复，也不得复述 AI 解读。
-- 必须能从当前图片直接确认或克制推断，不允许为了有趣补写画面里没有的动作、物体或心理。
+- sceneTags：严格 3 个、不带 #，每个 2–${VOICE_TAG_MAX_CHARACTERS} 个字，最多 ${VOICE_TAG_MAX_CHARACTERS} 个字；只写有画面或场景依据的动作、状态或小心思，标签之间不要重复意思，不强凑反差。
+- 标签用日常口语，读一遍就懂；允许轻微俏皮，禁止生造词、书面堆砌、拟人职业头衔，禁止把两句话压成一串词。例如玩毛球时可写「盯上毛球」「准备出爪」「想玩了」，休息时可写「犯困了」「歇一会儿」。只学表达方式，不能把示例事实套到当前画面。
+- 不要写「文静脸庞猎手心」「端坐蓄势待发」这类需要猜意思的标签；超长就换成完整短语，不能截半句或加省略号。
 
-严格返回符合 schema 的 JSON，不要 Markdown。输出前自检：意图是否有可见证据、心声是否换只猫也成立、是否把人格写成事实、是否出现 AI 造词、AI 解读合计是否超过 ${VOICE_ANALYSIS_GENERATION_MAX_CHARACTERS} 字；任一不合格就重写。`;
+严格返回符合 schema 的 JSON，不要 Markdown。输出前自检：意图是否有可见证据、心声是否换只猫也成立、是否把人格写成事实、是否出现 AI 造词、每个标签是否都在 ${VOICE_TAG_MAX_CHARACTERS} 字以内且一读就懂、AI 解读合计是否超过 ${VOICE_ANALYSIS_GENERATION_MAX_CHARACTERS} 字；任一不合格就在本次输出前改好。`;
   try {
     const result = await callFirstAvailableJson<VoiceGenerationOutput>(
       (provider) => [

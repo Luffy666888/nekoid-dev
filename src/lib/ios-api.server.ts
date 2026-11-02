@@ -236,7 +236,12 @@ async function handleIOSAPIRequestInternal(request: Request, env: unknown, trace
 
     if (url.pathname === "/api/ios/onboarding/persona") {
       const result = await generateCatPersonaServer(
-        body as Parameters<typeof generateCatPersonaServer>[0],
+        {
+          ...(body as Parameters<typeof generateCatPersonaServer>[0]),
+          // Existing iOS clients send only answer letters. Resolve their wording
+          // server-side; never interpret them using the different web choices.
+          questionnaireVersion: "ios-v1",
+        },
         trace,
       );
       return jsonResponse({ ok: true, data: result });

@@ -49,6 +49,150 @@ const candidate = {
   tags: ["看着眼前", "先看再动", "还没着急"],
 };
 
+test("voice tags keep complete 2–5-character phrases, dedupe, and never truncate long labels", () => {
+  const api = loadAIServer("neko-ai", { internals: ["normalizeVoiceTags", "VOICE_JSON_SCHEMA"] });
+  const tags = api.normalizeVoiceTags([
+    " 玩 ", "#等你一起玩", "等你一起玩", "想看看再出爪", "准备出爪",
+    "文静脸庞猎手心", "𠮷猫看球", "AI", "视线朝前", null, 123, {},
+  ], profile);
+  assert.deepEqual(Array.from(tags), ["等你一起玩", "准备出爪", "𠮷猫看球", "AI", "视线朝前"]);
+  assert.ok(tags.every((tag) => length(tag) >= 2 && length(tag) <= 5));
+  assert.ok(!tags.includes("想看看再出"));
+  assert.equal(api.VOICE_JSON_SCHEMA.properties.sceneTags.items.maxLength, 5);
+  assert.equal(api.VOICE_JSON_SCHEMA.properties.sceneTags.items.minLength, 2);
+  assert.ok(api.VOICE_JSON_SCHEMA.required.includes("sceneTags"));
+  assert.equal(api.VOICE_JSON_SCHEMA.properties.tags, undefined);
+});
+
+test("the reported long tags fall back to the current intent in both detail and share output", () => {
+  const api = loadAIServer("neko-ai", { internals: ["normalizeVoiceForProfile"] });
+  const result = api.normalizeVoiceForProfile({
+    ...candidate,
+    currentIntent: "想抓",
+    tags: ["盯紧半空毛球", "端坐蓄势待发", "文静脸庞猎手心"],
+    share: { tags: ["文静脸庞猎手心", "这条分享标签也很长"] },
+  }, profile);
+  assert.deepEqual(Array.from(result.tags), ["想伸爪", "准备出爪", "盯着目标"]);
+  assert.deepEqual(Array.from(result.sceneTags), Array.from(result.tags));
+  assert.deepEqual(Array.from(result.share.tags), Array.from(result.tags));
+  assert.equal(result.analysis.observation, candidate.analysis.observation);
+  assert.equal(result.analysis.personalityInterpretation, candidate.analysis.personalityInterpretation);
+});
+
+test("sceneTags is canonical while legacy tags remain readable and all output aliases agree", () => {
+  const api = loadAIServer("neko-ai", { internals: ["normalizeVoiceForProfile"] });
+  const shortTags = ["看球", "想玩了", "准备出爪"];
+  for (const fields of [
+    { sceneTags: shortTags },
+    { tags: shortTags },
+    { sceneTags: shortTags, tags: ["旧的标签"] },
+    { sceneTags: null, tags: shortTags },
+    { sceneTags: "invalid", tags: shortTags },
+  ]) {
+    const result = api.normalizeVoiceForProfile({ ...candidate, ...fields }, profile);
+    assert.deepEqual(Array.from(result.sceneTags), shortTags);
+    assert.deepEqual(Array.from(result.tags), shortTags);
+    assert.deepEqual(Array.from(result.share.tags), shortTags);
+  }
+});
+
+test("every intent and malformed tag list produces three short unique tags, with neutral defaults for missing intent", () => {
+  const api = loadAIServer("neko-ai", {
+    internals: ["normalizeVoiceForProfile", "VOICE_CURRENT_INTENTS"],
+  });
+  for (const currentIntent of [...api.VOICE_CURRENT_INTENTS, undefined, "not-an-intent"]) {
+    for (const tags of [undefined, "invalid", [], [null, 123, {}], ["歇一会儿", "歇一会儿", "长".repeat(50)]]) {
+      const result = api.normalizeVoiceForProfile({
+        ...candidate, currentIntent, mood: "", tags, share: { tags: [null, "歇一会儿"] },
+      }, profile);
+      for (const values of [result.sceneTags, result.tags, result.share.tags]) {
+        assert.equal(values.length, 3);
+        assert.equal(new Set(values).size, 3);
+        assert.ok(values.every((tag) => length(tag) >= 2 && length(tag) <= 5));
+      }
+    }
+  }
+  const neutral = api.normalizeVoiceForProfile({ ...candidate, currentIntent: undefined, tags: [], mood: "" }, profile);
+  assert.deepEqual(Array.from(neutral.tags), ["这一刻", "日常片段", "随手记录"]);
+});
+
+for (const field of ["sceneTags", "tags"]) {
+  test(`${field}: malformed, long or stylistically imperfect labels never cause a model retry`, async () => {
+    const cases = [
+      undefined, "invalid", [], [null, 123, {}], ["只有一个"],
+      ["观察", "想玩了", "准备出爪"],
+      ["盯紧半空毛球", "端坐蓄势待发", "文静脸庞猎手心"],
+      ["#看着眼前", "等你一起玩", "AI"],
+      ["慢热", "温柔", "独立"],
+      ["先看看", "先看看", "先看一看"],
+      ["准备出爪", "想玩了", "趴在地上"],
+      ["猫坐着看", "先观察", "还在观察"],
+    ];
+    for (const values of cases) {
+      let calls = 0;
+      const generation = loadAIServer("neko-ai", {
+        env: {
+          AI_PROVIDER: "bytecat", AI_REQUIRE_REAL: "true", BYTECAT_API_KEY: "test-key",
+          BYTECAT_MODEL: "first", BYTECAT_TEXT_FALLBACK_MODELS: "second",
+        },
+        logger: { info() {}, error() {} },
+        fetch: async () => {
+          calls++;
+          return Response.json({ choices: [{ message: { content: JSON.stringify({
+            ...candidate, tags: undefined, [field]: values,
+          }) } }] });
+        },
+      });
+      const result = await generation.generateCatVoiceServer({ profile, persona: null });
+      assert.equal(calls, 1, JSON.stringify(values));
+      assert.equal(result.sceneTags.length, 3);
+      assert.equal(new Set(result.sceneTags).size, 3);
+      assert.ok(result.sceneTags.every((tag) => length(tag) >= 2 && length(tag) <= 5));
+      assert.deepEqual(Array.from(result.tags), Array.from(result.sceneTags));
+      assert.deepEqual(Array.from(result.share.tags), Array.from(result.sceneTags));
+      assert.equal(result.text, candidate.voiceLine);
+      assert.equal(result.analysis.observation, candidate.analysis.observation);
+      assert.equal(result.analysis.personalityInterpretation, candidate.analysis.personalityInterpretation);
+    }
+  });
+}
+
+test("an overlong tag alone does not retry the model or change the voice and analysis", async () => {
+  let calls = 0;
+  const generation = loadAIServer("neko-ai", {
+    env: {
+      AI_PROVIDER: "bytecat",
+      AI_REQUIRE_REAL: "true",
+      BYTECAT_API_KEY: "test-key",
+      BYTECAT_MODEL: "first",
+      BYTECAT_TEXT_FALLBACK_MODELS: "second",
+    },
+    logger: { info() {}, error() {} },
+    fetch: async (_url, init) => {
+      calls++;
+      const prompt = JSON.parse(init.body).messages[1].content[0].text;
+      assert.match(prompt, /每个 2–5 个字，最多 5 个字/);
+      assert.match(prompt, /不强凑反差/);
+      assert.match(prompt, /日常口语/);
+      assert.match(prompt, /禁止生造词/);
+      assert.match(prompt, /不能截半句/);
+      assert.doesNotMatch(prompt, /每个 4–10 字/);
+      return Response.json({
+        choices: [{ message: { content: JSON.stringify({
+          ...candidate, tags: ["看着眼前", "这条标签太长了", "还没着急"],
+        }) } }],
+      });
+    },
+  });
+  const result = await generation.generateCatVoiceServer({ profile, persona: null });
+  assert.equal(calls, 1);
+  assert.deepEqual(Array.from(result.tags), ["看着眼前", "还没着急", "先看看"]);
+  assert.deepEqual(Array.from(result.share.tags), Array.from(result.tags));
+  assert.equal(result.text, candidate.voiceLine);
+  assert.equal(result.analysis.observation, candidate.analysis.observation);
+  assert.equal(result.analysis.personalityInterpretation, candidate.analysis.personalityInterpretation);
+});
+
 test("generation accepts 80 characters and retries 81 with the full short sentences intact", async () => {
   const api = loadAIServer("neko-ai", { internals: ["inspectVoiceGenerationOutput"] });
   const exact = { observation: "看".repeat(39), personalityInterpretation: "想".repeat(40) };
@@ -249,6 +393,7 @@ test("Gemini receives the same five style examples in its native system instruct
       assert.equal((system.match(/<example id=/g) ?? []).length, 5);
       assert.match(system, /只学语气，不借用事实/);
       assert.match(JSON.stringify(request.contents), /两项合计不超过 80 个字符/);
+      assert.equal(request.generationConfig.responseJsonSchema.properties.sceneTags.items.maxLength, 5);
       assert.ok(
         request.contents.some(({ parts }) =>
           parts.some(({ inlineData }) => inlineData?.data === "aW1hZ2U="),
