@@ -1,0 +1,6 @@
+[Unit]
+Description=Rotate NEKO.ID performance logs only
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/logrotate --state /var/lib/logrotate/nekoid-performance.status /etc/nekoid/performance-logrotate.conf

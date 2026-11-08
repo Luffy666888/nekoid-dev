@@ -135,6 +135,87 @@ script can still request a certificate without it.
 
 ## Verify
 
+### Performance logs / Volcengine TLS
+
+The China-only Node preload `performance-log-preload.mjs` mirrors the existing
+`NEKO perf` events to `/var/log/nekoid/performance.jsonl`. It does not change the
+application bundle, model calls, prompts, responses, production env file, Nginx,
+iOS, or Cloudflare. Original journal output is preserved. An allowlist excludes
+arbitrary debug messages, prompts, results, media URLs, credentials and user IDs.
+Each accepted event gets a UTC `timestamp`, `schemaVersion`, `service` and
+`deployment`; request/flow UUIDs and diagnostic metrics are retained.
+
+Run offline checks before uploading this add-on:
+
+```sh
+node --test scripts/test-performance-log-sink.mjs scripts/test-performance-trace.mjs
+bash -n deploy/china/install-performance-logging.sh
+```
+
+Copy the five add-on files plus `install-performance-logging.sh` from this directory
+to a private staging directory on the verified domestic host (no env files).
+Run as root, passing that host's actual private IP:
+
+```sh
+bash install-performance-logging.sh EXPECTED_PRIVATE_IP
+```
+
+The installer checks the target, backs up only its own config files under
+`/var/backups/nekoid-observability-*`, and installs a systemd drop-in at
+`/etc/systemd/system/nekoid.service.d/20-performance-log.conf`. It restarts only
+`nekoid`, verifies local health and rolls back config on failure. It does not
+replace `/opt/nekoid/current` or `/etc/nekoid/nekoid.env`. Later normal app deploys
+retain this drop-in. Inspect it when intentionally changing the Node launch path.
+
+Logs are mode 0640 in a 0750 directory; the existing root LogCollector can read
+them. A dedicated hourly timer runs logrotate: daily or above 10 MiB at the next
+check, seven rotated files, delayed compression, rename/create (not copytruncate).
+Each batch reopens the current path. To bound failure impact, the sink buffers at
+most 512 KiB plus one batch; files stop growing at 64 MiB until rotation. IO errors
+drop events with a rate-limited fixed warning in journald and retry after 30 s.
+Logging is best-effort (including abrupt process termination), not an audit log;
+watch sink warnings and collector health before trusting success-rate statistics.
+
+TLS configuration (reuse the existing Shanghai resources):
+
+- Project `nekoid-prod`: `669d7d3b-c802-4eb5-96db-c89871441541`.
+- Topic `nekoid-perf`: `0c7be2b8-ea47-4540-aea7-7f16ee779057`.
+- Group `nekoid-china`: `6d3a58b3-125c-423e-b908-879a4e8bad90`.
+- Host file collection, JSON mode, exact path `/var/log/nekoid/performance.jsonl`.
+  Do not collect the entire journal, app stdout, env files or rotated files via a
+  broad wildcard. Do not create overlapping collection rules for this file.
+- Configure key-value indexes with statistics enabled for `event`, `operation`,
+  `requestId`, `flowId`, `stage`, `outcome`, `errorCategory`, `model` (text), and
+  `durationMs`, `elapsedMs`, `httpStatus`, `attempt`, `modelAttempts`, `modelRetries`,
+  `timeoutMs`, `headersMs`, `bodyMs` (long). Configure indexes before validation.
+- HTTP success is not end-to-end user success or proof of a non-fallback AI result.
+  For persona diagnostics, compare `persona_start`/`persona_end`, stage failures
+  and `http_end` by request ID. Missing terminal events must not count as success.
+  iOS-only network failures still need separate client telemetry later.
+
+Integration checkpoint (2026-11-06, China only): the add-on is installed, the
+application release is unchanged, local/public health checks pass, and a malformed
+JSON diagnostic request produced `http_start`, `span_end` and `http_end` in the
+JSONL file without invoking an AI model. The 17 topic indexes above were saved
+in the console. **The application collection rule is not yet created/bound;
+cloud ingestion and success-rate queries are not yet verified.** The existing
+ECS role returned `403 AccessDenied` for the read-only TLS `DescribeIndex` API;
+do not expand its permissions just to finish setup.
+
+Finish in TLS console > 日志接入 > LogCollector 日志采集: create a host-file
+rule named `nekoid-performance-json`, choose the project/topic/group above, JSON
+mode, directory `/var/log/nekoid`, file `performance.jsonl` (or the full exact
+path if the form has one path field). Leave historical backfill off and use
+collection time initially. After binding, generate a fresh diagnostic request
+and verify all three events by its request ID in TLS. The earlier diagnostic
+request `40d33c8e-73fc-45d2-92a5-22c449d53011` returned the expected HTTP 400;
+it is not a real generation failure and must not be treated as one in reports.
+
+Rollback this add-on without changing application code: disable its timer; move
+`20-performance-log.conf` out of the `.service.d` directory (or restore the prior
+copy from the installer backup), run `systemctl daemon-reload`, then restart
+`nekoid` and check health. Preserve log files and backups for investigation.
+
 ### Dedicated App Review phone login
 
 The existing iOS phone/OTP endpoints support **one opt-in review account**. Normal
