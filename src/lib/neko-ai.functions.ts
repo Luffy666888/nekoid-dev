@@ -2906,17 +2906,17 @@ function getUserFacingAIMessage(kind: "persona" | "voice" | "video", error: unkn
 }
 
 const BYTECAT_DEFAULT_TEXT_MODELS = [
+  "gpt-6.1-sol",
+  "gpt-5.6-sol",
   "gemini-3.7-flash",
   "gemini-3-flash-preview",
-  "gpt-5.6-sol",
-  "gpt-5.5",
 ] as const;
 
 const BYTECAT_DEFAULT_VISION_MODELS = [
+  "gpt-6.1-sol",
+  "gpt-5.6-sol",
   "gemini-3.7-flash",
   "gemini-3-flash-preview",
-  "gpt-5.6-sol",
-  "gpt-5.5",
 ] as const;
 
 const MAX_VIDEO_ANALYSIS_FRAMES = 4;
@@ -2994,8 +2994,8 @@ async function getProviderModel(provider: AIProvider, mode: "text" | "vision" = 
     return mode === "vision"
       ? (await getServerEnv("BYTECAT_VISION_MODEL")) ||
           (await getServerEnv("BYTECAT_MODEL")) ||
-          "gpt-5.6-terra"
-      : (await getServerEnv("BYTECAT_MODEL")) || "gpt-5.6-luna";
+          BYTECAT_DEFAULT_VISION_MODELS[0]
+      : (await getServerEnv("BYTECAT_MODEL")) || BYTECAT_DEFAULT_TEXT_MODELS[0];
   }
   return mode === "vision"
     ? (await getServerEnv("OPENAI_VISION_MODEL")) ||

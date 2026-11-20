@@ -11,8 +11,8 @@ const env = {
   BYTECAT_GEMINI_BASE_URL: "https://gemini.example/v1beta/",
   BYTECAT_MODEL: "gpt-5.6-luna",
   BYTECAT_VISION_MODEL: "gpt-5.6-terra",
-  BYTECAT_TEXT_FALLBACK_MODELS: "gemini-3.7-flash",
-  BYTECAT_VISION_FALLBACK_MODELS: "gemini-3.7-flash",
+  BYTECAT_TEXT_FALLBACK_MODELS: "gemini-3.7-flash,gemini-3-flash-preview",
+  BYTECAT_VISION_FALLBACK_MODELS: "gemini-3.7-flash,gemini-3-flash-preview",
 };
 const logger = { info() {}, error() {} };
 const imageDataUrl = "data:image/png;base64,aW1hZ2U=";
@@ -227,12 +227,12 @@ test("primary deadline is shorter while backups retain their full deadline", asy
   assert.equal(await short.getChatTimeoutMs("bytecat", "vision", undefined, "gpt-5.6-terra"), 1000);
 });
 
-test("both text and vision have all four requested backups without duplicates", async () => {
+test("both text and vision include the current model candidates without duplicates", async () => {
   for (const name of ["catface", "neko-ai"]) {
     const api = loadAIServer(name, { env, internals: ["getProviderModels"] });
     for (const mode of name === "neko-ai" ? ["text", "vision"] : ["vision"]) {
       const models = await api.getProviderModels("bytecat", mode);
-      for (const model of ["gpt-5.6-sol", "gpt-5.5", "gemini-3-flash-preview", "gemini-3.7-flash"])
+      for (const model of ["gpt-6.1-sol", "gpt-5.6-sol", "gemini-3.7-flash", "gemini-3-flash-preview"])
         assert.ok(models.includes(model), `${name} ${mode} ${model}`);
       assert.equal(new Set(models).size, models.length);
     }
@@ -1481,21 +1481,30 @@ for (const personaMode of ["without persona", "with persona"]) {
   });
 }
 
-test("default generation and detection order tries both Gemini backups before other GPTs", async () => {
-  const defaultEnv = {
-    ...env,
-    BYTECAT_TEXT_FALLBACK_MODELS: "",
-    BYTECAT_VISION_FALLBACK_MODELS: "",
-  };
-  for (const name of ["neko-ai", "catface"]) {
-    const api = loadAIServer(name, { env: defaultEnv, internals: ["getProviderModels"] });
-    for (const mode of name === "neko-ai" ? ["text", "vision"] : ["vision"]) {
-      const models = await api.getProviderModels("bytecat", mode);
-      assert.deepEqual(Array.from(models.slice(0, 3)), [
-        mode === "text" ? "gpt-5.6-luna" : "gpt-5.6-terra",
-        "gemini-3.7-flash",
-        "gemini-3-flash-preview",
-      ]);
+test("default generation and detection order prioritizes GPT 6.1 then GPT 5.6 before Gemini", async () => {
+  const expectedModels = [
+    "gpt-6.1-sol",
+    "gpt-5.6-sol",
+    "gemini-3.7-flash",
+    "gemini-3-flash-preview",
+  ];
+  for (const defaultEnv of [
+    {},
+    {
+      BYTECAT_MODEL: "gpt-6.1-sol",
+      BYTECAT_VISION_MODEL: "gpt-6.1-sol",
+      BYTECAT_CATFACE_MODEL: "gpt-6.1-sol",
+      BYTECAT_TEXT_FALLBACK_MODELS: expectedModels.slice(1).join(","),
+      BYTECAT_VISION_FALLBACK_MODELS: expectedModels.slice(1).join(","),
+      BYTECAT_CATFACE_FALLBACK_MODELS: expectedModels.slice(1).join(","),
+    },
+  ]) {
+    for (const name of ["neko-ai", "catface"]) {
+      const api = loadAIServer(name, { env: defaultEnv, internals: ["getProviderModels"] });
+      for (const mode of name === "neko-ai" ? ["text", "vision"] : ["vision"]) {
+        const models = await api.getProviderModels("bytecat", mode);
+        assert.deepEqual(Array.from(models), expectedModels);
+      }
     }
   }
 });

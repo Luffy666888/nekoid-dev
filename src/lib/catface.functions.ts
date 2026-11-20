@@ -127,10 +127,10 @@ function getUserFacingCatFaceFailure(error: unknown) {
 }
 
 const BYTECAT_DEFAULT_VISION_MODELS = [
+  "gpt-6.1-sol",
+  "gpt-5.6-sol",
   "gemini-3.7-flash",
   "gemini-3-flash-preview",
-  "gpt-5.6-sol",
-  "gpt-5.5",
 ] as const;
 
 function parseModelList(value?: string | null) {
@@ -241,7 +241,7 @@ async function getProviderModel(provider: AIProvider) {
       (await getServerEnv("BYTECAT_CATFACE_MODEL")) ||
       (await getServerEnv("BYTECAT_VISION_MODEL")) ||
       (await getServerEnv("BYTECAT_MODEL")) ||
-      "gpt-5.5"
+      BYTECAT_DEFAULT_VISION_MODELS[0]
     );
   return (
     (await getServerEnv("OPENAI_VISION_MODEL")) ||

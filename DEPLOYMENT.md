@@ -31,12 +31,12 @@ BYTECAT_BASE_URL=https://www.bytecatcode.org/v1
 BYTECAT_GEMINI_BASE_URL=https://bytecat.lamclod.cn
 # Dedicated token for the Gemini endpoint. Keep the real value server-only.
 BYTECAT_GEMINI_API_KEY=...
-BYTECAT_MODEL=gemini-3.7-flash
-BYTECAT_VISION_MODEL=gemini-3.7-flash
-BYTECAT_CATFACE_MODEL=gemini-3.7-flash
-BYTECAT_CATFACE_FALLBACK_MODELS=
-BYTECAT_TEXT_FALLBACK_MODELS=
-BYTECAT_VISION_FALLBACK_MODELS=
+BYTECAT_MODEL=gpt-6.1-sol
+BYTECAT_VISION_MODEL=gpt-6.1-sol
+BYTECAT_CATFACE_MODEL=gpt-6.1-sol
+BYTECAT_CATFACE_FALLBACK_MODELS=gpt-5.6-sol,gemini-3.7-flash,gemini-3-flash-preview
+BYTECAT_TEXT_FALLBACK_MODELS=gpt-5.6-sol,gemini-3.7-flash,gemini-3-flash-preview
+BYTECAT_VISION_FALLBACK_MODELS=gpt-5.6-sol,gemini-3.7-flash,gemini-3-flash-preview
 BYTECAT_CATFACE_TIMEOUT_MS=15000
 BYTECAT_PRIMARY_TIMEOUT_MS=30000
 BYTECAT_TEXT_TIMEOUT_MS=30000
@@ -48,6 +48,12 @@ SUPABASE_PUBLISHABLE_KEY=...
 SUPABASE_SECRET_KEY=...
 SUPABASE_JWKS_URL=https://jbjgrkivscrombvnlcrl.supabase.co/auth/v1/.well-known/jwks.json
 ```
+
+The current ByteCat priority for text generation, image/video analysis, and cat detection is
+`gpt-6.1-sol` → `gpt-5.6-sol` → `gemini-3.7-flash` → `gemini-3-flash-preview`.
+Explicit model environment variables take precedence over code defaults. Update all six
+model variables above when changing an existing deployment; changing code alone does not
+replace an old primary model stored in Worker secrets or the China server environment.
 
 Upload or refresh secrets for the Worker:
 
@@ -89,7 +95,7 @@ its production history version is `20260912130236`.
 
 - GPT models use `BYTECAT_BASE_URL` with `/chat/completions` and a Bearer token.
 - Gemini models use `BYTECAT_GEMINI_BASE_URL` with `/v1beta/models/{model}:generateContent` and `x-goog-api-key`. The dedicated Gemini token resolved the earlier “no available channel” responses.
-- All four requested backups have returned valid text and cat detection results. Upstream latency varies; see [local test results](docs/bytecat-local-testing.md) for business-level results and limitations.
+- The earlier backup models returned valid text and cat detection results in the 2026-09-12 tests. Those historical results do not verify current model availability or `gpt-6.1-sol`; see [local test results](docs/bytecat-local-testing.md) for the recorded results and limitations.
 - The configured primary model has an 8-second deadline. Text backups have an 18-second deadline, and image generation backups have a 22-second deadline. Cat detection uses 20 seconds for a face and 8 seconds for presence; the primary deadline can shorten these. Each deadline includes receiving the response body.
 - Failed, empty, truncated or invalid responses advance to the next model. Gemini thought parts are excluded from the answer. Presence detection retains its permissive result only after all configured candidates fail.
 - Keep Gemini secrets out of `VITE_*` variables. Run `pnpm test:ai` for offline regressions and `pnpm test:ai:live` for real ByteCat tests using `.env.local` (these consume API quota).
